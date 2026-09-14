@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Pengaturan dasar untuk memperhalus tampilan (Opsional tapi direkomendasikan) */
+@layer base {
+  html {
+    /* Membuat efek scroll halus saat tombol navbar diklik */
+    scroll-behavior: smooth; 
+  }
+  
+  body {
+    /* Memastikan font terlihat tajam dan tidak bergerigi */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* ========================================== */
+  /* KUSTOMISASI SCROLLBAR (Tampilan Modern)    */
+  /* ========================================== */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: #fafafa; 
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #d4d4d8; 
+    border-radius: 10px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: #E87F24; /* Warna oranye Duluin saat di-hover */
+  }
+}
