@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, ArrowRight, Menu, X, Briefcase } from 'lucide-react';
+import { Zap, ArrowRight, Menu, X, Store } from 'lucide-react';
 
-export default function Navbar({ onOpenRegister, onOpenLogin, onOpenCareers }) {
+export default function Navbar({ onOpenRegister, onOpenLogin, onOpenApp }) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('beranda');
 
@@ -37,7 +37,7 @@ export default function Navbar({ onOpenRegister, onOpenLogin, onOpenCareers }) {
             <Zap className="text-white fill-white" size={16} />
           </div>
           <span className="text-xl font-black tracking-tight text-zinc-900">
-            RecruitIn<span className="text-[#E87F24]">.</span>
+            Stocko<span className="text-[#E87F24]">.</span>
           </span>
         </div>
 
@@ -66,7 +66,7 @@ export default function Navbar({ onOpenRegister, onOpenLogin, onOpenCareers }) {
           </a>
 
           <a 
-            href="#" 
+            href="#harga" 
             onClick={() => setActiveSection('harga')}
             className={`transition-colors relative py-1 ${activeSection === 'harga' ? 'text-[#E87F24]' : 'hover:text-[#E87F24]'}`}
           >
@@ -78,12 +78,12 @@ export default function Navbar({ onOpenRegister, onOpenLogin, onOpenCareers }) {
 
           <a href="#" className="hover:text-[#E87F24] transition-colors py-1">Tentang Duluin</a>
 
-          {/* Tombol Pintasan ke Job Board Publik */}
+          {/* Tombol Pintasan ke Simulasi POS */}
           <button 
-            onClick={onOpenCareers}
-            className="text-[#E87F24] hover:text-[#c96a1a] transition-colors py-1 flex items-center gap-1.5 cursor-pointer bg-orange-50 px-3 py-1 rounded-full border border-orange-200 shadow-sm text-xs"
+            onClick={onOpenApp}
+            className="text-[#E87F24] hover:text-[#c96a1a] transition-colors py-1 flex items-center gap-1.5 cursor-pointer bg-orange-50 px-3 py-1.5 rounded-full border border-orange-200 shadow-sm text-xs"
           >
-            <Briefcase size={13} /> Lowongan Kerja
+            <Store size={13} /> Simulasi POS
           </button>
         </div>
 
@@ -99,7 +99,7 @@ export default function Navbar({ onOpenRegister, onOpenLogin, onOpenCareers }) {
             onClick={onOpenRegister}
             className="bg-gradient-to-r from-[#E87F24] to-[#FFC81E] hover:from-[#c96a1a] hover:to-[#e6b419] text-zinc-950 font-black text-xs sm:text-sm px-6 py-2.5 rounded-full shadow-lg transition-transform hover:scale-105 shrink-0 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
           >
-            Hubungi Sales <ArrowRight size={16} />
+            Coba Gratis <ArrowRight size={16} />
           </button>
         </div>
 
@@ -118,14 +118,14 @@ export default function Navbar({ onOpenRegister, onOpenLogin, onOpenCareers }) {
           >
             <a href="#" onClick={() => setIsOpen(false)} className="font-bold hover:text-[#E87F24]">Beranda</a>
             <a href="#fitur" onClick={() => setIsOpen(false)} className="font-bold hover:text-[#E87F24]">Fitur</a>
-            <a href="#" onClick={() => setIsOpen(false)} className="font-bold hover:text-[#E87F24]">Harga</a>
+            <a href="#harga" onClick={() => setIsOpen(false)} className="font-bold hover:text-[#E87F24]">Harga</a>
             <a href="#" onClick={() => setIsOpen(false)} className="font-bold hover:text-[#E87F24]">Tentang Duluin</a>
             
             <button 
-              onClick={() => { setIsOpen(false); onOpenCareers?.(); }}
+              onClick={() => { setIsOpen(false); onOpenApp?.(); }}
               className="font-bold text-left hover:text-[#E87F24] flex items-center gap-2 text-orange-600"
             >
-              <Briefcase size={16} /> Lowongan Kerja (Job Board)
+              <Store size={16} /> Buka Simulasi POS
             </button>
 
             <button 
@@ -139,7 +139,7 @@ export default function Navbar({ onOpenRegister, onOpenLogin, onOpenCareers }) {
               onClick={() => { setIsOpen(false); onOpenRegister?.(); }}
               className="bg-gradient-to-r from-[#E87F24] to-[#FFC81E] text-zinc-950 font-black py-3 rounded-xl flex justify-center items-center gap-2 shadow-md cursor-pointer"
             >
-              Hubungi Sales <ArrowRight size={18} />
+              Coba Gratis <ArrowRight size={18} />
             </button>
           </motion.div>
         )}

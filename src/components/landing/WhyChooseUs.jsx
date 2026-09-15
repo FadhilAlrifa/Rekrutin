@@ -1,26 +1,26 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Timer, Zap, CheckCircle } from 'lucide-react';
+import { Layers, ShieldCheck, Zap } from 'lucide-react';
 
 export default function WhyChooseUs() {
   const reasons = [
     {
-      icon: <Timer size={36} className="text-[#E87F24]" />,
-      stat: "80%",
-      title: "Efisiensi Waktu",
-      desc: "Pemilahan ribuan CV yang sebelumnya memakan waktu berminggu-minggu, kini dieksekusi AI dalam hitungan detik."
+      icon: <Layers size={36} className="text-[#E87F24]" />,
+      stat: "100%",
+      title: "Otomasi BOM & Stok",
+      desc: "Setiap pesanan di POS kasir otomatis memotong persediaan bahan baku di gudang secara presisi tanpa perlu rekap manual yang melelahkan."
     },
     {
-      icon: <CheckCircle size={36} className="text-[#E87F24]" />,
+      icon: <ShieldCheck size={36} className="text-[#E87F24]" />,
       stat: "0%",
-      title: "Ghosting Rate",
-      desc: "Sistem otomatisasi menjamin setiap kandidat mendapat notifikasi kepastian, meningkatkan reputasi perusahaan Anda."
+      title: "Human Error",
+      desc: "Sistem cerdas memantau batas minimum restock dan masa kedaluwarsa secara real-time, menjaga kualitas bahan selalu prima."
     },
     {
       icon: <Zap size={36} className="text-[#E87F24]" />,
-      stat: "100%",
-      title: "Terintegrasi",
-      desc: "Data kandidat yang diterima langsung terhubung ke sistem HRIS internal tanpa proses ketik ulang yang melelahkan."
+      stat: "24/7",
+      title: "Kontrol Terintegrasi",
+      desc: "Manajemen inventaris, pengelolaan menu, hingga analitik laporan keuangan terhubung dalam satu dasbor yang cepat dan responsif."
     }
   ];
 
@@ -32,10 +32,10 @@ export default function WhyChooseUs() {
       <div className="max-w-7xl mx-auto px-6 relative z-10">
         <div className="text-center mb-20">
           <motion.h2 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-4xl md:text-6xl font-black tracking-tight mb-6">
-            Bukan Sekadar Alat. <br className="hidden md:block" />Ini <span className="text-[#E87F24]">Keunggulan Kompetitif.</span>
+            Bukan Sekadar POS. <br className="hidden md:block" />Ini <span className="text-[#E87F24]">Solusi Gudang Cerdas.</span>
           </motion.h2>
           <motion.p initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }} className="text-zinc-400 font-medium text-lg md:text-xl max-w-2xl mx-auto">
-            Angka tidak pernah bohong. Inilah mengapa perusahaan B2B beralih meninggalkan metode rekrutmen tradisional.
+            Tinggalkan pencatatan manual yang rentan selisih. Inilah mengapa Stocko menjadi standar baru operasional F&B modern.
           </motion.p>
         </div>
 

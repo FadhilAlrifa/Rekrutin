@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { MapPin, Phone, Mail, Globe, Zap, ArrowRight, ShieldCheck } from 'lucide-react';
 
-export default function Footer({ onOpenRegister }) {
+export default function Footer({ onOpenApp, onOpenRegister, onOpenLogin }) {
   return (
     <footer className="bg-zinc-950 text-zinc-400 pt-20 pb-36 font-sans relative overflow-hidden border-t border-zinc-800/80">
 
@@ -22,12 +22,12 @@ export default function Footer({ onOpenRegister }) {
                 <Zap className="text-white fill-white" size={16} />
               </div>
               <span className="text-2xl font-black tracking-tight text-white">
-                RecruitIn<span className="text-[#E87F24]">.</span>
+                Stocko<span className="text-[#E87F24]">.</span>
               </span>
             </div>
 
             <p className="text-sm text-zinc-400 font-medium leading-relaxed max-w-md">
-              Sistem rekrutmen cerdas berbasis otomatisasi AI di bawah ekosistem PT. Duluin Solusi Kepegawaian untuk efisiensi bisnis modern.
+              Sistem Smart Inventory & POS berbasis integrasi BOM dan FEFO di bawah ekosistem teknologi PT. Duluin Solusi Indonesia untuk efisiensi bisnis F&B modern.
             </p>
 
             <div className="space-y-3 text-sm font-medium pt-2">
@@ -45,7 +45,7 @@ export default function Footer({ onOpenRegister }) {
               </div>
               <div className="flex items-center gap-3 hover:text-white transition-colors">
                 <Globe size={18} className="text-[#E87F24] shrink-0" />
-                <span>duluinrecruitin</span>
+                <span>duluinstocko.com</span>
               </div>
             </div>
           </div>
@@ -57,7 +57,7 @@ export default function Footer({ onOpenRegister }) {
                 <span className="text-blue-400 font-bold">☁</span> KOMINFO
               </div>
               <p className="text-xs font-medium text-zinc-400 leading-relaxed">
-                <strong className="text-zinc-200">PT. Duluin Solusi Kepegawaian</strong><br />
+                <strong className="text-zinc-200">PT. Duluin Solusi Indonesia</strong><br />
                 Terdaftar di Penyelenggara Sistem Elektronik<br />
                 <span className="font-mono text-[11px] text-[#FFC81E]">018780.01/DJAI.PSE/06/2025</span>
               </p>
@@ -77,10 +77,10 @@ export default function Footer({ onOpenRegister }) {
             <h4 className="font-bold text-white text-sm uppercase tracking-wider">Navigasi</h4>
             <ul className="space-y-3 text-sm font-medium">
               <li><a href="#" className="hover:text-[#E87F24] transition-colors flex items-center gap-2">Beranda</a></li>
-              <li><a href="#fitur" className="hover:text-[#E87F24] transition-colors flex items-center gap-2">Fitur AI</a></li>
-              <li><a href="#solusi" className="hover:text-[#E87F24] transition-colors flex items-center gap-2">Solusi HR</a></li>
-              <li><a href="#" className="hover:text-[#E87F24] transition-colors flex items-center gap-2">Harga</a></li>
-              <li><a href="#" className="hover:text-[#E87F24] transition-colors flex items-center gap-2">FAQ</a></li>
+              <li><a href="#features" className="hover:text-[#E87F24] transition-colors flex items-center gap-2">Fitur POS & BOM</a></li>
+              <li><a href="#why-us" className="hover:text-[#E87F24] transition-colors flex items-center gap-2">Keunggulan FEFO</a></li>
+              <li><a href="#benefits" className="hover:text-[#E87F24] transition-colors flex items-center gap-2">Manfaat Bisnis</a></li>
+              <li><a href="#faq" className="hover:text-[#E87F24] transition-colors flex items-center gap-2">FAQ</a></li>
               <li><a href="#" className="hover:text-[#E87F24] transition-colors flex items-center gap-2">Kebijakan Privasi</a></li>
             </ul>
           </div>
@@ -89,7 +89,7 @@ export default function Footer({ onOpenRegister }) {
 
         {/* Hak Cipta */}
         <div className="pt-8 text-center text-xs font-medium text-zinc-500">
-          &copy; 2026 PT. Duluin Solusi Kepegawaian. Hak cipta dilindungi undang-undang.
+          &copy; 2026 PT. Duluin Solusi Indonesia. Hak cipta dilindungi undang-undang.
         </div>
 
       </div>
@@ -107,13 +107,13 @@ export default function Footer({ onOpenRegister }) {
           <div className="text-xs sm:text-sm font-bold flex items-center justify-center sm:justify-start gap-2.5">
             <span className="w-2.5 h-2.5 rounded-full bg-[#E87F24] animate-ping shrink-0"></span>
             <span className="leading-snug">
-              Kelola Rekrutmen Mulai <span className="text-[#E87F24] font-black underline decoration-wavy decoration-[#E87F24]">Rp249.000/bln</span>
+              Optimalkan Bisnis Anda Mulai <span className="text-[#E87F24] font-black underline decoration-wavy decoration-[#E87F24]">Rp249.000/bln</span>
             </span>
           </div>
 
           <button
             onClick={onOpenRegister}
-            className="w-full sm:w-auto bg-gradient-to-r from-[#E87F24] to-[#FFC81E] hover:from-[#c96a1a] hover:to-[#e6b419] text-zinc-950 font-black text-xs sm:text-sm px-5 py-2.5 rounded-full shadow-lg transition-transform hover:scale-105 shrink-0 flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+            className="w-full sm:w-auto bg-gradient-to-r from-[#E87F24] to-[#FFC81E] hover:from-[#c96a1a] hover:to-[#e6b419] text-white/90 font-black text-xs sm:text-sm px-5 py-2.5 rounded-full shadow-lg transition-transform hover:scale-105 shrink-0 flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
           >
             Daftar Sekarang <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
           </button>
