@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase, supabaseAdminAuth } from './supabaseClient';
 
 export async function fetchIngredients() {
   const { data, error } = await supabase.from('ingredients').select('*');
@@ -162,4 +162,43 @@ export async function recordRestock(ingredientId, addedQty, supplierName, notes)
   }
 
   return { success: true, newStock };
+}
+
+// --- KELOLA KARYAWAN (ADMIN ONLY) ---
+
+export async function fetchEmployees() {
+  const { data, error } = await supabase.from('user_roles').select('*').order('email');
+  if (error) {
+    console.error('Gagal memuat karyawan:', error.message);
+    return { success: false, data: [] };
+  }
+  return { success: true, data };
+}
+
+export async function addEmployee(email, password, role) {
+  // 1. Buat user di Auth (Trigger otomatis menulis ke user_roles berkat data.role)
+  const { data, error } = await supabaseAdminAuth.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        role: role
+      }
+    }
+  });
+
+  if (error) {
+    console.error('Gagal membuat akun karyawan:', error.message);
+    return { success: false, message: error.message };
+  }
+  return { success: true, data };
+}
+
+export async function deleteEmployeeRole(employeeId) {
+  // Menghapus dari user_roles (akses menu otomatis tertutup jika login)
+  const { error } = await supabase.from('user_roles').delete().eq('id', employeeId);
+  if (error) {
+    return { success: false, message: error.message };
+  }
+  return { success: true };
 }

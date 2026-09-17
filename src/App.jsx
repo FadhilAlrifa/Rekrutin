@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import LandingPage from './components/landing/LandingPage';
 import Register from './Page/auth/Register';
 import Login from './Page/auth/Login';
@@ -9,6 +10,7 @@ import InventoryModule from './components/dashboard/inventory/InventoryModule';
 import AlertsModule from './components/dashboard/AlertsModule';
 import ReportingModule from './components/dashboard/reporting/ReportingModule';
 import SelfOrderModule from './components/dashboard/self-order/SelfOrderModule';
+import EmployeeModule from './components/dashboard/employee/EmployeeModule';
 import { supabase } from './services/supabaseClient';
 import { fetchProducts, fetchIngredients, saveTransaction, updateIngredientStock } from './services/stockoService';
 
@@ -20,6 +22,27 @@ export default function App() {
   const [ingredients, setIngredients] = useState([]);
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [transactionCount, setTransactionCount] = useState(0);
+  const [userRole, setUserRole] = useState('superadmin'); // Secara default dianggap superadmin
+
+  const checkUserRole = async (userId) => {
+    try {
+      const { data, error } = await supabase.from('user_roles').select('role').eq('id', userId).single();
+      if (data && data.role) {
+        setUserRole(data.role);
+        if (data.role === 'stocker') {
+          setActiveTab('inventory');
+        } else {
+          setActiveTab('pos');
+        }
+      } else {
+        setUserRole('superadmin'); 
+        setActiveTab('pos');
+      }
+    } catch (e) {
+      setUserRole('superadmin');
+      setActiveTab('pos');
+    }
+  };
 
   useEffect(() => {
     async function loadBackendData() {
@@ -33,13 +56,17 @@ export default function App() {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
+        checkUserRole(session.user.id);
         setCurrentView('app'); 
       }
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
+        checkUserRole(session.user.id);
         setCurrentView('app');
+      } else if (event === 'SIGNED_OUT') {
+        setCurrentView('landing');
       }
     });
 
@@ -49,6 +76,11 @@ export default function App() {
       }
     };
   }, []);
+
+  // Auto-scroll ke atas setiap kali menu/tab berubah
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [activeTab]);
 
   const checkExpiryAlert = (dateString) => {
     if (!dateString) return false;
@@ -152,7 +184,9 @@ export default function App() {
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
         alertCount={alertCount} 
-        onBackToLanding={() => {
+        userRole={userRole}
+        onBackToLanding={async () => {
+          await supabase.auth.signOut();
           setCurrentView('landing');
           setActiveTab('pos');
         }}
@@ -163,29 +197,42 @@ export default function App() {
         activeTab === 'self-order' ? 'p-0 ml-0' : 'p-6 md:p-10 md:ml-72'
       }`}>
         <div className="max-w-7xl mx-auto">
-          {activeTab === 'pos' && (
-            <PosModule products={products} ingredients={ingredients} onCheckout={handleCheckout} />
-          )}
-          {activeTab === 'self-order' && (
-            <SelfOrderModule 
-              products={products} 
-              ingredients={ingredients} 
-              onCheckout={handleCheckout} 
-              setActiveTab={setActiveTab} 
-            />
-          )}
-          {activeTab === 'menu-management' && (
-            <MenuManagementModule products={products} setProducts={setProducts} />
-          )}
-          {activeTab === 'inventory' && (
-            <InventoryModule products={products} ingredients={ingredients} setIngredients={setIngredients} />
-          )}
-          {activeTab === 'alerts' && (
-            <AlertsModule ingredients={ingredients} />
-          )}
-          {activeTab === 'reporting' && (
-            <ReportingModule totalRevenue={totalRevenue} transactionCount={transactionCount} />
-          )}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+            >
+              {activeTab === 'pos' && (
+                <PosModule products={products} ingredients={ingredients} onCheckout={handleCheckout} />
+              )}
+              {activeTab === 'self-order' && (
+                <SelfOrderModule 
+                  products={products} 
+                  ingredients={ingredients} 
+                  onCheckout={handleCheckout} 
+                  setActiveTab={setActiveTab} 
+                />
+              )}
+              {activeTab === 'menu-management' && (
+                <MenuManagementModule products={products} setProducts={setProducts} />
+              )}
+              {activeTab === 'inventory' && (
+                <InventoryModule products={products} ingredients={ingredients} setIngredients={setIngredients} />
+              )}
+              {activeTab === 'alerts' && (
+                <AlertsModule ingredients={ingredients} />
+              )}
+              {activeTab === 'employees' && (
+                <EmployeeModule />
+              )}
+              {activeTab === 'reporting' && (
+                <ReportingModule totalRevenue={totalRevenue} transactionCount={transactionCount} />
+              )}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
     </div>

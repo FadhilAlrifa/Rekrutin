@@ -16,24 +16,26 @@ export default function ReportingMetrics({ metrics }) {
             <DollarSign size={24} />
           </div>
           <span className="text-[11px] font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full flex items-center gap-1 border border-emerald-200">
-            <ArrowUpRight size={13} /> Hari Ini
+            <ArrowUpRight size={13} /> {metrics.filterLabel}
           </span>
         </div>
         <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider pt-2">Pendapatan Kotor</p>
         <h3 className="text-3xl font-black text-zinc-900 font-mono tracking-tight">
-          Rp {metrics.todayRevenue.toLocaleString('id-ID')}
+          Rp {metrics.revenue.toLocaleString('id-ID')}
         </h3>
         
-        {/* Indikator Tren */}
-        <div className={`flex items-center gap-1.5 text-xs font-bold mt-2 ${metrics.isUp ? 'text-emerald-500' : 'text-red-500'}`}>
-          {metrics.isUp ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-          <span>
-            {metrics.isUp ? 'Naik' : 'Turun'} {metrics.trendPercentage}% dari kemarin
-          </span>
-        </div>
+        {/* Indikator Tren (Hanya muncul jika filter adalah Hari Ini) */}
+        {metrics.filterLabel === 'Hari Ini' && (
+          <div className={`flex items-center gap-1.5 text-xs font-bold mt-2 ${metrics.isUp ? 'text-emerald-500' : 'text-red-500'}`}>
+            {metrics.isUp ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+            <span>
+              {metrics.isUp ? 'Naik' : 'Turun'} {metrics.trendPercentage}% dari kemarin
+            </span>
+          </div>
+        )}
       </motion.div>
 
-      {/* 2. Total Pesanan (Dipertahankan) */}
+      {/* 2. Total Pesanan (Dinamis sesuai Filter) */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }}
         className="bg-white border border-zinc-200/80 rounded-[2.5rem] p-7 shadow-xl space-y-3 relative overflow-hidden"
@@ -43,7 +45,7 @@ export default function ReportingMetrics({ metrics }) {
             <ShoppingBag size={24} />
           </div>
           <span className="text-[11px] font-black text-[#E87F24] bg-orange-50 px-3 py-1 rounded-full border border-orange-200">
-            Total Keseluruhan
+            {metrics.filterLabel}
           </span>
         </div>
         <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider pt-2">Transaksi Berhasil</p>
@@ -52,7 +54,7 @@ export default function ReportingMetrics({ metrics }) {
         </h3>
       </motion.div>
 
-      {/* 3. Total Item / Porsi Terjual (Pengganti yang Mudah & Penting) */}
+      {/* 3. Total Item / Porsi Terjual (Dinamis sesuai Filter) */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }}
         className="bg-white border border-zinc-200/80 rounded-[2.5rem] p-7 shadow-xl space-y-3 relative overflow-hidden"
@@ -62,7 +64,7 @@ export default function ReportingMetrics({ metrics }) {
             <PackageCheck size={24} />
           </div>
           <span className="text-[11px] font-black text-purple-600 bg-purple-50 px-3 py-1 rounded-full border border-purple-200">
-            Volume Produk
+            {metrics.filterLabel}
           </span>
         </div>
         <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider pt-2">Total Item Terjual</p>

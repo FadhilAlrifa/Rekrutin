@@ -24,6 +24,7 @@ export default function ReportingModule() {
   const [bestSellers, setBestSellers] = useState([]);
   const [selectedTx, setSelectedTx] = useState(null);
   const [filter, setFilter] = useState('all'); // State untuk filter
+  const [customDate, setCustomDate] = useState(''); // State untuk filter tanggal kalender bebas
 
   useEffect(() => {
     async function loadReportData() {
@@ -107,11 +108,45 @@ export default function ReportingModule() {
     if (filter === 'today') {
       return txDate.toDateString() === now.toDateString();
     }
+    if (filter === 'yesterday') {
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      return txDate.toDateString() === yesterday.toDateString();
+    }
     if (filter === 'month') {
       return txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
     }
+    if (filter === 'custom' && customDate) {
+      // Mencocokkan tanggal transaksi dengan tanggal yang dipilih dari kalender
+      const localISODate = new Date(txDate.getTime() - (txDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+      return localISODate === customDate;
+    }
     return true;
   });
+
+  // Tentukan label yang akan tampil di UI
+  let fLabel = 'Semua Waktu';
+  if (filter === 'today') fLabel = 'Hari Ini';
+  else if (filter === 'yesterday') fLabel = 'Kemarin';
+  else if (filter === 'month') fLabel = 'Bulan Ini';
+  else if (filter === 'custom' && customDate) {
+    fLabel = new Date(customDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  // Hitung jumlah transaksi, pendapatan, dan item khusus untuk filter yang aktif
+  const displayMetrics = {
+    ...metrics,
+    revenue: filteredTransactions.reduce((sum, tx) => sum + (Number(tx.total_amount) || 0), 0),
+    transactionCount: filteredTransactions.length,
+    totalItemsSold: filteredTransactions.reduce((sum, tx) => {
+      let itemSum = 0;
+      if (tx.items) {
+         tx.items.forEach(i => itemSum += Number(i.qty) || 0);
+      }
+      return sum + itemSum;
+    }, 0),
+    filterLabel: fLabel
+  };
 
   const handleDownloadReport = () => {
     if (transactions.length === 0) return alert("Belum ada data untuk diunduh.");
@@ -150,9 +185,11 @@ export default function ReportingModule() {
         onDownload={handleDownloadReport} 
         currentFilter={filter} 
         setFilter={setFilter} 
+        customDate={customDate}
+        setCustomDate={setCustomDate}
       />
       
-      <ReportingMetrics metrics={metrics} />
+      <ReportingMetrics metrics={displayMetrics} />
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <BestSellersTable bestSellers={bestSellers} />

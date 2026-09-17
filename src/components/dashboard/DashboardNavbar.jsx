@@ -1,17 +1,35 @@
 import React, { useState } from 'react';
-import { Store, Package, Bell, BarChart3, UtensilsCrossed, Zap, ArrowLeft, QrCode, Menu, X } from 'lucide-react';
+import { Store, Package, Bell, BarChart3, UtensilsCrossed, Zap, ArrowLeft, QrCode, Menu, X, Users } from 'lucide-react';
 
-export default function DashboardNavbar({ activeTab, setActiveTab, alertCount, onBackToLanding }) {
+export default function DashboardNavbar({ activeTab, setActiveTab, alertCount, onBackToLanding, userRole = 'superadmin' }) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const navItems = [
+  const allNavItems = [
     { id: 'pos', label: 'POS Kasir', icon: Store },
     { id: 'self-order', label: 'Pemesanan Mandiri', icon: QrCode, badge: 'Kiosk' },
     { id: 'menu-management', label: 'Kelola Menu', icon: UtensilsCrossed },
     { id: 'inventory', label: 'Stok & BOM Gudang', icon: Package },
     { id: 'alerts', label: 'Peringatan Khusus', icon: Bell, count: alertCount },
+    { id: 'employees', label: 'Kelola Karyawan', icon: Users, badge: 'Admin' },
     { id: 'reporting', label: 'Analitik Laporan', icon: BarChart3 },
   ];
+
+  // Logika Penyaring (Filter) Berdasarkan Jabatan Karyawan
+  const navItems = allNavItems.filter(item => {
+    if (userRole === 'superadmin') return true; // Bos bisa lihat semua menu
+    
+    if (userRole === 'kasir') {
+      // Kasir hanya boleh melihat POS dan Kelola Menu
+      return ['pos', 'menu-management'].includes(item.id);
+    }
+    
+    if (userRole === 'stocker') {
+      // Stocker hanya boleh melihat Stok Gudang dan Peringatan
+      return ['inventory', 'alerts'].includes(item.id);
+    }
+    
+    return false;
+  });
 
   // Khusus mode Self-Order, sembunyikan sidebar total untuk pengalaman full-screen kiosk
   if (activeTab === 'self-order') {
