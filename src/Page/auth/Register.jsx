@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Zap, ArrowLeft, Check, CheckCircle2, Building2, User, Mail, Phone, Bot, ShieldCheck, Sparkles, Star, Store } from 'lucide-react';
+import { Zap, ArrowLeft, Check, CheckCircle2, Building2, User, Mail, Phone, ShieldCheck, Sparkles, Store } from 'lucide-react';
+import { sendMagicLink } from '../../services/stockoService'; // Menggunakan layanan Magic Link
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
   show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 50, damping: 20 } }
 };
 
-export default function Register({ onBack }) {
+export default function Register({ onBack, onOpenLogin }) {
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -18,9 +22,20 @@ export default function Register({ onBack }) {
     location: 'Makassar',
   });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
+    setLoading(true);
+    setErrorMessage('');
+
+    // Kirim Magic Link ke Supabase Auth
+    const result = await sendMagicLink(formData.email);
+    setLoading(false);
+
+    if (result.success) {
+      setSubmitted(true);
+    } else {
+      setErrorMessage(result.message || 'Gagal mengirim tautan masuk. Silakan coba lagi.');
+    }
   };
 
   return (
@@ -97,7 +112,7 @@ export default function Register({ onBack }) {
         </div>
 
         {/* DETAIL HARGA & FITUR */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center bg-white border border-zinc-200/80 rounded-[3rem] p-8 md:p-14 shadow-xl shadow-zinc-200/40">
+        <div id="harga" className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center bg-white border border-zinc-200/80 rounded-[3rem] p-8 md:p-14 shadow-xl shadow-zinc-200/40">
           <div className="space-y-6">
             <div className="inline-block bg-[#FEFDDF] border border-[#FFC81E]/40 px-3 py-1 rounded-full text-xs font-black text-[#E87F24]">
               Paket Spesial F&B Owner
@@ -148,12 +163,12 @@ export default function Register({ onBack }) {
                 <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
                   <CheckCircle2 size={36} />
                 </div>
-                <h3 className="text-2xl font-black text-zinc-900">Registrasi Berhasil!</h3>
-                <p className="text-zinc-500 text-sm max-w-sm mx-auto">
-                  Halo <strong className="text-zinc-900">{formData.fullName}</strong>, akun Stocko untuk usaha <strong className="text-zinc-900">{formData.businessName}</strong> siap diaktivasi. Cek email <strong>{formData.email}</strong> untuk langkah selanjutnya.
+                <h3 className="text-2xl font-black text-zinc-900">Cek Email Anda!</h3>
+                <p className="text-zinc-500 text-sm max-w-sm mx-auto leading-relaxed">
+                  Halo <strong className="text-zinc-900">{formData.fullName}</strong>, kami telah mengirimkan <strong className="text-zinc-900">Magic Link</strong> ke email <strong className="text-zinc-900">{formData.email}</strong>. Klik tautan tersebut untuk mengaktifkan akun dan masuk otomatis.
                 </p>
                 <button onClick={() => setSubmitted(false)} className="mt-4 bg-zinc-900 text-white font-bold px-6 py-2.5 rounded-full text-sm cursor-pointer">
-                  Daftar Akun Lain
+                  Daftar dengan Email Lain
                 </button>
               </div>
             ) : (
@@ -161,10 +176,16 @@ export default function Register({ onBack }) {
                 <div className="flex justify-between items-center mb-6">
                   <div>
                     <h3 className="text-2xl font-black text-zinc-900">Daftar Akun Stocko</h3>
-                    <p className="text-xs text-zinc-500 font-medium mt-1">Masukkan informasi bisnis Anda.</p>
+                    <p className="text-xs text-zinc-500 font-medium mt-1">Tanpa kata sandi, cukup gunakan email aktif.</p>
                   </div>
                   <span className="text-xs font-black bg-[#E87F24]/10 text-[#E87F24] px-3.5 py-1.5 rounded-full">Trial 14 Hari</span>
                 </div>
+
+                {errorMessage && (
+                  <div className="bg-red-50 border border-red-200 text-red-600 text-xs font-semibold p-3 rounded-xl text-center">
+                    {errorMessage}
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Nama Pemilik / Pengelola</label>
@@ -208,7 +229,7 @@ export default function Register({ onBack }) {
                   <div className="relative">
                     <Building2 size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
                     <input 
-                      type="text" required placeholder="Contoh: Kopi Kenangan / Cafe BallaEja"
+                      type="text" required placeholder="Contoh: Kopi Kenangan / Resto Gokana"
                       value={formData.businessName} onChange={(e) => setFormData({...formData, businessName: e.target.value})}
                       className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-3.5 pl-12 text-sm text-zinc-900 focus:outline-none focus:border-[#E87F24] transition-colors"
                     />
@@ -243,10 +264,10 @@ export default function Register({ onBack }) {
                 </div>
 
                 <button 
-                  type="submit"
-                  className="w-full mt-6 bg-gradient-to-r from-[#E87F24] to-[#FFC81E] hover:from-[#c96a1a] hover:to-[#e6b419] text-zinc-950 font-black py-4 rounded-2xl shadow-xl shadow-[#E87F24]/20 transition-all hover:scale-[1.01] cursor-pointer"
+                  type="submit" disabled={loading}
+                  className="w-full mt-6 bg-gradient-to-r from-[#E87F24] to-[#FFC81E] hover:from-[#c96a1a] hover:to-[#e6b419] text-zinc-950 font-black py-4 rounded-2xl shadow-xl shadow-[#E87F24]/20 transition-all hover:scale-[1.01] cursor-pointer disabled:opacity-50"
                 >
-                  Mulai Gunakan Stocko Gratis
+                  {loading ? 'Mengirim Magic Link...' : 'Kirim Tautan Masuk Gratis'}
                 </button>
               </form>
             )}

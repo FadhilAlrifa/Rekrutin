@@ -1,49 +1,50 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import logoKominfo from '../../assets/logo_kominfo.svg';
 import { MapPin, Phone, Mail, Globe, Zap, ArrowRight, ShieldCheck } from 'lucide-react';
 
 export default function Footer({ onOpenApp, onOpenRegister, onOpenLogin }) {
   return (
-    <footer className="bg-zinc-950 text-zinc-400 pt-20 pb-36 font-sans relative overflow-hidden border-t border-zinc-800/80">
+    <footer className="bg-[#f8f9fb] text-zinc-600 pt-20 pb-36 font-sans relative overflow-hidden border-t border-zinc-200/80">
 
-      {/* 1. Background Glow & Ornaments */}
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-5xl h-[400px] bg-gradient-to-t from-[#E87F24]/10 via-[#FFC81E]/5 to-transparent blur-[120px] pointer-events-none -z-10"></div>
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none -z-10"></div>
+      {/* 1. Background Glow & Ornaments (Disesuaikan untuk mode terang) */}
+      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-5xl h-[400px] bg-gradient-to-t from-[#E87F24]/15 via-[#FFC81E]/10 to-transparent blur-[120px] pointer-events-none -z-10"></div>
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#00000008_1px,transparent_1px),linear-gradient(to_bottom,#00000008_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none -z-10"></div>
 
       <div className="max-w-7xl mx-auto px-6 relative z-10">
 
         {/* Grid Footer Utama */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-12 pb-16 border-b border-zinc-800/80">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-12 pb-16 border-b border-zinc-200/80">
 
           {/* Kolom 1: Logo & Kontak Perusahaan */}
           <div className="md:col-span-5 space-y-6">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#E87F24] to-[#FFC81E] flex items-center justify-center shadow-lg shadow-[#E87F24]/30">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#E87F24] to-[#FFC81E] flex items-center justify-center shadow-md shadow-[#E87F24]/20">
                 <Zap className="text-white fill-white" size={16} />
               </div>
-              <span className="text-2xl font-black tracking-tight text-white">
+              <span className="text-2xl font-black tracking-tight text-zinc-900">
                 Stocko<span className="text-[#E87F24]">.</span>
               </span>
             </div>
 
-            <p className="text-sm text-zinc-400 font-medium leading-relaxed max-w-md">
+            <p className="text-sm text-zinc-500 font-medium leading-relaxed max-w-md">
               Sistem Smart Inventory & POS berbasis integrasi BOM dan FEFO di bawah ekosistem teknologi PT. Duluin Solusi Indonesia untuk efisiensi bisnis F&B modern.
             </p>
 
             <div className="space-y-3 text-sm font-medium pt-2">
-              <div className="flex items-start gap-3 hover:text-white transition-colors">
+              <div className="flex items-start gap-3 hover:text-zinc-900 transition-colors">
                 <MapPin size={18} className="text-[#E87F24] shrink-0 mt-0.5" />
                 <span>Jl. Batununggal Indah Raya No.365, Batununggal, Kec. Bandung Kidul, Kota Bandung, Jawa Barat 40266</span>
               </div>
-              <div className="flex items-center gap-3 hover:text-white transition-colors">
+              <div className="flex items-center gap-3 hover:text-zinc-900 transition-colors">
                 <Phone size={18} className="text-[#E87F24] shrink-0" />
                 <span>081910031000</span>
               </div>
-              <div className="flex items-center gap-3 hover:text-white transition-colors">
+              <div className="flex items-center gap-3 hover:text-zinc-900 transition-colors">
                 <Mail size={18} className="text-[#E87F24] shrink-0" />
                 <span>hello@duluin.com</span>
               </div>
-              <div className="flex items-center gap-3 hover:text-white transition-colors">
+              <div className="flex items-center gap-3 hover:text-zinc-900 transition-colors">
                 <Globe size={18} className="text-[#E87F24] shrink-0" />
                 <span>duluinstocko.com</span>
               </div>
@@ -52,30 +53,36 @@ export default function Footer({ onOpenApp, onOpenRegister, onOpenLogin }) {
 
           {/* Kolom 2: Legalitas / Kominfo & ISO */}
           <div className="md:col-span-4 space-y-6">
-            <div className="space-y-3 bg-zinc-900/60 border border-zinc-800 p-5 rounded-2xl">
-              <div className="flex items-center gap-2 font-black text-white text-base tracking-wider">
-                <span className="text-blue-400 font-bold">☁</span> KOMINFO
+            <div className="space-y-3 bg-white border border-zinc-200 p-5 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-center gap-3">
+                {/* Menggunakan file SVG Logo Kominfo */}
+                <img
+                  src={logoKominfo}
+                  alt="Logo Kominfo"
+                  className="h-8 w-auto object-contain"
+                />
               </div>
-              <p className="text-xs font-medium text-zinc-400 leading-relaxed">
-                <strong className="text-zinc-200">PT. Duluin Solusi Indonesia</strong><br />
+              <p className="text-xs font-medium text-zinc-500 leading-relaxed mt-1">
+                <strong className="text-zinc-900">PT. Duluin Solusi Indonesia</strong><br />
                 Terdaftar di Penyelenggara Sistem Elektronik<br />
-                <span className="font-mono text-[11px] text-[#FFC81E]">018780.01/DJAI.PSE/06/2025</span>
+                {/* Warna kode diubah dari kuning ke oranye agar lebih mudah dibaca di background terang */}
+                <span className="font-mono text-[11px] text-[#E87F24] font-bold">018780.01/DJAI.PSE/06/2025</span>
               </p>
             </div>
 
-            <div className="flex items-center gap-3 bg-zinc-900/60 border border-zinc-800 p-4 rounded-2xl">
-              <ShieldCheck className="text-emerald-400 shrink-0" size={24} />
-              <div className="text-[11px] font-bold text-zinc-300">
+            <div className="flex items-center gap-3 bg-white border border-zinc-200 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+              <ShieldCheck className="text-emerald-500 shrink-0" size={24} />
+              <div className="text-[11px] font-bold text-zinc-900">
                 ISO/IEC 27001:2022
-                <span className="block font-normal text-zinc-500 text-[10px]">Certified Security Management</span>
+                <span className="block font-medium text-zinc-500 text-[10px]">Certified Security Management</span>
               </div>
             </div>
           </div>
 
           {/* Kolom 3: Navigasi Halaman */}
           <div className="md:col-span-3 space-y-4">
-            <h4 className="font-bold text-white text-sm uppercase tracking-wider">Navigasi</h4>
-            <ul className="space-y-3 text-sm font-medium">
+            <h4 className="font-bold text-zinc-900 text-sm uppercase tracking-wider">Navigasi</h4>
+            <ul className="space-y-3 text-sm font-medium text-zinc-500">
               <li><a href="#" className="hover:text-[#E87F24] transition-colors flex items-center gap-2">Beranda</a></li>
               <li><a href="#features" className="hover:text-[#E87F24] transition-colors flex items-center gap-2">Fitur POS & BOM</a></li>
               <li><a href="#why-us" className="hover:text-[#E87F24] transition-colors flex items-center gap-2">Keunggulan FEFO</a></li>
@@ -88,8 +95,8 @@ export default function Footer({ onOpenApp, onOpenRegister, onOpenLogin }) {
         </div>
 
         {/* Hak Cipta */}
-        <div className="pt-8 text-center text-xs font-medium text-zinc-500">
-          &copy; 2026 PT. Duluin Solusi Indonesia. Hak cipta dilindungi undang-undang.
+        <div className="pt-8 text-center text-xs font-medium text-zinc-400">
+          &copy; {new Date().getFullYear()} PT. Duluin Solusi Indonesia. Hak cipta dilindungi undang-undang.
         </div>
 
       </div>

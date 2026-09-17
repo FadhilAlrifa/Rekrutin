@@ -13,7 +13,7 @@ import Footer from './Footer';
 
 export default function LandingPage({ onOpenApp, onOpenRegister, onOpenLogin }) {
   return (
-    <div className="min-h-screen bg-white text-zinc-900 font-sans selection:bg-[#E87F24] selection:text-white overflow-x-hidden pb-28">
+    <div className="min-h-screen bg-zinc-50 text-zinc-900 font-sans selection:bg-[#E87F24] selection:text-white overflow-x-hidden">
       
       <Navbar 
         onOpenApp={onOpenApp} 

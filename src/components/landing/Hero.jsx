@@ -9,7 +9,7 @@ const fadeUp = {
 
 export default function Hero({ onOpenApp, onOpenRegister }) {
   return (
-    <section className="relative pt-32 pb-16 px-6 max-w-7xl mx-auto flex flex-col items-center text-center overflow-hidden bg-white text-zinc-900">
+    <section className="relative pt-32 pb-16 px-6 max-w-7xl mx-auto flex flex-col items-center text-center overflow-hidden bg-[#f8f9fb] text-zinc-900">
       
       {/* BACKGROUND ORNAMENTS */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] -z-20"></div>
@@ -20,27 +20,27 @@ export default function Hero({ onOpenApp, onOpenRegister }) {
       <motion.div variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } }} initial="hidden" animate="show" className="relative z-10 w-full flex flex-col items-center">
         
         {/* Badge Atas */}
-        <motion.div variants={fadeUp} className="flex items-center gap-2 bg-zinc-50 backdrop-blur-md px-5 py-2 rounded-full border border-zinc-200 shadow-sm mb-6 hover:shadow-md transition-shadow cursor-default">
+        <motion.div variants={fadeUp} className="flex items-center gap-2 bg-zinc-50 backdrop-blur-md px-5 py-2 rounded-full border border-zinc-200 shadow-sm mb-4 hover:shadow-md transition-shadow cursor-default">
           <Sparkles size={14} className="text-[#E87F24]" />
           <span className="text-[11px] font-black text-zinc-700 uppercase tracking-widest">Solusi Track 4.2 Duluinnovation 2026</span>
         </motion.div>
 
-        {/* Teks Utama (Hero Title) dengan Elemen Melayang yang Diposisikan Aman */}
-        <div className="relative w-full max-w-5xl py-4">
+        {/* CONTAINER TEKS UTAMA (Ditambah padding vertikal py-12 agar elemen melayang punya ruang) */}
+        <div className="relative w-full max-w-5xl py-12 lg:py-16">
           
-          {/* Elemen Melayang Kiri */}
+          {/* Elemen Melayang Kiri (Dipindah ke Kiri Atas & ditarik keluar) */}
           <motion.div 
             initial={{ opacity: 0, x: -30, y: 10 }} animate={{ opacity: 1, x: 0, y: 0 }} transition={{ duration: 1, delay: 0.5, type: "spring" }}
-            className="absolute -left-2 md:-left-4 top-0 lg:top-4 hidden sm:flex items-center gap-3 bg-white p-3 pr-5 rounded-2xl shadow-xl border border-zinc-200/80 z-20"
+            className="absolute left-2 sm:-left-8 md:-left-12 lg:-left-24 -top-4 sm:-top-6 lg:top-4 hidden sm:flex items-center gap-3 bg-white p-3 pr-5 rounded-2xl shadow-xl border border-zinc-200/80 z-20"
           >
             <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center"><CheckCircle2 className="text-emerald-600" size={18} /></div>
             <div className="text-left"><p className="text-[9px] font-bold text-zinc-400 uppercase">Kasir (POS)</p><p className="text-xs font-black text-zinc-900">Transaksi Super Kilat</p></div>
           </motion.div>
 
-          {/* Elemen Melayang Kanan */}
+          {/* Elemen Melayang Kanan (Dipindah ke Kanan Bawah & ditarik keluar) */}
           <motion.div 
             initial={{ opacity: 0, x: 30, y: 10 }} animate={{ opacity: 1, x: 0, y: 0 }} transition={{ duration: 1, delay: 0.7, type: "spring" }}
-            className="absolute -right-2 md:-right-4 top-2 lg:top-6 hidden sm:flex items-center gap-3 bg-zinc-900 p-3 pr-5 rounded-2xl shadow-xl border border-zinc-800 z-20 text-white"
+            className="absolute right-2 sm:-right-8 md:-right-12 lg:-right-24 bottom-0 sm:-bottom-8 lg:bottom-4 top-auto hidden sm:flex items-center gap-3 bg-zinc-900 p-3 pr-5 rounded-2xl shadow-xl border border-zinc-800 z-20 text-white"
           >
             <div className="w-9 h-9 rounded-full bg-zinc-800 flex items-center justify-center"><Package className="text-[#FFC81E]" size={18} /></div>
             <div className="text-left"><p className="text-[9px] font-bold text-zinc-400 uppercase">Stok Gudang & BOM</p><p className="text-xs font-black text-white">Akurasi FEFO 99.9%</p></div>
@@ -54,12 +54,12 @@ export default function Hero({ onOpenApp, onOpenRegister }) {
           </motion.h1>
         </div>
         
-        <motion.p variants={fadeUp} className="mt-6 text-base md:text-xl text-zinc-600 font-medium max-w-2xl leading-relaxed px-4">
+        <motion.p variants={fadeUp} className="text-base md:text-xl text-zinc-600 font-medium max-w-2xl leading-relaxed px-4">
           Tinggalkan pencatatan manual. Percepat transaksi kasir, potong stok otomatis via resep (BOM), dan pantau kedaluwarsa dalam satu layar.
         </motion.p>
 
         {/* Tumpukan Avatar (Social Proof) */}
-        <motion.div variants={fadeUp} className="mt-6 flex flex-col items-center gap-2">
+        <motion.div variants={fadeUp} className="mt-8 flex flex-col items-center gap-2">
           <div className="flex -space-x-3">
             {[1, 2, 3, 4, 5].map((i) => (
               <img key={i} src={`https://i.pravatar.cc/100?img=${i + 20}`} alt="User" className="w-9 h-9 rounded-full border-2 border-white shadow-sm" />

@@ -2,36 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Pengaturan dasar untuk memperhalus tampilan (Opsional tapi direkomendasikan) */
 @layer base {
   html {
-    /* Membuat efek scroll halus saat tombol navbar diklik */
+    /* Membuat efek scroll halus saat tombol navigasi diklik */
     scroll-behavior: smooth; 
   }
   
   body {
-    /* Memastikan font terlihat tajam dan tidak bergerigi */
+    /* Memastikan font terlihat tajam, modern, dan tidak bergerigi */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    
+    /* Menerapkan warna latar belakang tema terang bawaan agar tidak ada flash putih sebelum React dimuat */
+    @apply bg-zinc-50 text-zinc-900;
   }
   
   /* ========================================== */
   /* KUSTOMISASI SCROLLBAR (Tampilan Modern)    */
   /* ========================================== */
+  
+  /* Lebar untuk scrollbar vertikal & Tinggi untuk scrollbar horizontal (tabel) */
   ::-webkit-scrollbar {
     width: 8px;
+    height: 8px; 
   }
   
   ::-webkit-scrollbar-track {
-    background: #fafafa; 
+    background: transparent; 
   }
   
   ::-webkit-scrollbar-thumb {
-    background: #d4d4d8; 
-    border-radius: 10px;
+    @apply bg-zinc-300 rounded-full;
   }
   
   ::-webkit-scrollbar-thumb:hover {
-    background: #E87F24; /* Warna oranye Duluin saat di-hover */
+    background: #E87F24; /* Warna oranye identitas Stocko / Duluin */
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+
+  /* Animasi shimmer (kilap) yang digunakan pada tombol CTA "Daftar Sekarang" */
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
   }
 }

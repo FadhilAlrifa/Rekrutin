@@ -8,15 +8,12 @@ export default function CTA({ onOpenApp, onOpenRegister }) {
       {/* Background Glow Premium */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl h-full bg-gradient-to-r from-[#E87F24]/20 to-[#FFC81E]/20 blur-[120px] rounded-full pointer-events-none"></div>
       
-      {/* Ornamen Grid Line di Background */}
-      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150"></div>
-      
       <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
         <motion.div 
           initial={{ opacity: 0, scale: 0.95, y: 20 }} 
           whileInView={{ opacity: 1, scale: 1, y: 0 }} 
           viewport={{ once: true }} 
-          transition={{ duration: 1.5 }} // Durasi animasi lambat yang sudah Anda tentukan
+          transition={{ duration: 1.5 }}
           className="bg-white/5 backdrop-blur-2xl border border-white/10 p-10 md:p-20 rounded-[3rem] shadow-2xl"
         >
           <Sparkles className="text-[#FFC81E] w-12 h-12 mx-auto mb-6 animate-pulse" />
