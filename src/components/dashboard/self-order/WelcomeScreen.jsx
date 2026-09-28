@@ -13,9 +13,7 @@ export default function WelcomeScreen({ tableNumber, setTableNumber, onNext }) {
       
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
-          <div className="w-20 h-20 bg-gradient-to-br from-[#E87F24] to-[#FFC81E] text-white rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-orange-500/20">
-            <UtensilsCrossed size={40} />
-          </div>
+          <img src="/logo-stocko.png" alt="Stocko Logo" className="w-20 h-20 object-contain mx-auto mb-6 drop-shadow-xl" />
           <h1 className="text-3xl font-black text-zinc-900 tracking-tight">Stocko Resto.</h1>
           <p className="text-xs font-medium text-zinc-500 mt-2">
             Pesan menu favorit Anda langsung dari meja.

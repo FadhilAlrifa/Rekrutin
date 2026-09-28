@@ -13,6 +13,9 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
   const [customNote, setCustomNote] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('qris');
   const [successMsg, setSuccessMsg] = useState(false);
+  const [cashModalOpen, setCashModalOpen] = useState(false);
+  const [cashReceived, setCashReceived] = useState('');
+  const [receiptData, setReceiptData] = useState(null);
 
   const [stockAlertModal, setStockAlertModal] = useState({
     isOpen: false,
@@ -198,10 +201,30 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
 
   const handleProcessPayment = () => {
     if (cart.length === 0) return;
-    onCheckout(cart);
-    setSuccessMsg(true);
+    if (paymentMethod === 'cash') {
+      setCashModalOpen(true);
+      setCashReceived(''); // Reset input
+    } else {
+      finalizeCheckout();
+    }
+  };
+
+  const finalizeCheckout = (received = 0) => {
+    onCheckout(cart, 'Kasir Utama', paymentMethod);
+    
+    const kembalian = paymentMethod === 'cash' ? received - totalPrice : 0;
+    
+    setReceiptData({
+      cart: [...cart],
+      total: totalPrice,
+      paymentMethod,
+      received: paymentMethod === 'cash' ? received : totalPrice,
+      change: kembalian,
+      date: new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
+    });
+
     setCart([]);
-    setTimeout(() => setSuccessMsg(false), 3500);
+    setCashModalOpen(false);
   };
 
   const filteredProducts = products.filter(p => {
@@ -246,7 +269,7 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
               const maxPortions = getMaxPossiblePortions(prod);
 
               return (
-                <motion.div layout initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }} transition={{ duration: 0.2 }} key={prod.id} onClick={() => isAvailable && addToCart(prod)} className={`bg-white border rounded-[2rem] overflow-hidden flex flex-col justify-between transition-all shadow-sm relative group ${!isAvailable ? 'border-red-200 bg-red-50/20 opacity-60 cursor-not-allowed' : 'border-zinc-200/80 hover:border-zinc-300 hover:shadow-xl cursor-pointer'}`}>
+                <motion.div layout initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -10 }} transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} key={prod.id} onClick={() => isAvailable && addToCart(prod)} className={`bg-white border rounded-[2rem] overflow-hidden flex flex-col justify-between transition-all shadow-sm relative group ${!isAvailable ? 'border-red-200 bg-red-50/20 opacity-60 cursor-not-allowed' : 'border-zinc-200/80 hover:border-zinc-300 hover:shadow-xl cursor-pointer'}`}>
                   <div className="relative h-36 w-full overflow-hidden bg-zinc-100">
                     <img src={prod.image} alt={prod.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60"></div>
@@ -302,7 +325,7 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
                 </motion.div>
               ) : (
                 cart.map(item => (
-                  <motion.div layout initial={{ opacity: 0, x: 15 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, scale: 0.9 }} key={item.id} className="bg-zinc-50 border border-zinc-200/60 p-3 rounded-2xl space-y-2 shadow-2xs">
+                  <motion.div layout initial={{ opacity: 0, x: 15 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }} key={item.id} className="bg-zinc-50 border border-zinc-200/60 p-3 rounded-2xl space-y-2 shadow-2xs">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2.5">
                         <img src={item.image} alt={item.name} className="w-10 h-10 rounded-xl object-cover shrink-0 border border-zinc-200" />
@@ -357,7 +380,7 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
 
             <AnimatePresence>
               {successMsg && (
-                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="bg-emerald-50 border border-emerald-200 text-emerald-700 p-3 rounded-2xl text-xs font-bold text-center flex items-center justify-center gap-2 shadow-sm">
+                <motion.div initial={{ opacity: 0, scale: 0.95, y: -5 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }} className="bg-emerald-50 border border-emerald-200 text-emerald-700 p-3 rounded-2xl text-xs font-bold text-center flex items-center justify-center gap-2 shadow-sm">
                   <CheckCircle2 size={16} /> Transaksi Sukses! Stok gudang terpotong.
                 </motion.div>
               )}
@@ -374,7 +397,7 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
         {noteModalItem && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setNoteModalItem(null)} className="absolute inset-0 bg-zinc-900/50 backdrop-blur-xs cursor-pointer"></motion.div>
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} className="relative w-full max-w-md bg-white rounded-[2.5rem] p-7 shadow-2xl border border-zinc-100 space-y-5">
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} className="relative w-full max-w-md bg-white rounded-[2.5rem] p-7 shadow-2xl border border-zinc-100 space-y-5">
               <div className="flex justify-between items-center">
                 <h4 className="font-black text-zinc-900 text-base flex items-center gap-2"><MessageSquare size={18} className="text-[#E87F24]" /> Catatan Dapur</h4>
                 <span className="text-xs font-bold bg-orange-50 text-[#E87F24] px-3 py-1 rounded-full">{noteModalItem.name}</span>
@@ -393,7 +416,7 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
         {stockAlertModal.isOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setStockAlertModal({ ...stockAlertModal, isOpen: false })} className="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm cursor-pointer"></motion.div>
-            <motion.div initial={{ opacity: 0, scale: 0.9, y: 15 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 15 }} className="relative w-full max-w-sm bg-white rounded-[2.5rem] p-7 shadow-2xl border border-zinc-100 text-center space-y-5">
+            <motion.div initial={{ opacity: 0, scale: 0.9, y: 15 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 15 }} transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} className="relative w-full max-w-sm bg-white rounded-[2.5rem] p-7 shadow-2xl border border-zinc-100 text-center space-y-5">
               <div className="w-16 h-16 bg-red-50 text-red-500 rounded-3xl mx-auto flex items-center justify-center border border-red-100 shadow-inner">
                 <ShieldAlert size={32} />
               </div>
@@ -408,7 +431,173 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
           </div>
         )}
       </AnimatePresence>
+      {/* MODAL KEMBALIAN TUNAI */}
+      <AnimatePresence>
+        {cashModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm cursor-pointer" onClick={() => setCashModalOpen(false)}></motion.div>
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 15 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 15 }} transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} className="relative w-full max-w-sm bg-white rounded-[2.5rem] p-7 shadow-2xl border border-zinc-100 space-y-5">
+              <div className="text-center space-y-1">
+                <h3 className="font-black text-zinc-900 text-lg">Pembayaran Tunai</h3>
+                <p className="text-xs text-zinc-500 font-medium">Total Tagihan: <span className="font-black text-[#E87F24]">Rp {totalPrice.toLocaleString('id-ID')}</span></p>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">Uang Diterima (Rp)</label>
+                <input 
+                  type="number" 
+                  autoFocus
+                  placeholder="Contoh: 50000" 
+                  value={cashReceived} 
+                  onChange={(e) => setCashReceived(e.target.value)} 
+                  className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 text-sm font-black focus:outline-none focus:border-[#E87F24] focus:ring-4 focus:ring-[#E87F24]/10 transition-all text-center"
+                />
+              </div>
 
+              {Number(cashReceived) >= totalPrice && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-center space-y-1">
+                  <p className="text-[10px] font-black uppercase text-emerald-600 tracking-wider">Kembalian</p>
+                  <p className="font-mono text-xl text-emerald-600 font-black">Rp {(Number(cashReceived) - totalPrice).toLocaleString('id-ID')}</p>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setCashModalOpen(false)} className="w-full px-5 py-3.5 text-xs font-black text-zinc-500 hover:bg-zinc-100 rounded-2xl cursor-pointer transition-colors">Batal</button>
+                <button 
+                  onClick={() => finalizeCheckout(Number(cashReceived))} 
+                  disabled={!cashReceived || Number(cashReceived) < totalPrice}
+                  className="w-full bg-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black rounded-2xl shadow-lg hover:bg-zinc-800 cursor-pointer transition-colors"
+                >
+                  Selesai
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL STRUK (RECEIPT) */}
+      <AnimatePresence>
+        {receiptData && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm cursor-pointer"></motion.div>
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 15 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 15 }} transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} className="relative w-full max-w-sm bg-white rounded-[2rem] shadow-2xl border border-zinc-100 overflow-hidden flex flex-col max-h-[90vh]">
+              
+              <div id="receipt-content" className="p-6 bg-white overflow-y-auto no-scrollbar">
+                <div className="text-center space-y-1 border-b border-dashed border-zinc-300 pb-4 mb-4">
+                  <h2 className="font-black text-xl text-zinc-900 tracking-tight">STOCKO.</h2>
+                  <p className="text-[10px] text-zinc-500 font-medium">Sistem Kasir Pintar UMKM</p>
+                  <p className="text-[10px] text-zinc-400">{receiptData.date}</p>
+                </div>
+                
+                <div className="space-y-3 mb-4">
+                  {receiptData.cart.map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-start text-xs font-medium text-zinc-700">
+                      <div>
+                        <p>{item.name}</p>
+                        <p className="text-[10px] text-zinc-400">{item.qty} x {item.price.toLocaleString('id-ID')}</p>
+                      </div>
+                      <p className="font-mono">{(item.qty * item.price).toLocaleString('id-ID')}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-t border-dashed border-zinc-300 pt-3 space-y-1 text-xs">
+                  <div className="flex justify-between font-black text-zinc-900 text-sm">
+                    <span>Total</span>
+                    <span className="font-mono">Rp {receiptData.total.toLocaleString('id-ID')}</span>
+                  </div>
+                  <div className="flex justify-between text-zinc-600">
+                    <span className="uppercase text-[10px] font-black">{receiptData.paymentMethod}</span>
+                    <span className="font-mono">Rp {receiptData.received.toLocaleString('id-ID')}</span>
+                  </div>
+                  {receiptData.paymentMethod === 'cash' && (
+                    <div className="flex justify-between text-zinc-600 pt-1">
+                      <span>Kembalian</span>
+                      <span className="font-mono">Rp {receiptData.change.toLocaleString('id-ID')}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="text-center mt-6 pt-4 border-t border-dashed border-zinc-300">
+                  <p className="text-[10px] font-bold text-zinc-500">Terima Kasih</p>
+                </div>
+              </div>
+
+              <div className="p-4 bg-zinc-50 border-t border-zinc-100 flex gap-2">
+                <button 
+                  onClick={() => {
+                    const printContents = document.getElementById('receipt-content').innerHTML;
+                    const iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    document.body.appendChild(iframe);
+                    
+                    iframe.contentWindow.document.open();
+                    iframe.contentWindow.document.write(`
+                      <html>
+                        <head>
+                          <style>
+                            body { font-family: 'Courier New', Courier, monospace; color: #000; padding: 10px; font-size: 12px; }
+                            .text-center { text-align: center; }
+                            .font-black { font-weight: bold; }
+                            .text-xl { font-size: 18px; }
+                            .text-sm { font-size: 14px; }
+                            .text-xs { font-size: 12px; }
+                            .text-\\[10px\\] { font-size: 10px; }
+                            .font-medium { font-weight: 500; }
+                            .font-mono { font-family: 'Courier New', Courier, monospace; }
+                            .flex { display: flex; }
+                            .justify-between { justify-content: space-between; }
+                            .items-start { align-items: flex-start; }
+                            .border-b { border-bottom: 1px dashed #000; }
+                            .border-t { border-top: 1px dashed #000; }
+                            .border-dashed { border-style: dashed; }
+                            .pb-4 { padding-bottom: 16px; }
+                            .mb-4 { margin-bottom: 16px; }
+                            .pt-3 { padding-top: 12px; }
+                            .pt-4 { padding-top: 16px; }
+                            .pt-1 { padding-top: 4px; }
+                            .space-y-1 > * + * { margin-top: 4px; }
+                            .space-y-3 > * + * { margin-top: 12px; }
+                            .mt-6 { margin-top: 24px; }
+                            .uppercase { text-transform: uppercase; }
+                            p { margin: 0; }
+                            * { color: #000 !important; }
+                          </style>
+                        </head>
+                        <body>
+                          <div style="max-width: 300px; margin: 0 auto;">
+                            ${printContents}
+                          </div>
+                        </body>
+                      </html>
+                    `);
+                    iframe.contentWindow.document.close();
+                    
+                    setTimeout(() => {
+                      iframe.contentWindow.focus();
+                      iframe.contentWindow.print();
+                      setTimeout(() => {
+                        document.body.removeChild(iframe);
+                      }, 1000);
+                    }, 300);
+                  }} 
+                  className="flex-1 bg-white border border-zinc-200 text-zinc-700 text-xs font-black py-3 rounded-xl shadow-sm hover:bg-zinc-50 transition-colors cursor-pointer"
+                >
+                  Cetak Struk
+                </button>
+                <button 
+                  onClick={() => setReceiptData(null)} 
+                  className="flex-1 bg-zinc-900 text-white text-xs font-black py-3 rounded-xl shadow-md hover:bg-zinc-800 transition-colors cursor-pointer"
+                >
+                  Selesai
+                </button>
+              </div>
+
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

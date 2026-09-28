@@ -17,6 +17,7 @@ export default function InventoryModule({ ingredients = [], setIngredients }) {
   const [isStockInModalOpen, setIsStockInModalOpen] = useState(false);
   const [stockInData, setStockInData] = useState({
     name: '',
+    category: 'Bahan Minuman',
     addedQty: '',
     unit: 'pcs',
     minLimit: '5',
@@ -45,7 +46,8 @@ export default function InventoryModule({ ingredients = [], setIngredients }) {
       return;
     }
 
-    const trimmedName = stockInData.name.toLowerCase().trim();
+    const finalName = `${stockInData.name.trim()} | ${stockInData.category}`;
+    const trimmedName = finalName.toLowerCase();
     const qtyToAdd = parseFloat(stockInData.addedQty);
     const incomingEntryDate = stockInData.entryDate || todayDate;
 
@@ -83,7 +85,7 @@ export default function InventoryModule({ ingredients = [], setIngredients }) {
 
     } else {
       const newRecord = {
-        name: stockInData.name.trim(),
+        name: finalName,
         stock: qtyToAdd,
         unit: stockInData.unit,
         min_limit: parseFloat(stockInData.minLimit) || 5,
@@ -116,11 +118,16 @@ export default function InventoryModule({ ingredients = [], setIngredients }) {
     }
 
     setIsStockInModalOpen(false);
-    setStockInData({ name: '', addedQty: '', unit: 'pcs', minLimit: '5', newExpiryDate: '', entryDate: todayDate });
+    setStockInData({ name: '', category: 'Bahan Minuman', addedQty: '', unit: 'pcs', minLimit: '5', newExpiryDate: '', entryDate: todayDate });
   };
 
   const handleOpenEdit = (item) => {
-    setEditingItem({ ...item });
+    const nameParts = (item.name || '').split(' | ');
+    setEditingItem({ 
+      ...item,
+      nameOnly: nameParts[0],
+      category: nameParts[1] || 'Bahan Minuman'
+    });
     setIsEditModalOpen(true);
   };
 
@@ -128,10 +135,12 @@ export default function InventoryModule({ ingredients = [], setIngredients }) {
     e.preventDefault();
     if (!editingItem) return;
 
+    const finalName = `${editingItem.nameOnly.trim()} | ${editingItem.category}`;
+
     const { error } = await supabase
       .from('ingredients')
       .update({
-        name: editingItem.name.trim(),
+        name: finalName,
         stock: parseFloat(editingItem.stock),
         unit: editingItem.unit,
         min_limit: parseFloat(editingItem.minLimit),
@@ -145,7 +154,7 @@ export default function InventoryModule({ ingredients = [], setIngredients }) {
       return;
     }
 
-    setIngredients(prev => prev.map(ing => ing.id === editingItem.id ? editingItem : ing));
+    setIngredients(prev => prev.map(ing => ing.id === editingItem.id ? { ...editingItem, name: finalName } : ing));
     setIsEditModalOpen(false);
     setEditingItem(null);
   };
@@ -195,66 +204,57 @@ export default function InventoryModule({ ingredients = [], setIngredients }) {
   return (
     <div className="space-y-8 pb-16">
       
-      {/* Banner Header Modern */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-br from-zinc-900 via-zinc-950 to-zinc-900 text-white rounded-[2.5rem] p-7 md:p-8 shadow-xl relative overflow-hidden border border-zinc-800">
-        <div className="absolute top-0 right-0 w-72 h-72 bg-[#E87F24]/20 rounded-full blur-[80px] pointer-events-none"></div>
-        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <span className="bg-[#E87F24]/20 text-[#FFC81E] border border-[#E87F24]/30 px-3.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5">
-              <Sparkles size={13} /> Modul Manajemen Gudang & FIFO
-            </span>
-            <h1 className="text-2xl md:text-3xl font-black tracking-tight">Stok & Komposisi Bahan Baku</h1>
-            <p className="text-zinc-400 text-xs font-medium max-w-lg">Pantau persediaan bahan baku secara real-time dan catat barang masuk secara presisi.</p>
-          </div>
-          <button onClick={() => setIsStockInModalOpen(true)} className="bg-gradient-to-r from-[#E87F24] to-[#FFC81E] text-zinc-950 font-black text-xs px-6 py-3.5 rounded-2xl shadow-lg cursor-pointer flex items-center gap-2 shrink-0 active:scale-95 transition-transform">
-            <ArrowDownToLine size={16} /> Catat Barang Masuk
-          </button>
+      {/* Banner Header Modern ala macOS / iOS */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 mb-8">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-900">Stok Gudang</h1>
+          <p className="text-zinc-500 text-[13px] font-medium mt-1">Pantau persediaan bahan baku dan catat masuk barang.</p>
         </div>
-      </motion.div>
+        <button onClick={() => setIsStockInModalOpen(true)} className="bg-[#E87F24] hover:bg-[#d6731f] text-white font-medium text-[13px] px-5 py-2.5 rounded-full shadow-[0_4px_14px_rgba(232,127,36,0.25)] cursor-pointer flex items-center gap-2 shrink-0 active:scale-[0.98] transition-all">
+          <ArrowDownToLine size={16} /> Catat Barang Masuk
+        </button>
+      </div>
 
-      {/* Filter Tabs dengan Logika Ikon Aktif/Non-aktif */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar pb-1">
+      {/* Filter Tabs & Search (macOS Style) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        
+        {/* Segmented Control ala Apple */}
+        <div className="flex items-center p-1 bg-black/[0.04] rounded-[14px] overflow-x-auto hide-scrollbar">
           {tabs.map(tab => {
-            const IconComponent = tab.icon;
             const isActive = activeTab === tab.name;
-
             return (
               <button
                 key={tab.name}
                 onClick={() => setActiveTab(tab.name)}
-                className={`px-5 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 ${
+                className={`px-4 py-1.5 rounded-[10px] text-[13px] font-medium transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                   isActive 
-                    ? 'bg-zinc-900 text-white shadow-md' 
-                    : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50'
+                    ? 'bg-white text-zinc-900 shadow-[0_1px_4px_rgba(0,0,0,0.12)] border border-black/[0.04]' 
+                    : 'text-zinc-500 hover:text-zinc-700 hover:bg-black/[0.02] border border-transparent'
                 }`}
               >
-                <IconComponent 
-                  size={14} 
-                  className={isActive ? tab.activeColor : 'text-zinc-400'} 
-                />
                 <span>{tab.name}</span>
-                {tab.name === 'Kritis' && <span className="opacity-80">({lowStockCount})</span>}
-                {tab.name === 'Hampir Exp' && <span className="opacity-80">({nearExpiryCount})</span>}
+                {tab.name === 'Kritis' && <span className="opacity-80 font-semibold">({lowStockCount})</span>}
+                {tab.name === 'Hampir Exp' && <span className="opacity-80 font-semibold">({nearExpiryCount})</span>}
               </button>
             );
           })}
         </div>
 
-        <div className="relative w-full md:w-72">
-          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+        {/* Search Field ala macOS */}
+        <div className="relative w-full md:w-64">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
           <input 
             type="text" 
             placeholder="Cari bahan baku..." 
             value={searchTerm} 
             onChange={(e) => setSearchTerm(e.target.value)} 
-            className="w-full bg-white border border-zinc-200 text-zinc-900 text-xs rounded-2xl pl-10 pr-4 py-3.5 focus:outline-none focus:border-[#E87F24] transition-all font-medium shadow-2xs" 
+            className="w-full bg-black/[0.04] border-transparent text-zinc-900 text-[13px] rounded-[12px] pl-9 pr-4 py-2 focus:outline-none focus:bg-white focus:border-zinc-300 focus:shadow-[0_0_0_4px_rgba(232,127,36,0.1)] transition-all font-medium" 
           />
         </div>
       </div>
 
       {/* Area Tabel Utama */}
-      <div className="bg-white border border-zinc-200/80 rounded-[2.5rem] p-6 md:p-8 shadow-xl overflow-hidden">
+      <div className="bg-white border border-black/[0.04] rounded-[24px] p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04)] overflow-hidden">
         <InventoryTable 
           activeSub="ingredients"
           filteredProducts={[]}

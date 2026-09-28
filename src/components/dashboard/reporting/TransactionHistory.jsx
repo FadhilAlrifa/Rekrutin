@@ -66,8 +66,13 @@ export default function TransactionHistory({ transactions, formatDateTime, onSel
                       <MapPin size={10} /> {tx.table_number || 'Takeaway / Kasir'}
                     </span>
                   </td>
-                  <td className="py-3 px-2 font-mono font-bold text-zinc-900">
-                    Rp {Number(tx.total_amount).toLocaleString('id-ID')}
+                  <td className="py-3 px-2">
+                    <div className="font-mono font-bold text-zinc-900">
+                      Rp {Number(tx.total_amount).toLocaleString('id-ID')}
+                    </div>
+                    <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded bg-zinc-100 text-[9px] font-black text-zinc-500 uppercase tracking-widest">
+                      {tx.payment_method || 'CASH'}
+                    </span>
                   </td>
                   <td className="py-3 px-2 text-right">
                     <button 

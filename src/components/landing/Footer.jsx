@@ -19,9 +19,7 @@ export default function Footer({ onOpenApp, onOpenRegister, onOpenLogin }) {
           {/* Kolom 1: Logo & Kontak Perusahaan */}
           <div className="md:col-span-5 space-y-6">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#E87F24] to-[#FFC81E] flex items-center justify-center shadow-md shadow-[#E87F24]/20">
-                <Zap className="text-white fill-white" size={16} />
-              </div>
+              <img src="/logo-stocko.png" alt="Stocko Logo" className="w-10 h-10 object-contain" />
               <span className="text-2xl font-black tracking-tight text-zinc-900">
                 Stocko<span className="text-[#E87F24]">.</span>
               </span>

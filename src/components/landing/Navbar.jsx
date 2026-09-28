@@ -32,10 +32,8 @@ export default function Navbar({ onOpenRegister, onOpenLogin, onOpenApp }) {
       <div className="max-w-7xl mx-auto bg-white/80 backdrop-blur-xl border border-zinc-200/80 rounded-full px-6 py-3 flex items-center justify-between shadow-[0_10px_30px_rgb(0,0,0,0.05)]">
 
         {/* Logo */}
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#E87F24] to-[#FFC81E] flex items-center justify-center shadow-md shadow-[#E87F24]/20">
-            <Zap className="text-white fill-white" size={16} />
-          </div>
+        <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+          <img src="/logo-stocko.png" alt="Stocko Logo" className="w-9 h-9 object-contain" />
           <span className="text-xl font-black tracking-tight text-zinc-900">
             Stocko<span className="text-[#E87F24]">.</span>
           </span>

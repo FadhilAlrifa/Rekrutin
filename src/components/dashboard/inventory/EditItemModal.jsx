@@ -6,14 +6,14 @@ export default function EditItemModal({ isOpen, onClose, onSubmit, editingItem, 
   if (!isOpen || !editingItem) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
-      {/* Backdrop Gelap dengan Efek Blur */}
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+      {/* Backdrop */}
       <motion.div 
         initial={{ opacity: 0 }} 
         animate={{ opacity: 1 }} 
         exit={{ opacity: 0 }} 
         onClick={onClose} 
-        className="fixed inset-0 bg-zinc-900/60 backdrop-blur-xs cursor-pointer"
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm cursor-pointer"
       />
       
       {/* Container Modal Utama */}
@@ -21,125 +21,119 @@ export default function EditItemModal({ isOpen, onClose, onSubmit, editingItem, 
         initial={{ opacity: 0, scale: 0.95, y: 15 }} 
         animate={{ opacity: 1, scale: 1, y: 0 }} 
         exit={{ opacity: 0, scale: 0.95, y: 15 }} 
-        className="relative w-full max-w-lg bg-white rounded-[2.5rem] p-7 md:p-8 shadow-2xl border border-zinc-100 z-10 space-y-6 max-h-[90vh] overflow-y-auto hide-scrollbar"
+        className="relative w-full max-w-lg bg-[#f5f5f7] sm:rounded-[24px] rounded-t-[24px] shadow-2xl z-10 flex flex-col max-h-[90vh] overflow-hidden"
       >
         
-        {/* Header Modal */}
-        <div className="flex justify-between items-center border-b border-zinc-100 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-orange-50 text-[#E87F24] flex items-center justify-center font-bold border border-orange-100 shadow-xs">
-              <Edit3 size={18} />
-            </div>
-            <div>
-              <h3 className="font-black text-zinc-900 text-lg">Edit Barang Gudang</h3>
-              <p className="text-xs text-zinc-400 font-medium">Perbarui parameter dan batas stok inventaris.</p>
-            </div>
-          </div>
-          <button 
-            onClick={onClose} 
-            className="w-8 h-8 rounded-full bg-zinc-100 text-zinc-500 hover:bg-zinc-200 flex items-center justify-center cursor-pointer transition-colors"
-          >
-            <X size={16} />
-          </button>
+        {/* iOS Style Modal Header */}
+        <div className="flex justify-between items-center px-4 py-3 bg-white/80 backdrop-blur-xl border-b border-black/5 shrink-0">
+          <button type="button" onClick={onClose} className="text-[#007AFF] font-medium text-[15px] px-2 py-1 active:opacity-50">Batal</button>
+          <h3 className="font-semibold text-zinc-900 text-[15px]">Edit Barang Gudang</h3>
+          <button type="button" onClick={onSubmit} className="text-[#007AFF] font-semibold text-[15px] px-2 py-1 active:opacity-50">Simpan</button>
         </div>
 
-        {/* Form Input */}
-        <form onSubmit={onSubmit} className="space-y-4">
-          
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-zinc-600 flex items-center gap-1.5">
-              <Tag size={14} className="text-[#E87F24]" /> Nama Barang / Bahan Baku
-            </label>
-            <input 
-              type="text" 
-              value={editingItem.name} 
-              onChange={(e) => setEditingItem({...editingItem, name: e.target.value})} 
-              className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-3.5 text-xs font-bold focus:outline-none focus:border-[#E87F24] transition-all" 
-              required 
-            />
-          </div>
+        {/* Form Input Group */}
+        <div className="overflow-y-auto p-4 sm:p-6">
+          <form id="editItemForm" onSubmit={onSubmit} className="space-y-6">
+            
+            {/* Group 1: Informasi Barang */}
+            <div>
+              <p className="text-[12px] font-medium text-zinc-500 uppercase tracking-wide ml-3 mb-2">Informasi Bahan Baku</p>
+              <div className="bg-white rounded-[14px] border border-black/[0.04] overflow-hidden shadow-sm">
+                
+                <div className="flex items-center px-4 py-3 border-b border-black/[0.04]">
+                  <label className="text-[15px] font-medium text-zinc-900 w-32 shrink-0">Nama Barang</label>
+                  <input 
+                    type="text" 
+                    value={editingItem.nameOnly} 
+                    onChange={(e) => setEditingItem({...editingItem, nameOnly: e.target.value})} 
+                    className="w-full text-[15px] text-zinc-900 placeholder-zinc-400 focus:outline-none bg-transparent"
+                    required
+                  />
+                </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-zinc-600 flex items-center gap-1.5">
-                <Layers size={14} className="text-[#E87F24]" /> Total Stok
-              </label>
-              <input 
-                type="number" 
-                step="any" 
-                value={editingItem.stock} 
-                onChange={(e) => setEditingItem({...editingItem, stock: e.target.value})} 
-                className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-3.5 text-xs font-mono font-black focus:outline-none focus:border-[#E87F24] transition-all" 
-                required 
-              />
+                <div className="flex items-center px-4 py-3 border-b border-black/[0.04]">
+                  <label className="text-[15px] font-medium text-zinc-900 w-32 shrink-0">Kategori</label>
+                  <select 
+                    value={editingItem.category} 
+                    onChange={(e) => setEditingItem({...editingItem, category: e.target.value})} 
+                    className="w-full text-[15px] text-zinc-900 focus:outline-none bg-transparent appearance-none cursor-pointer"
+                  >
+                    <option value="Bahan Minuman">Bahan Minuman</option>
+                    <option value="Bahan Makanan">Bahan Makanan</option>
+                    <option value="Bahan Bakery">Bahan Bakery</option>
+                    <option value="Bahan Pelengkap">Bahan Pelengkap</option>
+                    <option value="Lainnya">Lainnya</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center px-4 py-3 border-b border-black/[0.04]">
+                  <label className="text-[15px] font-medium text-zinc-900 w-32 shrink-0">Total Stok</label>
+                  <input 
+                    type="number" 
+                    step="any"
+                    value={editingItem.stock} 
+                    onChange={(e) => setEditingItem({...editingItem, stock: e.target.value})} 
+                    className="w-full text-[15px] text-zinc-900 placeholder-zinc-400 focus:outline-none bg-transparent" 
+                    required 
+                  />
+                </div>
+
+                <div className="flex items-center px-4 py-3 border-b border-black/[0.04]">
+                  <label className="text-[15px] font-medium text-zinc-900 w-32 shrink-0">Satuan</label>
+                  <input 
+                    type="text" 
+                    placeholder="kg / liter / pcs" 
+                    value={editingItem.unit} 
+                    onChange={(e) => setEditingItem({...editingItem, unit: e.target.value})} 
+                    className="w-full text-[15px] text-zinc-900 placeholder-zinc-400 focus:outline-none bg-transparent" 
+                    required 
+                  />
+                </div>
+
+                <div className="flex items-center px-4 py-3">
+                  <label className="text-[15px] font-medium text-zinc-900 w-32 shrink-0">Batas Min.</label>
+                  <input 
+                    type="number" 
+                    value={editingItem.minLimit} 
+                    onChange={(e) => setEditingItem({...editingItem, minLimit: e.target.value})} 
+                    className="w-full text-[15px] text-zinc-900 placeholder-zinc-400 focus:outline-none bg-transparent" 
+                  />
+                </div>
+
+              </div>
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-zinc-600">Satuan</label>
-              <input 
-                type="text" 
-                value={editingItem.unit} 
-                onChange={(e) => setEditingItem({...editingItem, unit: e.target.value})} 
-                className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-3.5 text-xs font-medium focus:outline-none focus:border-[#E87F24] transition-all" 
-                required 
-              />
+
+            {/* Group 2: Tanggal & Kedaluwarsa */}
+            <div>
+              <p className="text-[12px] font-medium text-zinc-500 uppercase tracking-wide ml-3 mb-2">Tanggal & Expired (FIFO)</p>
+              <div className="bg-white rounded-[14px] border border-black/[0.04] overflow-hidden shadow-sm">
+                
+                <div className="flex items-center justify-between px-4 py-3 border-b border-black/[0.04]">
+                  <label className="text-[15px] font-medium text-zinc-900 shrink-0">Tgl. Masuk</label>
+                  <input 
+                    type="date" 
+                    value={editingItem.entryDate || ''} 
+                    onChange={(e) => setEditingItem({...editingItem, entryDate: e.target.value})} 
+                    className="text-[15px] text-[#007AFF] focus:outline-none bg-transparent text-right"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between px-4 py-3">
+                  <label className="text-[15px] font-medium text-zinc-900 shrink-0">Tgl. Kedaluwarsa</label>
+                  <input 
+                    type="date" 
+                    value={editingItem.expiryDate || ''} 
+                    onChange={(e) => setEditingItem({...editingItem, expiryDate: e.target.value})} 
+                    className="text-[15px] text-[#007AFF] focus:outline-none bg-transparent text-right"
+                  />
+                </div>
+
+              </div>
+              <p className="text-[12px] text-zinc-400 ml-3 mt-2">Batas minimum digunakan untuk memicu notifikasi peringatan stok menipis (restock alert).</p>
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-zinc-600 flex items-center gap-1.5">
-                <Calendar size={14} className="text-zinc-400" /> Tgl. Masuk Barang
-              </label>
-              <input 
-                type="date" 
-                value={editingItem.entryDate || ''} 
-                onChange={(e) => setEditingItem({...editingItem, entryDate: e.target.value})} 
-                className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-3.5 text-xs font-medium focus:outline-none focus:border-[#E87F24] cursor-pointer" 
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-zinc-600 flex items-center gap-1.5">
-                <AlertCircle size={14} className="text-orange-500" /> Batas Restock (Min.)
-              </label>
-              <input 
-                type="number" 
-                value={editingItem.minLimit} 
-                onChange={(e) => setEditingItem({...editingItem, minLimit: e.target.value})} 
-                className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-3.5 text-xs font-mono font-bold focus:outline-none focus:border-[#E87F24]" 
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-zinc-600 flex items-center gap-1.5">
-              <Calendar size={14} className="text-red-400" /> Tgl. Kedaluwarsa (FIFO)
-            </label>
-            <input 
-              type="date" 
-              value={editingItem.expiryDate || ''} 
-              onChange={(e) => setEditingItem({...editingItem, expiryDate: e.target.value})} 
-              className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-3.5 text-xs font-medium focus:outline-none focus:border-[#E87F24] cursor-pointer" 
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-zinc-100">
-            <button 
-              type="button" 
-              onClick={onClose} 
-              className="px-5 py-3 text-xs font-black text-zinc-500 hover:bg-zinc-100 rounded-2xl cursor-pointer transition-colors"
-            >
-              Batal
-            </button>
-            <button 
-              type="submit" 
-              className="px-6 py-3 bg-gradient-to-r from-[#E87F24] to-[#FFC81E] text-zinc-950 font-black text-xs rounded-2xl shadow-lg cursor-pointer flex items-center gap-2 hover:scale-[1.02] transition-transform active:scale-95"
-            >
-              <Save size={15} /> Simpan Perubahan
-            </button>
-          </div>
-
-        </form>
-
+          </form>
+        </div>
       </motion.div>
     </div>
   );

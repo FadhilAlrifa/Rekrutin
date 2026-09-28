@@ -145,6 +145,12 @@ export default function ReportingModule() {
       }
       return sum + itemSum;
     }, 0),
+    paymentBreakdown: filteredTransactions.reduce((acc, tx) => {
+      const method = tx.payment_method || 'cash';
+      if (!acc[method]) acc[method] = 0;
+      acc[method] += 1; // hitung jumlah transaksi
+      return acc;
+    }, { qris: 0, cash: 0, card: 0 }),
     filterLabel: fLabel
   };
 

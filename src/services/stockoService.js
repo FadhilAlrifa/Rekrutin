@@ -46,7 +46,7 @@ export async function fetchProducts() {
   }));
 }
 
-export async function saveTransaction(totalAmount, cartItems, tableNumber) {
+export async function saveTransaction(totalAmount, cartItems, tableNumber, paymentMethod = 'cash') {
   const { data, error } = await supabase
     .from('transactions')
     .insert([
@@ -54,6 +54,7 @@ export async function saveTransaction(totalAmount, cartItems, tableNumber) {
         total_amount: totalAmount,
         items: cartItems,
         table_number: tableNumber || 'Takeaway / Kasir',
+        payment_method: paymentMethod,
         created_at: new Date().toISOString()
       }
     ])

@@ -18,9 +18,7 @@ export default function ReceiptModal({ selectedTx, onClose, formatDateTime }) {
           </button>
 
           <div className="text-center space-y-1 mb-6 mt-2">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#E87F24] to-[#FFC81E] text-zinc-950 flex items-center justify-center mx-auto mb-3 shadow-md">
-              <FileText size={20} />
-            </div>
+            <img src="/logo-stocko.png" alt="Stocko Logo" className="w-12 h-12 object-contain mx-auto mb-3 grayscale opacity-80" />
             <h3 className="font-black text-zinc-900 text-lg">Stocko. POS</h3>
             <p className="text-[10px] text-zinc-400 font-mono">ID: {selectedTx.id}</p>
             <p className="text-[10px] text-zinc-400 font-medium">{formatDateTime(selectedTx.created_at)}</p>
@@ -46,8 +44,14 @@ export default function ReceiptModal({ selectedTx, onClose, formatDateTime }) {
               Rp {Number(selectedTx.total_amount).toLocaleString('id-ID')}
             </span>
           </div>
+          <div className="flex justify-between items-center pt-2">
+            <span className="text-xs font-bold text-zinc-500 uppercase">Metode Pembayaran</span>
+            <span className="text-xs font-black bg-zinc-100 px-2 py-0.5 rounded-lg text-zinc-700 uppercase tracking-widest">
+              {selectedTx.payment_method || 'CASH'}
+            </span>
+          </div>
 
-          <div className="mt-8 text-center">
+          <div className="mt-6 pt-4 border-t border-dashed border-zinc-200 text-center">
             <p className="text-[10px] text-zinc-400 font-medium uppercase tracking-widest">Terima Kasih</p>
           </div>
         </motion.div>

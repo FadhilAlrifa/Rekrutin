@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import LandingPage from './components/landing/LandingPage';
 import Register from './Page/auth/Register';
@@ -20,8 +20,6 @@ export default function App() {
 
   const [products, setProducts] = useState([]);
   const [ingredients, setIngredients] = useState([]);
-  const [totalRevenue, setTotalRevenue] = useState(0);
-  const [transactionCount, setTransactionCount] = useState(0);
   const [userRole, setUserRole] = useState('superadmin'); // Secara default dianggap superadmin
 
   const checkUserRole = async (userId) => {
@@ -77,11 +75,8 @@ export default function App() {
     };
   }, []);
 
-  // Auto-scroll ke atas setiap kali menu/tab berubah
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [activeTab]);
-
+  // Scroll handling telah dipindahkan ke onExitComplete di AnimatePresence
+  
   const checkExpiryAlert = (dateString) => {
     if (!dateString) return false;
     const diffDays = Math.ceil((new Date(dateString) - new Date()) / (1000 * 60 * 60 * 24));
@@ -109,7 +104,7 @@ export default function App() {
     return neededBase;
   };
 
-  const handleCheckout = async (cartItems, tableNumber = 'Kasir Utama') => {
+  const handleCheckout = async (cartItems, tableNumber = 'Kasir Utama', paymentMethod = 'cash') => {
     let updatedIngredients = [...ingredients];
 
     for (let cartItem of cartItems) {
@@ -141,100 +136,142 @@ export default function App() {
     setIngredients(updatedIngredients);
 
     const currentSubtotal = cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    setTotalRevenue(prev => prev + currentSubtotal);
-    setTransactionCount(prev => prev + 1);
-
-    await saveTransaction(currentSubtotal, cartItems, tableNumber);
+    await saveTransaction(currentSubtotal, cartItems, tableNumber, paymentMethod);
   };
 
-  if (currentView === 'landing') {
-    return (
-      <LandingPage 
-        onOpenApp={() => setCurrentView('app')} 
-        onOpenRegister={() => setCurrentView('register')}
-        onOpenLogin={() => setCurrentView('login')}
-      />
-    );
-  }
+  const renderCurrentView = () => {
+    switch (currentView) {
+      case 'landing':
+        return (
+          <motion.div 
+            key="landing"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full min-h-screen"
+          >
+            <LandingPage 
+              onOpenApp={() => setCurrentView('app')} 
+              onOpenRegister={() => setCurrentView('register')}
+              onOpenLogin={() => setCurrentView('login')}
+            />
+          </motion.div>
+        );
+      
+      case 'register':
+        return (
+          <motion.div 
+            key="register"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full min-h-screen"
+          >
+            <Register 
+              onBack={() => setCurrentView('landing')} 
+              onOpenLogin={() => setCurrentView('login')}
+            />
+          </motion.div>
+        );
 
-  if (currentView === 'register') {
-    return (
-      <Register 
-        onBack={() => setCurrentView('landing')} 
-        onOpenLogin={() => setCurrentView('login')}
-      />
-    );
-  }
+      case 'login':
+        return (
+          <motion.div 
+            key="login"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full min-h-screen"
+          >
+            <Login 
+              onBack={() => setCurrentView('landing')} 
+              onOpenRegister={() => setCurrentView('register')}
+              onLoginSuccess={() => setCurrentView('app')}
+            />
+          </motion.div>
+        );
 
-  if (currentView === 'login') {
-    return (
-      <Login 
-        onBack={() => setCurrentView('landing')} 
-        onOpenRegister={() => setCurrentView('register')}
-        onLoginSuccess={() => setCurrentView('app')}
-      />
-    );
-  }
+      case 'app':
+      default:
+        return (
+          <motion.div 
+            key="app"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full"
+          >
+            <div className="min-h-screen bg-[#f5f5f7] text-zinc-900 font-sans flex flex-col md:flex-row relative selection:bg-[#FFC81E]/30 selection:text-zinc-900">
+              
+              {/* Navbar Samping */}
+              <DashboardNavbar 
+                activeTab={activeTab} 
+                setActiveTab={setActiveTab} 
+                alertCount={alertCount} 
+                userRole={userRole}
+                onBackToLanding={async () => {
+                  await supabase.auth.signOut();
+                  setCurrentView('landing');
+                  setActiveTab('pos');
+                }}
+              />
+              
+              {/* Konten Utama: Jika di self-order margin kiri 0, jika di menu lain di desktop diberi margin kiri md:ml-72 */}
+              <main className={`flex-1 w-full min-h-screen transition-all duration-300 ${
+                activeTab === 'self-order' ? 'p-0 ml-0' : 'p-6 md:p-10 md:ml-72'
+              }`}>
+                <div className="max-w-7xl mx-auto">
+                  <AnimatePresence mode="wait" onExitComplete={() => window.scrollTo(0, 0)}>
+                    <motion.div
+                      key={activeTab}
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -15 }}
+                      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                    >
+                      {activeTab === 'pos' && (
+                        <PosModule products={products} ingredients={ingredients} onCheckout={handleCheckout} />
+                      )}
+                      {activeTab === 'self-order' && (
+                        <SelfOrderModule 
+                          products={products} 
+                          ingredients={ingredients} 
+                          onCheckout={handleCheckout} 
+                          setActiveTab={setActiveTab} 
+                        />
+                      )}
+                      {activeTab === 'menu-management' && (
+                        <MenuManagementModule products={products} setProducts={setProducts} ingredients={ingredients} />
+                      )}
+                      {activeTab === 'inventory' && (
+                        <InventoryModule products={products} ingredients={ingredients} setIngredients={setIngredients} />
+                      )}
+                      {activeTab === 'alerts' && (
+                        <AlertsModule ingredients={ingredients} />
+                      )}
+                      {activeTab === 'employees' && (
+                        <EmployeeModule />
+                      )}
+                      {activeTab === 'reporting' && (
+                        <ReportingModule />
+                      )}
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+              </main>
+            </div>
+          </motion.div>
+        );
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#f8f9fb] text-zinc-900 font-sans flex flex-col md:flex-row relative">
-      
-      {/* Navbar Samping */}
-      <DashboardNavbar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        alertCount={alertCount} 
-        userRole={userRole}
-        onBackToLanding={async () => {
-          await supabase.auth.signOut();
-          setCurrentView('landing');
-          setActiveTab('pos');
-        }}
-      />
-      
-      {/* Konten Utama: Jika di self-order margin kiri 0, jika di menu lain di desktop diberi margin kiri md:ml-72 */}
-      <main className={`flex-1 w-full min-h-screen transition-all duration-300 ${
-        activeTab === 'self-order' ? 'p-0 ml-0' : 'p-6 md:p-10 md:ml-72'
-      }`}>
-        <div className="max-w-7xl mx-auto">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-            >
-              {activeTab === 'pos' && (
-                <PosModule products={products} ingredients={ingredients} onCheckout={handleCheckout} />
-              )}
-              {activeTab === 'self-order' && (
-                <SelfOrderModule 
-                  products={products} 
-                  ingredients={ingredients} 
-                  onCheckout={handleCheckout} 
-                  setActiveTab={setActiveTab} 
-                />
-              )}
-              {activeTab === 'menu-management' && (
-                <MenuManagementModule products={products} setProducts={setProducts} />
-              )}
-              {activeTab === 'inventory' && (
-                <InventoryModule products={products} ingredients={ingredients} setIngredients={setIngredients} />
-              )}
-              {activeTab === 'alerts' && (
-                <AlertsModule ingredients={ingredients} />
-              )}
-              {activeTab === 'employees' && (
-                <EmployeeModule />
-              )}
-              {activeTab === 'reporting' && (
-                <ReportingModule totalRevenue={totalRevenue} transactionCount={transactionCount} />
-              )}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </main>
-    </div>
+    <AnimatePresence mode="wait" onExitComplete={() => window.scrollTo(0, 0)}>
+      {renderCurrentView()}
+    </AnimatePresence>
   );
 }

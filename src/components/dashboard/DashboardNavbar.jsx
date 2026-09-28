@@ -41,9 +41,7 @@ export default function DashboardNavbar({ activeTab, setActiveTab, alertCount, o
       {/* Top Mobile Bar & Hamburger Button (Hanya tampil di layar kecil) */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-xl border-b border-zinc-200/80 px-4 flex items-center justify-between z-30 shadow-xs">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#E87F24] to-[#FFC81E] flex items-center justify-center text-zinc-950 shadow-md">
-            <Zap size={16} className="fill-zinc-950" />
-          </div>
+          <img src="/logo-stocko.png" alt="Stocko Logo" className="w-8 h-8 object-contain" />
           <span className="font-black text-base text-zinc-900 tracking-tight">
             Stocko<span className="text-[#E87F24]">.</span>
           </span>
@@ -66,32 +64,30 @@ export default function DashboardNavbar({ activeTab, setActiveTab, alertCount, o
         />
       )}
 
-      {/* Sidebar Utama: Drawer di Mobile (Slide-in), Posisi Tetap di Desktop (lg:translate-x-0) */}
-      <aside className={`w-72 bg-white/95 lg:bg-white/90 backdrop-blur-xl border-r border-zinc-200/80 flex flex-col justify-between p-6 shrink-0 fixed top-0 left-0 h-screen z-50 shadow-2xl lg:shadow-[4px_0_24px_rgba(0,0,0,0.02)] select-none transition-transform duration-300 ease-in-out ${
+      {/* Sidebar Utama: Liquid Glass Sidebar ala iPadOS/macOS */}
+      <aside className={`w-72 bg-white/70 backdrop-blur-2xl border-r border-black/[0.04] flex flex-col justify-between p-5 shrink-0 fixed top-0 left-0 h-screen z-50 shadow-none select-none transition-transform duration-300 ease-in-out ${
         isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       }`}>
         
         {/* Bagian Atas: Brand & Navigasi */}
         <div className="space-y-6">
           
-          {/* Brand Header (Desktop Only, karena Mobile sudah ada di top bar) */}
-          <div className="hidden lg:flex items-center justify-between px-2 pt-2">
+          {/* Brand Header */}
+          <div className="hidden lg:flex items-center justify-between px-3 pt-2">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#E87F24] via-orange-500 to-[#FFC81E] flex items-center justify-center text-zinc-950 shadow-lg shadow-orange-500/25 ring-4 ring-orange-500/10">
-                <Zap size={22} className="fill-zinc-950" />
-              </div>
+              <img src="/logo-stocko.png" alt="Stocko Logo" className="w-10 h-10 object-contain drop-shadow-sm" />
               <div>
-                <span className="font-black text-lg text-zinc-900 tracking-tight block leading-none">
-                  Stocko<span className="text-[#E87F24]">.</span>
+                <span className="font-bold text-lg text-zinc-900 tracking-tight block leading-none">
+                  Stocko
                 </span>
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-1 block">Enterprise POS</span>
+                <span className="text-[10px] font-medium text-zinc-400 mt-1 block">Enterprise POS</span>
               </div>
             </div>
           </div>
 
           {/* Navigasi Menu */}
-          <div className="space-y-1.5 pt-12 lg:pt-4">
-            <p className="text-[10px] font-black uppercase tracking-wider text-zinc-400 px-3 pb-2">Menu Utama</p>
+          <div className="space-y-1 pt-8 lg:pt-4">
+            <p className="text-[11px] font-semibold text-zinc-400 px-4 pb-2">Menu Utama</p>
             
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -102,35 +98,31 @@ export default function DashboardNavbar({ activeTab, setActiveTab, alertCount, o
                   key={item.id}
                   onClick={() => {
                     setActiveTab(item.id);
-                    setIsOpen(false); // Otomatis menutup drawer di HP saat menu diklik
+                    setIsOpen(false);
                   }}
-                  className={`w-full group px-4 py-3.5 rounded-2xl text-xs font-black transition-all duration-300 flex items-center justify-between cursor-pointer relative overflow-hidden ${
+                  className={`w-full group px-3 py-2.5 rounded-[14px] text-[13px] font-medium transition-all duration-200 flex items-center justify-between cursor-pointer relative overflow-hidden active:scale-[0.98] ${
                     isActive 
-                      ? 'bg-zinc-900 text-white shadow-xl shadow-zinc-900/10 scale-[1.02]' 
-                      : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100/80'
+                      ? 'bg-white text-black shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-black/[0.02]' 
+                      : 'text-zinc-500 hover:text-zinc-900 hover:bg-black/[0.03] border border-transparent'
                   }`}
                 >
-                  {isActive && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-[#FFC81E] rounded-r-full"></div>
-                  )}
-
-                  <div className="flex items-center gap-3.5 relative z-10">
-                    <div className={`p-2 rounded-xl transition-colors ${
-                      isActive ? 'bg-white/10 text-[#FFC81E]' : 'bg-zinc-100 text-zinc-500 group-hover:bg-white group-hover:text-zinc-900'
+                  <div className="flex items-center gap-3 relative z-10">
+                    <div className={`transition-colors ${
+                      isActive ? 'text-[#E87F24]' : 'text-zinc-400 group-hover:text-zinc-600'
                     }`}>
-                      <Icon size={18} />
+                      <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
                     </div>
-                    <span className="tracking-wide">{item.label}</span>
+                    <span className={`tracking-tight ${isActive ? 'font-semibold' : 'font-medium'}`}>{item.label}</span>
                   </div>
 
                   <div className="flex items-center gap-1.5 relative z-10">
                     {item.badge && (
-                      <span className="text-[9px] font-black bg-gradient-to-r from-orange-500 to-[#FFC81E] text-zinc-950 px-2 py-0.5 rounded-md uppercase tracking-wider shadow-xs">
+                      <span className="text-[9px] font-semibold bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-md tracking-wide">
                         {item.badge}
                       </span>
                     )}
                     {item.count > 0 && (
-                      <span className="bg-red-500 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-bounce shadow-md shadow-red-500/30">
+                      <span className="bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
                         {item.count}
                       </span>
                     )}
