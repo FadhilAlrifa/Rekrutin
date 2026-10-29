@@ -112,7 +112,7 @@ export default function Footer({ onOpenApp, onOpenRegister, onOpenLogin }) {
           <div className="text-xs sm:text-sm font-bold flex items-center justify-center sm:justify-start gap-2.5">
             <span className="w-2.5 h-2.5 rounded-full bg-[#E87F24] animate-ping shrink-0"></span>
             <span className="leading-snug">
-              Optimalkan Bisnis Anda Mulai <span className="text-[#E87F24] font-black underline decoration-wavy decoration-[#E87F24]">Rp249.000/bln</span>
+              Optimalkan Bisnis Anda Mulai <span className="text-[#E87F24] font-black underline decoration-wavy decoration-[#E87F24]">Rp79.000/bln</span>
             </span>
           </div>
 
