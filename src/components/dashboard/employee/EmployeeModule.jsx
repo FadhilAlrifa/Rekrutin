@@ -146,104 +146,123 @@ export default function EmployeeModule() {
       {/* MODAL TAMBAH KARYAWAN */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
               onClick={() => setIsModalOpen(false)}
-              className="absolute inset-0 bg-zinc-950/40 backdrop-blur-sm"
+              className="fixed inset-0 bg-zinc-950/50 backdrop-blur-sm cursor-pointer"
             />
             
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl relative z-10 overflow-hidden"
+              initial={{ opacity: 0, scale: 0.96, y: 15 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 15 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              className="bg-white w-full max-w-lg sm:rounded-[2rem] rounded-t-[2rem] shadow-2xl border border-zinc-200/80 relative z-10 flex flex-col max-h-[90vh] overflow-hidden"
             >
-              <div className="p-6 md:p-8 space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-2xl bg-zinc-100 flex items-center justify-center text-zinc-900">
-                    <Users size={24} />
+              {/* Header Modal */}
+              <div className="flex items-center justify-between px-6 py-5 border-b border-zinc-100 bg-white shrink-0">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-2xl bg-orange-50 border border-orange-100 text-[#E87F24] flex items-center justify-center shadow-2xs">
+                    <Users size={20} />
                   </div>
-                  <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 flex items-center justify-center text-zinc-500 transition-colors cursor-pointer">
-                    <X size={16} />
-                  </button>
-                </div>
-                
-                <div>
-                  <h3 className="text-2xl font-black text-zinc-900 tracking-tight">Karyawan Baru</h3>
-                  <p className="text-xs text-zinc-500 font-medium mt-1">
-                    Buat akun login dan tentukan jabatan karyawan Anda.
-                  </p>
-                </div>
-
-                {errorMessage && (
-                  <div className="bg-red-50 border border-red-200 text-red-600 text-xs font-bold p-3 rounded-xl">
-                    {errorMessage}
-                  </div>
-                )}
-
-                <form onSubmit={handleAddEmployee} className="space-y-4">
                   <div>
-                    <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-wider mb-2">Email Login</label>
+                    <h3 className="font-black text-zinc-900 text-lg tracking-tight">Tambah Karyawan Baru</h3>
+                    <p className="text-xs font-medium text-zinc-500 mt-0.5">
+                      Buat akun login dan tentukan jabatan akses karyawan Anda.
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => setIsModalOpen(false)} 
+                  className="w-9 h-9 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900 flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddEmployee} className="flex flex-col flex-1 overflow-hidden">
+                <div className="overflow-y-auto p-6 space-y-5 flex-1">
+                  {errorMessage && (
+                    <div className="bg-red-50 border border-red-200 text-red-600 text-xs font-bold p-3.5 rounded-xl">
+                      {errorMessage}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-600 mb-1.5">Email Login Karyawan</label>
                     <div className="relative">
                       <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
                       <input 
                         type="email" required placeholder="karyawan@toko.com"
                         value={newEmployee.email} onChange={e => setNewEmployee({...newEmployee, email: e.target.value})}
-                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 pl-11 text-xs text-zinc-900 font-bold focus:outline-none focus:border-[#E87F24] focus:ring-1 focus:ring-[#E87F24]"
+                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 pl-11 text-sm text-zinc-900 font-bold placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#E87F24] focus:ring-3 focus:ring-[#E87F24]/15 transition-all"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-wider mb-2">Kata Sandi (Password Sementara)</label>
+                    <label className="block text-[11px] font-bold text-zinc-600 mb-1.5">Kata Sandi (Password Sementara)</label>
                     <div className="relative">
                       <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
                       <input 
                         type="text" required placeholder="Buat sandi yang mudah diingat"
                         value={newEmployee.password} onChange={e => setNewEmployee({...newEmployee, password: e.target.value})}
-                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 pl-11 text-xs text-zinc-900 font-bold focus:outline-none focus:border-[#E87F24] focus:ring-1 focus:ring-[#E87F24]"
+                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 pl-11 text-sm text-zinc-900 font-bold placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#E87F24] focus:ring-3 focus:ring-[#E87F24]/15 transition-all"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-wider mb-2">Pilih Jabatan (Akses)</label>
+                    <label className="block text-[11px] font-bold text-zinc-600 mb-2">Pilih Jabatan (Hak Akses Sistem)</label>
                     <div className="grid grid-cols-2 gap-3">
                       <button
                         type="button"
                         onClick={() => setNewEmployee({...newEmployee, role: 'kasir'})}
-                        className={`p-3 rounded-xl border text-xs font-bold transition-all flex flex-col items-center gap-2 cursor-pointer ${
+                        className={`p-4 rounded-2xl border text-xs font-black transition-all flex flex-col items-center gap-2 cursor-pointer ${
                           newEmployee.role === 'kasir' 
-                          ? 'bg-orange-50 border-orange-200 text-orange-700 ring-2 ring-orange-500/20' 
-                          : 'bg-white border-zinc-200 text-zinc-400 hover:bg-zinc-50'
+                          ? 'bg-orange-50 border-[#E87F24] text-[#E87F24] ring-3 ring-[#E87F24]/15' 
+                          : 'bg-zinc-50 border-zinc-200 text-zinc-500 hover:bg-zinc-100'
                         }`}
                       >
-                        <Store size={20} className={newEmployee.role === 'kasir' ? 'text-orange-500' : 'text-zinc-300'} />
-                        Kasir POS
+                        <Store size={22} className={newEmployee.role === 'kasir' ? 'text-[#E87F24]' : 'text-zinc-400'} />
+                        <span>Kasir POS</span>
                       </button>
                       
                       <button
                         type="button"
                         onClick={() => setNewEmployee({...newEmployee, role: 'stocker'})}
-                        className={`p-3 rounded-xl border text-xs font-bold transition-all flex flex-col items-center gap-2 cursor-pointer ${
+                        className={`p-4 rounded-2xl border text-xs font-black transition-all flex flex-col items-center gap-2 cursor-pointer ${
                           newEmployee.role === 'stocker' 
-                          ? 'bg-blue-50 border-blue-200 text-blue-700 ring-2 ring-blue-500/20' 
-                          : 'bg-white border-zinc-200 text-zinc-400 hover:bg-zinc-50'
+                          ? 'bg-orange-50 border-[#E87F24] text-[#E87F24] ring-3 ring-[#E87F24]/15' 
+                          : 'bg-zinc-50 border-zinc-200 text-zinc-500 hover:bg-zinc-100'
                         }`}
                       >
-                        <Package size={20} className={newEmployee.role === 'stocker' ? 'text-blue-500' : 'text-zinc-300'} />
-                        Stocker Gudang
+                        <Package size={22} className={newEmployee.role === 'stocker' ? 'text-[#E87F24]' : 'text-zinc-400'} />
+                        <span>Stocker Gudang</span>
                       </button>
                     </div>
                   </div>
+                </div>
 
+                {/* Footer Modal */}
+                <div className="px-6 py-4 bg-zinc-50 border-t border-zinc-100 flex items-center justify-end gap-3 shrink-0">
                   <button 
-                    type="submit" disabled={isSubmitting}
-                    className="w-full mt-2 bg-zinc-900 hover:bg-zinc-800 text-white font-black py-3.5 rounded-xl text-xs transition-all cursor-pointer disabled:opacity-50"
+                    type="button" 
+                    onClick={() => setIsModalOpen(false)} 
+                    className="px-5 py-3 rounded-xl bg-white border border-zinc-200 hover:bg-zinc-100 text-xs font-black text-zinc-600 transition-colors cursor-pointer"
                   >
-                    {isSubmitting ? 'Memproses...' : 'Simpan & Daftarkan Karyawan'}
+                    Batal
                   </button>
-                </form>
-              </div>
+                  <button 
+                    type="submit" 
+                    disabled={isSubmitting}
+                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#E87F24] to-[#FFC81E] hover:from-[#d6731f] hover:to-[#e6b419] text-zinc-950 text-xs font-black shadow-lg shadow-[#E87F24]/20 inline-flex items-center gap-2 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                  >
+                    {isSubmitting ? 'Memproses...' : 'Simpan & Daftarkan'}
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}

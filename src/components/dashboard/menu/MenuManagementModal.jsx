@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Search, Sparkles, LayoutGrid, Coffee, Utensils, Croissant, Cake } from 'lucide-react';
 import { supabase } from '../../../services/supabaseClient';
 import MenuCard from './MenuCard';
@@ -117,7 +117,7 @@ export default function MenuManagementModule({ products, setProducts, ingredient
   return (
     <div className="space-y-8 pb-16">
       
-      {/* Banner Header Modern ala macOS / iOS */}
+      {/* Banner Header Modern */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-zinc-900">Kelola Menu & Resep</h1>
@@ -128,10 +128,10 @@ export default function MenuManagementModule({ products, setProducts, ingredient
         </button>
       </div>
 
-      {/* Filter Kategori & Pencarian (macOS Style) */}
+      {/* Filter Kategori & Pencarian */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         
-        {/* Segmented Control ala Apple */}
+        {/* Segmented Control */}
         <div className="flex items-center p-1 bg-black/[0.04] rounded-[14px] overflow-x-auto hide-scrollbar">
           {categories.map(cat => {
             const isActive = activeCategory === cat.name;
@@ -151,7 +151,7 @@ export default function MenuManagementModule({ products, setProducts, ingredient
           })}
         </div>
 
-        {/* Search Field ala macOS */}
+        {/* Search Field */}
         <div className="relative w-full md:w-64">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
           <input 
@@ -184,15 +184,17 @@ export default function MenuManagementModule({ products, setProducts, ingredient
       )}
 
       {/* Modal Form Tambah/Edit */}
-      <MenuFormModal 
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleSubmit}
-        editingProduct={editingProduct}
-        formData={formData}
-        setFormData={setFormData}
-        ingredients={ingredients}
-      />
+      <AnimatePresence>
+        <MenuFormModal 
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSubmit={handleSubmit}
+          editingProduct={editingProduct}
+          formData={formData}
+          setFormData={setFormData}
+          ingredients={ingredients}
+        />
+      </AnimatePresence>
 
     </div>
   );
