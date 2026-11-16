@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingCart, CheckCircle2, MessageSquare, Sparkles, 
-  Search, Trash2, Plus, CreditCard, Wallet, QrCode, ArrowRight, AlertTriangle, X, ShieldAlert 
+  Search, Trash2, Plus, CreditCard, Wallet, QrCode, ArrowRight, AlertTriangle, X, ShieldAlert, Store 
 } from 'lucide-react';
 
-export default function PosModule({ products, ingredients = [], onCheckout }) {
+export default function PosModule({ products, ingredients = [], onCheckout, subscriptionPlan = 'pro', activeOutlet = 'Cabang Utama — Makassar' }) {
   const [cart, setCart] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('Semua');
   const [searchQuery, setSearchQuery] = useState('');
@@ -23,6 +23,7 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
     message: ''
   });
 
+  const isStarter = subscriptionPlan === 'starter';
   const categories = ['Semua', ...new Set(products.map(p => p.category))];
 
   const getSubDescription = (prod) => {
@@ -56,7 +57,8 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
 
   // FUNGSI UTAMA: Mensimulasikan penambahan kuantitas item dan memeriksa apakah total bahan gudang mencukupi
   const validateCartWithNewItem = (currentCart, targetProduct, deltaQty) => {
-    // Buat salinan keranjang dengan penyesuaian kuantitas baru
+    if (isStarter) return { isValid: true };
+
     let simulatedCart = [...currentCart];
     const existingIndex = simulatedCart.findIndex(item => item.id === targetProduct.id);
 
@@ -71,14 +73,14 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
       simulatedCart.push({ ...targetProduct, qty: 1 });
     }
 
-    // Hitung total kebutuhan akumulasi seluruh bahan dari semua item di keranjang simulasi
-    const accumulatedDemand = {}; // { "susu segar uht": total_dibutuhkan_dalam_satuan_gudang }
+    const accumulatedDemand = {};
 
     simulatedCart.forEach(cartItem => {
       if (cartItem.recipe && Array.isArray(cartItem.recipe)) {
         cartItem.recipe.forEach(req => {
+          const reqClean = (req.name || '').split(' | ')[0].toLowerCase().trim();
           const foundIng = ingredients.find(
-            ing => ing.name?.toLowerCase().includes(req.name?.toLowerCase().trim())
+            ing => (ing.name || '').toLowerCase().includes(reqClean)
           );
           if (foundIng) {
             const ingKey = foundIng.name.toLowerCase().trim();
@@ -86,7 +88,7 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
             
             if (!accumulatedDemand[ingKey]) {
               accumulatedDemand[ingKey] = {
-                name: foundIng.name,
+                name: (foundIng.name || '').split(' | ')[0],
                 stock: foundIng.stock,
                 unit: foundIng.unit,
                 required: 0
@@ -98,7 +100,6 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
       }
     });
 
-    // Cek apakah ada bahan yang kebutuhan akumulasinya melebihi stok gudang
     for (let key in accumulatedDemand) {
       const demand = accumulatedDemand[key];
       if (demand.required > demand.stock) {
@@ -117,13 +118,15 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
 
   // Hitung maksimal porsi tersisa untuk satu produk mandiri
   const getMaxPossiblePortions = (product) => {
+    if (isStarter) return 999;
     if (!product.recipe || product.recipe.length === 0) return 999;
     const safeIngredients = ingredients || [];
     let limits = [];
 
     for (let req of product.recipe) {
+      const reqClean = (req.name || '').split(' | ')[0].toLowerCase().trim();
       const foundIng = safeIngredients.find(
-        ing => ing.name?.toLowerCase().includes(req.name?.toLowerCase().trim())
+        ing => (ing.name || '').toLowerCase().includes(reqClean)
       );
       if (!foundIng || foundIng.stock <= 0) return 0;
 
@@ -139,11 +142,11 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
   };
 
   const checkIsIngredientAvailable = (product) => {
+    if (isStarter) return true;
     return getMaxPossiblePortions(product) > 0;
   };
 
   const addToCart = (product) => {
-    // Validasi akumulasi keranjang jika produk ini ditambah 1 qty
     const validation = validateCartWithNewItem(cart, product, 1);
     
     if (!validation.isValid) {
@@ -167,7 +170,6 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
     const targetItem = cart.find(item => item.id === id);
     if (!targetItem) return;
 
-    // Validasi akumulasi keranjang untuk perubahan kuantitas
     const validation = validateCartWithNewItem(cart, targetItem, delta);
 
     if (!validation.isValid && delta > 0) {
@@ -203,14 +205,18 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
     if (cart.length === 0) return;
     if (paymentMethod === 'cash') {
       setCashModalOpen(true);
-      setCashReceived(''); // Reset input
+      setCashReceived('');
     } else {
       finalizeCheckout();
     }
   };
 
   const finalizeCheckout = (received = 0) => {
-    onCheckout(cart, 'Kasir Utama', paymentMethod);
+    const sourceLabel = subscriptionPlan === 'enterprise'
+      ? `Kasir (${activeOutlet.replace('Semua Cabang (Terpusat)', 'Cabang Utama — Makassar')})`
+      : 'Kasir Utama';
+
+    onCheckout(cart, sourceLabel, paymentMethod);
     
     const kembalian = paymentMethod === 'cash' ? received - totalPrice : 0;
     
@@ -218,6 +224,7 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
       cart: [...cart],
       total: totalPrice,
       paymentMethod,
+      outlet: sourceLabel,
       received: paymentMethod === 'cash' ? received : totalPrice,
       change: kembalian,
       date: new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
@@ -225,6 +232,8 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
 
     setCart([]);
     setCashModalOpen(false);
+    setSuccessMsg(true);
+    setTimeout(() => setSuccessMsg(false), 3000);
   };
 
   const filteredProducts = products.filter(p => {
@@ -242,10 +251,15 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
           <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
             <div className="space-y-2">
               <span className="bg-[#E87F24]/20 text-[#FFC81E] border border-[#E87F24]/30 px-3.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5">
-                <Sparkles size={13} /> POS Kasir Pintar (BOM Kolektif Connected)
+                {isStarter ? <Store size={13} /> : <Sparkles size={13} />}
+                {isStarter ? 'Paket Starter • Basic POS & Kasir Mandiri' : 'POS Kasir Pintar (Real-Time BOM Connected)'}
               </span>
               <h2 className="text-2xl md:text-3xl font-black tracking-tight">Katalog Penjualan</h2>
-              <p className="text-zinc-400 text-xs font-medium">Validasi stok lintas menu secara real-time di keranjang.</p>
+              <p className="text-zinc-400 text-xs font-medium">
+                {isStarter
+                  ? 'Mode pencatatan kasir cepat, catatan dapur, dan cetak struk instan.'
+                  : 'Validasi stok bahan baku lintas menu secara real-time di keranjang.'}
+              </p>
             </div>
             <div className="relative w-full sm:w-64">
               <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
@@ -277,7 +291,7 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
                     <div className="absolute top-3 right-3">
                       <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider shadow-md flex items-center gap-1.5 ${!isAvailable ? 'bg-red-600 text-white' : 'bg-zinc-900/90 backdrop-blur-md text-white border border-white/20'}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${!isAvailable ? 'bg-white animate-ping' : 'bg-emerald-400'}`}></span>
-                        {!isAvailable ? 'Habis' : `Maks: ${maxPortions}`}
+                        {isStarter ? 'Tersedia' : !isAvailable ? 'Habis' : `Maks: ${maxPortions}`}
                       </span>
                     </div>
                   </div>
@@ -381,7 +395,7 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
             <AnimatePresence>
               {successMsg && (
                 <motion.div initial={{ opacity: 0, scale: 0.95, y: -5 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }} className="bg-emerald-50 border border-emerald-200 text-emerald-700 p-3 rounded-2xl text-xs font-bold text-center flex items-center justify-center gap-2 shadow-sm">
-                  <CheckCircle2 size={16} /> Transaksi Sukses! Stok gudang terpotong.
+                  <CheckCircle2 size={16} /> {isStarter ? 'Transaksi Kasir Berhasil!' : 'Transaksi Sukses! Stok gudang terpotong.'}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -393,30 +407,32 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
         </div>
       </div>
 
+      {/* MODAL CATATAN DAPUR */}
       <AnimatePresence>
         {noteModalItem && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setNoteModalItem(null)} className="absolute inset-0 bg-zinc-900/50 backdrop-blur-xs cursor-pointer"></motion.div>
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} className="relative w-full max-w-md bg-white rounded-[2.5rem] p-7 shadow-2xl border border-zinc-100 space-y-5">
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }} className="relative w-full max-w-md bg-white rounded-[2rem] p-7 shadow-2xl border border-zinc-100 space-y-5">
               <div className="flex justify-between items-center">
                 <h4 className="font-black text-zinc-900 text-base flex items-center gap-2"><MessageSquare size={18} className="text-[#E87F24]" /> Catatan Dapur</h4>
-                <span className="text-xs font-bold bg-orange-50 text-[#E87F24] px-3 py-1 rounded-full">{noteModalItem.name}</span>
+                <span className="text-xs font-bold bg-orange-50 text-[#E87F24] px-3 py-1 rounded-full border border-orange-200">{noteModalItem.name}</span>
               </div>
               <textarea placeholder="Contoh: Kurang manis, tanpa es batu..." value={customNote} onChange={(e) => setCustomNote(e.target.value)} rows={3} className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 text-xs font-medium focus:outline-none focus:border-[#E87F24] focus:ring-4 focus:ring-[#E87F24]/10 resize-none transition-all" />
               <div className="flex justify-end gap-3 pt-2">
                 <button onClick={() => setNoteModalItem(null)} className="px-5 py-2.5 text-xs font-black text-zinc-500 hover:bg-zinc-100 rounded-xl cursor-pointer">Batal</button>
-                <button onClick={saveNote} className="px-6 py-2.5 bg-zinc-900 text-white text-xs font-black rounded-xl shadow-md hover:bg-zinc-800 cursor-pointer">Simpan Catatan</button>
+                <button onClick={saveNote} className="px-6 py-2.5 bg-gradient-to-r from-[#E87F24] to-[#FFC81E] text-zinc-950 text-xs font-black rounded-xl shadow-md cursor-pointer">Simpan Catatan</button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
+      {/* MODAL ALERT STOK TIDAK CUKUP */}
       <AnimatePresence>
         {stockAlertModal.isOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setStockAlertModal({ ...stockAlertModal, isOpen: false })} className="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm cursor-pointer"></motion.div>
-            <motion.div initial={{ opacity: 0, scale: 0.9, y: 15 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 15 }} transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} className="relative w-full max-w-sm bg-white rounded-[2.5rem] p-7 shadow-2xl border border-zinc-100 text-center space-y-5">
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 15 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 15 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }} className="relative w-full max-w-sm bg-white rounded-[2rem] p-7 shadow-2xl border border-zinc-100 text-center space-y-5">
               <div className="w-16 h-16 bg-red-50 text-red-500 rounded-3xl mx-auto flex items-center justify-center border border-red-100 shadow-inner">
                 <ShieldAlert size={32} />
               </div>
@@ -431,12 +447,13 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
           </div>
         )}
       </AnimatePresence>
+
       {/* MODAL KEMBALIAN TUNAI */}
       <AnimatePresence>
         {cashModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm cursor-pointer" onClick={() => setCashModalOpen(false)}></motion.div>
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 15 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 15 }} transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} className="relative w-full max-w-sm bg-white rounded-[2.5rem] p-7 shadow-2xl border border-zinc-100 space-y-5">
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 15 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 15 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }} className="relative w-full max-w-sm bg-white rounded-[2rem] p-7 shadow-2xl border border-zinc-100 space-y-5">
               <div className="text-center space-y-1">
                 <h3 className="font-black text-zinc-900 text-lg">Pembayaran Tunai</h3>
                 <p className="text-xs text-zinc-500 font-medium">Total Tagihan: <span className="font-black text-[#E87F24]">Rp {totalPrice.toLocaleString('id-ID')}</span></p>
@@ -450,7 +467,7 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
                   placeholder="Contoh: 50000" 
                   value={cashReceived} 
                   onChange={(e) => setCashReceived(e.target.value)} 
-                  className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 text-sm font-black focus:outline-none focus:border-[#E87F24] focus:ring-4 focus:ring-[#E87F24]/10 transition-all text-center"
+                  className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 text-sm font-black focus:outline-none focus:border-[#E87F24] focus:ring-4 focus:ring-[#E87F24]/10 transition-all text-center font-mono"
                 />
               </div>
 
@@ -466,7 +483,7 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
                 <button 
                   onClick={() => finalizeCheckout(Number(cashReceived))} 
                   disabled={!cashReceived || Number(cashReceived) < totalPrice}
-                  className="w-full bg-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black rounded-2xl shadow-lg hover:bg-zinc-800 cursor-pointer transition-colors"
+                  className="w-full bg-gradient-to-r from-[#E87F24] to-[#FFC81E] disabled:opacity-40 disabled:cursor-not-allowed text-zinc-950 text-xs font-black rounded-2xl shadow-lg cursor-pointer transition-all"
                 >
                   Selesai
                 </button>
@@ -481,12 +498,13 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
         {receiptData && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm cursor-pointer"></motion.div>
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 15 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 15 }} transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} className="relative w-full max-w-sm bg-white rounded-[2rem] shadow-2xl border border-zinc-100 overflow-hidden flex flex-col max-h-[90vh]">
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 15 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 15 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }} className="relative w-full max-w-sm bg-white rounded-[2rem] shadow-2xl border border-zinc-100 overflow-hidden flex flex-col max-h-[90vh]">
               
               <div id="receipt-content" className="p-6 bg-white overflow-y-auto no-scrollbar">
                 <div className="text-center space-y-1 border-b border-dashed border-zinc-300 pb-4 mb-4">
+                  <img src="/logo-stocko.png" alt="Stocko Logo" className="w-10 h-10 object-contain mx-auto mb-2 grayscale opacity-80" />
                   <h2 className="font-black text-xl text-zinc-900 tracking-tight">STOCKO.</h2>
-                  <p className="text-[10px] text-zinc-500 font-medium">Sistem Kasir Pintar UMKM</p>
+                  <p className="text-[10px] text-zinc-500 font-medium">{receiptData.outlet || 'Sistem Kasir Pintar UMKM'}</p>
                   <p className="text-[10px] text-zinc-400">{receiptData.date}</p>
                 </div>
                 
@@ -561,6 +579,7 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
                             .space-y-3 > * + * { margin-top: 12px; }
                             .mt-6 { margin-top: 24px; }
                             .uppercase { text-transform: uppercase; }
+                            img { display: none; }
                             p { margin: 0; }
                             * { color: #000 !important; }
                           </style>
@@ -588,7 +607,7 @@ export default function PosModule({ products, ingredients = [], onCheckout }) {
                 </button>
                 <button 
                   onClick={() => setReceiptData(null)} 
-                  className="flex-1 bg-zinc-900 text-white text-xs font-black py-3 rounded-xl shadow-md hover:bg-zinc-800 transition-colors cursor-pointer"
+                  className="flex-1 bg-gradient-to-r from-[#E87F24] to-[#FFC81E] text-zinc-950 text-xs font-black py-3 rounded-xl shadow-md cursor-pointer"
                 >
                   Selesai
                 </button>

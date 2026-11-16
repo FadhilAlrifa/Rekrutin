@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Zap, ArrowLeft, Mail, CheckCircle2, Store, Lock, KeyRound, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Mail, CheckCircle2, Store, Lock, KeyRound, ShieldCheck } from 'lucide-react';
 import { sendMagicLink, loginUser } from '../../services/stockoService';
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 30 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 50, damping: 20 } }
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } }
 };
 
 export default function Login({ onBack, onOpenRegister, onLoginSuccess }) {
@@ -57,14 +57,12 @@ export default function Login({ onBack, onOpenRegister, onLoginSuccess }) {
 
       {/* NAVBAR */}
       <motion.nav 
-        initial={{ y: -100 }} animate={{ y: 0 }} transition={{ duration: 0.8, ease: "easeOut" }}
+        initial={{ y: -100 }} animate={{ y: 0 }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
         className="w-full top-0 z-50 px-4 md:px-6 py-4"
       >
         <div className="max-w-7xl mx-auto bg-white/85 backdrop-blur-xl border border-zinc-200/80 rounded-full px-6 py-3 flex items-center justify-between shadow-[0_10px_30px_rgb(0,0,0,0.05)]">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={onBack}>
-            <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-[#E87F24] to-[#FFC81E] flex items-center justify-center shadow-md text-zinc-950">
-              <Zap size={18} className="fill-zinc-950" />
-            </div>
+          <div className="flex items-center gap-2.5 cursor-pointer" onClick={onBack}>
+            <img src="/logo-stocko.png" alt="Stocko Logo" className="w-9 h-9 object-contain" />
             <span className="text-xl font-black tracking-tight text-zinc-900">
               Stocko<span className="text-[#E87F24]">.</span>
             </span>
@@ -128,20 +126,20 @@ export default function Login({ onBack, onOpenRegister, onLoginSuccess }) {
               {loginMethod === 'magic' && (
                 <form onSubmit={handleMagicLinkSubmit} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Email Admin</label>
+                    <label className="block text-[11px] font-bold text-zinc-600 mb-1.5">Email Admin</label>
                     <div className="relative">
                       <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
                       <input 
                         type="email" required placeholder="admin@domain.com"
                         value={email} onChange={(e) => setEmail(e.target.value)}
-                        className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-3.5 pl-12 text-sm text-zinc-900 focus:outline-none focus:border-[#E87F24] transition-colors"
+                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3.5 pl-12 text-sm font-bold text-zinc-900 focus:outline-none focus:bg-white focus:border-[#E87F24] focus:ring-3 focus:ring-[#E87F24]/15 transition-all"
                       />
                     </div>
                   </div>
 
                   <button 
                     type="submit" disabled={loading}
-                    className="w-full mt-2 bg-gradient-to-r from-[#E87F24] to-[#FFC81E] hover:from-[#c96a1a] hover:to-[#e6b419] text-zinc-950 font-black py-4 rounded-2xl shadow-xl shadow-[#E87F24]/20 transition-all hover:scale-[1.01] cursor-pointer disabled:opacity-50"
+                    className="w-full mt-2 bg-gradient-to-r from-[#E87F24] to-[#FFC81E] hover:from-[#c96a1a] hover:to-[#e6b419] text-zinc-950 font-black py-4 rounded-2xl shadow-xl shadow-[#E87F24]/20 transition-all cursor-pointer disabled:opacity-50"
                   >
                     {loading ? 'Mengirim Tautan...' : 'Kirim Tautan Masuk'}
                   </button>
@@ -152,32 +150,32 @@ export default function Login({ onBack, onOpenRegister, onLoginSuccess }) {
               {loginMethod === 'password' && (
                 <form onSubmit={handlePasswordSubmit} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Email Karyawan</label>
+                    <label className="block text-[11px] font-bold text-zinc-600 mb-1.5">Email Karyawan</label>
                     <div className="relative">
                       <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
                       <input 
                         type="email" required placeholder="kasir@toko.com"
                         value={email} onChange={(e) => setEmail(e.target.value)}
-                        className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-3.5 pl-12 text-sm text-zinc-900 focus:outline-none focus:border-zinc-900 transition-colors"
+                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3.5 pl-12 text-sm font-bold text-zinc-900 focus:outline-none focus:bg-white focus:border-[#E87F24] focus:ring-3 focus:ring-[#E87F24]/15 transition-all"
                       />
                     </div>
                   </div>
                   
                   <div>
-                    <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Kata Sandi</label>
+                    <label className="block text-[11px] font-bold text-zinc-600 mb-1.5">Kata Sandi</label>
                     <div className="relative">
                       <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
                       <input 
                         type="password" required placeholder="••••••••"
                         value={password} onChange={(e) => setPassword(e.target.value)}
-                        className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-3.5 pl-12 text-sm text-zinc-900 focus:outline-none focus:border-zinc-900 transition-colors"
+                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3.5 pl-12 text-sm font-bold text-zinc-900 focus:outline-none focus:bg-white focus:border-[#E87F24] focus:ring-3 focus:ring-[#E87F24]/15 transition-all"
                       />
                     </div>
                   </div>
 
                   <button 
                     type="submit" disabled={loading}
-                    className="w-full mt-2 bg-zinc-900 hover:bg-zinc-800 text-white font-black py-4 rounded-2xl shadow-xl shadow-zinc-900/20 transition-all hover:scale-[1.01] cursor-pointer disabled:opacity-50"
+                    className="w-full mt-2 bg-zinc-900 hover:bg-zinc-800 text-white font-black py-4 rounded-2xl shadow-xl shadow-zinc-900/20 transition-all cursor-pointer disabled:opacity-50"
                   >
                     {loading ? 'Memeriksa...' : 'Masuk ke Sistem'}
                   </button>
@@ -185,7 +183,6 @@ export default function Login({ onBack, onOpenRegister, onLoginSuccess }) {
               )}
 
               <div className="space-y-3 pt-4 border-t border-zinc-100 text-center">
-                {/* TOMBOL PENGGANTI METODE LOGIN */}
                 {loginMethod === 'magic' ? (
                   <button 
                     onClick={(e) => { e.preventDefault(); setLoginMethod('password'); setErrorMessage(''); }}
@@ -202,7 +199,6 @@ export default function Login({ onBack, onOpenRegister, onLoginSuccess }) {
                   </button>
                 )}
 
-                {/* TAUTAN DAFTAR HANYA ADA DI MODE ADMIN */}
                 {loginMethod === 'magic' && (
                   <p className="text-xs text-zinc-400 font-medium pt-2">
                     Belum punya akun Admin?{' '}

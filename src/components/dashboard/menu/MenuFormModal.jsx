@@ -1,9 +1,11 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Edit3, X, Tag, DollarSign, Image, Layers, Trash2, UtensilsCrossed, Check } from 'lucide-react';
+import { Plus, Edit3, X, Tag, Image, Layers, Trash2, UtensilsCrossed, Check, Lock, Sparkles } from 'lucide-react';
 
-export default function MenuFormModal({ isOpen, onClose, onSubmit, editingProduct, formData, setFormData, ingredients = [] }) {
+export default function MenuFormModal({ isOpen, onClose, onSubmit, editingProduct, formData, setFormData, ingredients = [], subscriptionPlan = 'pro', onUpgradePlan }) {
   if (!isOpen) return null;
+
+  const isStarter = subscriptionPlan === 'starter';
 
   const handleAddRecipeRow = () => {
     setFormData({
@@ -54,7 +56,7 @@ export default function MenuFormModal({ isOpen, onClose, onSubmit, editingProduc
                 {editingProduct ? 'Edit Menu Produk' : 'Tambah Menu Baru'}
               </h3>
               <p className="text-xs font-medium text-zinc-500 mt-0.5">
-                Atur detail produk dan komposisi bahan baku (BOM) secara presisi.
+                {isStarter ? 'Manajemen Menu Dasar (Paket Starter).' : 'Atur detail produk dan komposisi bahan baku (BOM) secara presisi.'}
               </p>
             </div>
           </div>
@@ -157,83 +159,110 @@ export default function MenuFormModal({ isOpen, onClose, onSubmit, editingProduc
                   <Layers size={14} className="text-[#E87F24]" />
                   <span className="text-[11px] font-black text-zinc-400 uppercase tracking-wider">Komposisi Resep (BOM)</span>
                 </div>
-                <button 
-                  type="button" 
-                  onClick={handleAddRecipeRow} 
-                  className="bg-orange-50 hover:bg-orange-100 text-[#E87F24] border border-orange-200/80 px-3 py-1.5 rounded-xl text-xs font-black inline-flex items-center gap-1.5 transition-colors cursor-pointer active:scale-95"
-                >
-                  <Plus size={14} /> Tambah Bahan Baku
-                </button>
-              </div>
-
-              <div className="space-y-2.5">
-                {formData.recipe.map((rc, index) => (
-                  <div 
-                    key={index} 
-                    className="flex flex-col sm:flex-row sm:items-center gap-2.5 bg-zinc-50/80 border border-zinc-200/80 rounded-2xl p-3 transition-all hover:border-zinc-300"
+                {!isStarter && (
+                  <button 
+                    type="button" 
+                    onClick={handleAddRecipeRow} 
+                    className="bg-orange-50 hover:bg-orange-100 text-[#E87F24] border border-orange-200/80 px-3 py-1.5 rounded-xl text-xs font-black inline-flex items-center gap-1.5 transition-colors cursor-pointer active:scale-95"
                   >
-                    {/* Pilih Bahan Gudang */}
-                    <div className="flex-1">
-                      <select
-                        value={rc.name}
-                        onChange={(e) => handleRecipeChange(index, 'name', e.target.value)}
-                        className="w-full bg-white border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-zinc-900 focus:outline-none focus:border-[#E87F24] cursor-pointer"
-                        required
-                      >
-                        <option value="" disabled>Pilih Bahan Gudang...</option>
-                        {ingredients.map(ing => {
-                          const ingName = (ing.name || '').split(' | ')[0];
-                          return (
-                            <option key={ing.id} value={ing.name}>
-                              {ingName} (Stok: {ing.stock} {ing.unit})
-                            </option>
-                          );
-                        })}
-                      </select>
-                    </div>
-
-                    {/* Jumlah & Satuan */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      <input 
-                        type="number" 
-                        step="any"
-                        placeholder="Takaran" 
-                        value={rc.qty}
-                        onChange={(e) => handleRecipeChange(index, 'qty', e.target.value)}
-                        className="w-24 bg-white border border-zinc-200 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-900 text-right placeholder-zinc-400 focus:outline-none focus:border-[#E87F24] font-mono"
-                        required
-                      />
-                      <select
-                        value={rc.unit}
-                        onChange={(e) => handleRecipeChange(index, 'unit', e.target.value)}
-                        className="w-24 bg-white border border-zinc-200 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-700 focus:outline-none focus:border-[#E87F24] cursor-pointer"
-                        required
-                      >
-                        <option value="gram">gram</option>
-                        <option value="kg">kg</option>
-                        <option value="ml">ml</option>
-                        <option value="liter">liter</option>
-                        <option value="pcs">pcs</option>
-                      </select>
-
-                      {formData.recipe.length > 1 && (
-                        <button 
-                          type="button" 
-                          onClick={() => handleRemoveRecipeRow(index)} 
-                          className="w-9 h-9 rounded-xl bg-red-50 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center shrink-0 transition-colors cursor-pointer"
-                          title="Hapus Bahan"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                    <Plus size={14} /> Tambah Bahan Baku
+                  </button>
+                )}
               </div>
 
-              <p className="text-[11px] font-medium text-zinc-400 leading-relaxed">
-                * Bahan baku yang dipilih akan otomatis memotong stok Gudang setiap kali menu ini terjual di Kasir POS maupun Self-Order.
-              </p>
+              {isStarter ? (
+                <div className="bg-orange-50/70 border border-orange-200/80 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-[#E87F24] bg-white px-2.5 py-0.5 rounded-full border border-orange-200">
+                      <Lock size={10} /> Fitur Paket Pro & Enterprise
+                    </span>
+                    <h4 className="text-xs font-black text-zinc-900 pt-1">Mesin Pemotong Stok Resep Otomatis (BOM)</h4>
+                    <p className="text-[11px] font-medium text-zinc-600 leading-relaxed">
+                      Paket Starter hanya mencakup Manajemen Menu Dasar. Upgrade ke <strong>Paket Pro</strong> untuk menghubungkan menu dengan pemotongan gramasi bahan baku gudang secara otomatis.
+                    </p>
+                  </div>
+                  {onUpgradePlan && (
+                    <button
+                      type="button"
+                      onClick={() => onUpgradePlan('pro')}
+                      className="px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-[11px] font-black shrink-0 inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
+                    >
+                      <Sparkles size={13} className="text-[#FFC81E]" /> Aktifkan Mode Pro
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2.5">
+                    {formData.recipe.map((rc, index) => (
+                      <div 
+                        key={index} 
+                        className="flex flex-col sm:flex-row sm:items-center gap-2.5 bg-zinc-50/80 border border-zinc-200/80 rounded-2xl p-3 transition-all hover:border-zinc-300"
+                      >
+                        {/* Pilih Bahan Gudang */}
+                        <div className="flex-1">
+                          <select
+                            value={rc.name}
+                            onChange={(e) => handleRecipeChange(index, 'name', e.target.value)}
+                            className="w-full bg-white border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-zinc-900 focus:outline-none focus:border-[#E87F24] cursor-pointer"
+                            required={!isStarter}
+                          >
+                            <option value="" disabled>Pilih Bahan Gudang...</option>
+                            {ingredients.map(ing => {
+                              const ingName = (ing.name || '').split(' | ')[0];
+                              return (
+                                <option key={ing.id} value={ing.name}>
+                                  {ingName} (Stok: {ing.stock} {ing.unit})
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+
+                        {/* Jumlah & Satuan */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <input 
+                            type="number" 
+                            step="any"
+                            placeholder="Takaran" 
+                            value={rc.qty}
+                            onChange={(e) => handleRecipeChange(index, 'qty', e.target.value)}
+                            className="w-24 bg-white border border-zinc-200 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-900 text-right placeholder-zinc-400 focus:outline-none focus:border-[#E87F24] font-mono"
+                            required={!isStarter}
+                          />
+                          <select
+                            value={rc.unit}
+                            onChange={(e) => handleRecipeChange(index, 'unit', e.target.value)}
+                            className="w-24 bg-white border border-zinc-200 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-700 focus:outline-none focus:border-[#E87F24] cursor-pointer"
+                            required={!isStarter}
+                          >
+                            <option value="gram">gram</option>
+                            <option value="kg">kg</option>
+                            <option value="ml">ml</option>
+                            <option value="liter">liter</option>
+                            <option value="pcs">pcs</option>
+                          </select>
+
+                          {formData.recipe.length > 1 && (
+                            <button 
+                              type="button" 
+                              onClick={() => handleRemoveRecipeRow(index)} 
+                              className="w-9 h-9 rounded-xl bg-red-50 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center shrink-0 transition-colors cursor-pointer"
+                              title="Hapus Bahan"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="text-[11px] font-medium text-zinc-400 leading-relaxed">
+                    * Bahan baku yang dipilih akan otomatis memotong stok Gudang setiap kali menu ini terjual di Kasir POS maupun Self-Order.
+                  </p>
+                </>
+              )}
             </div>
 
           </div>

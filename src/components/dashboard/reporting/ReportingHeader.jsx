@@ -1,8 +1,11 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Download, Calendar } from 'lucide-react';
+import { Sparkles, Download, Lock, Building2 } from 'lucide-react';
 
-export default function ReportingHeader({ onDownload, currentFilter, setFilter, customDate, setCustomDate }) {
+export default function ReportingHeader({ onDownload, currentFilter, setFilter, customDate, setCustomDate, subscriptionPlan = 'pro', activeOutlet = 'Semua Cabang (Terpusat)', onUpgradePlan }) {
+  const isStarter = subscriptionPlan === 'starter';
+  const isEnterprise = subscriptionPlan === 'enterprise';
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
@@ -12,12 +15,21 @@ export default function ReportingHeader({ onDownload, currentFilter, setFilter, 
       
       <div className="relative z-10 flex flex-col xl:flex-row xl:items-end justify-between gap-6">
         <div className="space-y-2">
-          <span className="bg-[#E87F24]/20 text-[#FFC81E] border border-[#E87F24]/30 px-3.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5">
-            <Sparkles size={13} /> Analitik & Finansial
-          </span>
-          <h1 className="text-2xl md:text-3xl font-black tracking-tight">Laporan Performa Bisnis</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="bg-[#E87F24]/20 text-[#FFC81E] border border-[#E87F24]/30 px-3.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5">
+              <Sparkles size={13} /> {isStarter ? 'Laporan Dasar (Paket Starter)' : 'Advanced Reporting & Analitik'}
+            </span>
+            {isEnterprise && (
+              <span className="bg-white/10 text-white border border-white/15 px-3 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1.5">
+                <Building2 size={12} className="text-[#FFC81E]" /> {activeOutlet}
+              </span>
+            )}
+          </div>
+          <h1 className="text-2xl md:text-3xl font-black tracking-tight">
+            {isEnterprise ? 'Laporan Performa Multi-Outlet' : 'Laporan Performa Bisnis'}
+          </h1>
           <p className="text-zinc-400 text-xs font-medium max-w-lg">
-            Ringkasan omzet, jumlah transaksi berhasil, serta rekapitulasi riwayat pesanan berdasarkan rentang waktu.
+            Ringkasan omzet, jumlah transaksi berhasil, metode pembayaran, serta rekapitulasi riwayat pesanan berdasarkan rentang waktu.
           </p>
         </div>
 
@@ -34,7 +46,7 @@ export default function ReportingHeader({ onDownload, currentFilter, setFilter, 
               <button
                 key={f.id}
                 onClick={() => setFilter(f.id)}
-                className={`px-3 py-2.5 sm:px-4 text-[11px] sm:text-xs font-bold rounded-xl transition-all ${
+                className={`px-3 py-2.5 sm:px-4 text-[11px] sm:text-xs font-bold rounded-xl transition-all cursor-pointer ${
                   currentFilter === f.id 
                   ? 'bg-[#E87F24] text-zinc-950 shadow-md' 
                   : 'text-zinc-400 hover:text-white hover:bg-zinc-700/50'
@@ -63,13 +75,23 @@ export default function ReportingHeader({ onDownload, currentFilter, setFilter, 
             </div>
           </div>
 
-          <motion.button 
-            whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-            onClick={onDownload}
-            className="bg-gradient-to-r from-[#E87F24] to-[#FFC81E] text-zinc-950 font-black text-xs px-5 py-3.5 rounded-2xl shadow-lg cursor-pointer flex items-center gap-2"
-          >
-            <Download size={16} /> Unduh CSV
-          </motion.button>
+          {isStarter ? (
+            <button
+              onClick={() => onUpgradePlan?.('pro')}
+              className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-black text-xs px-5 py-3.5 rounded-2xl cursor-pointer flex items-center gap-2"
+              title="Ekspor CSV tersedia pada Paket Pro & Enterprise"
+            >
+              <Lock size={14} className="text-[#FFC81E]" /> Unduh CSV (Pro)
+            </button>
+          ) : (
+            <motion.button 
+              whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+              onClick={onDownload}
+              className="bg-gradient-to-r from-[#E87F24] to-[#FFC81E] text-zinc-950 font-black text-xs px-5 py-3.5 rounded-2xl shadow-lg cursor-pointer flex items-center gap-2"
+            >
+              <Download size={16} /> Unduh CSV
+            </motion.button>
+          )}
         </div>
       </div>
     </motion.div>

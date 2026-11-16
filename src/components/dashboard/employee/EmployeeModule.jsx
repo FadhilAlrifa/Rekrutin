@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Plus, ShieldCheck, Mail, Lock, X, Trash2, CheckCircle2, UserCog, Briefcase, Store, Package } from 'lucide-react';
+import { Users, Plus, ShieldCheck, Mail, Lock, X, Trash2, CheckCircle2, UserCog, Briefcase, Store, Package, Sparkles } from 'lucide-react';
 import { fetchEmployees, addEmployee, deleteEmployeeRole } from '../../../services/stockoService';
 
-export default function EmployeeModule() {
+export default function EmployeeModule({ subscriptionPlan = 'pro', onUpgradePlan }) {
   const [employees, setEmployees] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -11,7 +11,10 @@ export default function EmployeeModule() {
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
-  // 1. Ambil data asli dari Supabase saat menu dibuka
+  const isStarter = subscriptionPlan === 'starter';
+  const kasirCount = employees.filter(e => e.role === 'kasir').length;
+  const starterLimitReached = isStarter && kasirCount >= 1;
+
   const loadEmployees = async () => {
     const result = await fetchEmployees();
     if (result.success) setEmployees(result.data || []);
@@ -23,14 +26,23 @@ export default function EmployeeModule() {
 
   const handleAddEmployee = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setErrorMessage('');
-    
-    // Panggil fungsi mendaftarkan ke Supabase
+
+    if (isStarter && newEmployee.role === 'stocker') {
+      setErrorMessage('Peran Stocker Gudang hanya tersedia pada Paket Pro & Enterprise.');
+      return;
+    }
+
+    if (starterLimitReached) {
+      setErrorMessage('Paket Starter dibatasi maksimal 1 akun Kasir. Upgrade ke Paket Pro untuk menambah lebih banyak karyawan.');
+      return;
+    }
+
+    setIsSubmitting(true);
     const result = await addEmployee(newEmployee.email, newEmployee.password, newEmployee.role);
     
     if (result.success) {
-      await loadEmployees(); // Refresh tabel
+      await loadEmployees();
       setSuccessMsg('Karyawan berhasil didaftarkan ke sistem!');
       setNewEmployee({ email: '', password: '', role: 'kasir' });
       setIsModalOpen(false);
@@ -43,38 +55,74 @@ export default function EmployeeModule() {
   };
 
   const handleDelete = async (emp) => {
-    if(window.confirm('Yakin ingin mencabut akses karyawan ini? Mereka tidak akan bisa login lagi.')) {
+    if (window.confirm('Yakin ingin mencabut akses karyawan ini? Mereka tidak akan bisa login lagi.')) {
       const result = await deleteEmployeeRole(emp.id);
       if (result.success) {
-         setEmployees(employees.filter(e => e.id !== emp.id));
+        setEmployees(employees.filter(e => e.id !== emp.id));
       } else {
-         alert('Gagal menghapus karyawan: ' + result.message);
+        alert('Gagal menghapus karyawan: ' + result.message);
       }
     }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-16">
       {/* HEADER */}
       <div className="bg-white border border-zinc-200/80 rounded-[2.5rem] p-7 md:p-8 shadow-xl relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-2 relative z-10">
-          <span className="bg-purple-100 text-purple-700 border border-purple-200 px-3.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5">
-            <ShieldCheck size={13} /> Manajemen Akses
+          <span className="bg-orange-50 text-[#E87F24] border border-orange-200 px-3.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5">
+            <ShieldCheck size={13} /> {isStarter ? 'Akses Terbatas (Paket Starter)' : 'Full RBAC • Manajemen Akses'}
           </span>
           <h2 className="text-2xl md:text-3xl font-black text-zinc-900 tracking-tight">Kelola Karyawan</h2>
-          <p className="text-xs font-medium text-zinc-500 max-w-md">
-            Tambahkan akun karyawan baru dan tentukan apakah mereka bertugas sebagai Kasir atau Stocker Gudang.
+          <p className="text-xs font-medium text-zinc-500 max-w-lg">
+            {isStarter
+              ? 'Paket Starter mendukung 1 Superadmin dan maksimal 1 akun Kasir POS. Upgrade ke Paket Pro untuk mengaktifkan peran Stocker Gudang.'
+              : 'Tambahkan akun karyawan baru dan pisahkan hak akses antara Kasir POS dan Stocker Gudang (Full RBAC).'}
           </p>
         </div>
         
-        <motion.button 
-          whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-          onClick={() => setIsModalOpen(true)}
-          className="bg-zinc-900 text-white font-black text-xs px-6 py-3.5 rounded-2xl shadow-lg flex items-center justify-center gap-2 cursor-pointer z-10"
-        >
-          <Plus size={16} /> Tambah Karyawan
-        </motion.button>
+        <div className="flex items-center gap-3 z-10">
+          {starterLimitReached && onUpgradePlan ? (
+            <button
+              onClick={() => onUpgradePlan('pro')}
+              className="bg-gradient-to-r from-[#E87F24] to-[#FFC81E] text-zinc-950 font-black text-xs px-5 py-3.5 rounded-2xl shadow-lg flex items-center gap-2 cursor-pointer"
+            >
+              <Sparkles size={15} /> Upgrade ke Pro (Tambah Staf)
+            </button>
+          ) : (
+            <motion.button 
+              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                setErrorMessage('');
+                setIsModalOpen(true);
+              }}
+              className="bg-[#E87F24] hover:bg-[#d6731f] text-white font-black text-xs px-6 py-3.5 rounded-2xl shadow-lg shadow-[#E87F24]/20 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Plus size={16} /> Tambah Karyawan
+            </motion.button>
+          )}
+        </div>
       </div>
+
+      {/* BANNER KUOTA STARTER */}
+      {isStarter && (
+        <div className="bg-orange-50/80 border border-orange-200/80 rounded-2xl px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 text-xs font-bold text-zinc-700">
+            <Lock size={15} className="text-[#E87F24] shrink-0" />
+            <span>
+              Kuota Akun Kasir Paket Starter: <strong className="text-[#E87F24]">{kasirCount} / 1 Kasir</strong> (Peran Stocker Gudang terkunci di Paket Starter).
+            </span>
+          </div>
+          {onUpgradePlan && (
+            <button
+              onClick={() => onUpgradePlan('pro')}
+              className="text-[11px] font-black text-[#E87F24] hover:underline cursor-pointer shrink-0"
+            >
+              Buka Full RBAC di Paket Pro →
+            </button>
+          )}
+        </div>
+      )}
 
       {/* SUCCESS ALERT */}
       <AnimatePresence>
@@ -114,7 +162,7 @@ export default function EmployeeModule() {
                   </td>
                   <td className="p-5">
                     <span className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 w-max ${
-                      emp.role === 'kasir' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
+                      emp.role === 'kasir' ? 'bg-orange-50 text-[#E87F24] border border-orange-200/60' : 'bg-zinc-100 text-zinc-800 border border-zinc-200'
                     }`}>
                       <Briefcase size={14} />
                       {emp.role === 'kasir' ? 'Kasir POS' : 'Stocker Gudang'}
@@ -124,7 +172,7 @@ export default function EmployeeModule() {
                     <button 
                       onClick={() => handleDelete(emp)}
                       className="w-8 h-8 rounded-xl bg-red-50 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center ml-auto transition-colors cursor-pointer"
-                      title="Hapus / Pecat"
+                      title="Cabut Akses"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -231,13 +279,24 @@ export default function EmployeeModule() {
                       
                       <button
                         type="button"
-                        onClick={() => setNewEmployee({...newEmployee, role: 'stocker'})}
-                        className={`p-4 rounded-2xl border text-xs font-black transition-all flex flex-col items-center gap-2 cursor-pointer ${
+                        onClick={() => {
+                          if (isStarter) {
+                            setErrorMessage('Jabatan Stocker Gudang memerlukan Paket Pro / Business.');
+                            return;
+                          }
+                          setNewEmployee({...newEmployee, role: 'stocker'});
+                        }}
+                        className={`p-4 rounded-2xl border text-xs font-black transition-all flex flex-col items-center gap-2 cursor-pointer relative ${
                           newEmployee.role === 'stocker' 
                           ? 'bg-orange-50 border-[#E87F24] text-[#E87F24] ring-3 ring-[#E87F24]/15' 
                           : 'bg-zinc-50 border-zinc-200 text-zinc-500 hover:bg-zinc-100'
                         }`}
                       >
+                        {isStarter && (
+                          <span className="absolute top-2 right-2 bg-zinc-900 text-[#FFC81E] text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <Lock size={9} /> PRO
+                          </span>
+                        )}
                         <Package size={22} className={newEmployee.role === 'stocker' ? 'text-[#E87F24]' : 'text-zinc-400'} />
                         <span>Stocker Gudang</span>
                       </button>

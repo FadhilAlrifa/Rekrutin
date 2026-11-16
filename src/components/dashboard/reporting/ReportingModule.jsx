@@ -9,7 +9,7 @@ import BestSellersTable from './BestSellersTable';
 import TransactionHistory from './TransactionHistory';
 import ReceiptModal from './ReceiptModal';
 
-export default function ReportingModule() {
+export default function ReportingModule({ subscriptionPlan = 'pro', activeOutlet = 'Semua Cabang (Terpusat)', onUpgradePlan }) {
   const [isLoading, setIsLoading] = useState(true);
   const [transactions, setTransactions] = useState([]);
   const [metrics, setMetrics] = useState({
@@ -19,12 +19,12 @@ export default function ReportingModule() {
     trendPercentage: 0,
     isUp: true,
     transactionCount: 0,
-    totalItemsSold: 0, // <-- State untuk Total Item Terjual
+    totalItemsSold: 0,
   });
   const [bestSellers, setBestSellers] = useState([]);
   const [selectedTx, setSelectedTx] = useState(null);
-  const [filter, setFilter] = useState('all'); // State untuk filter
-  const [customDate, setCustomDate] = useState(''); // State untuk filter tanggal kalender bebas
+  const [filter, setFilter] = useState('all');
+  const [customDate, setCustomDate] = useState('');
 
   useEffect(() => {
     async function loadReportData() {
@@ -33,7 +33,7 @@ export default function ReportingModule() {
       
       let totalAllTime = 0;
       let count = txData.length;
-      let totalItemsCount = 0; // Inumulator total item
+      let totalItemsCount = 0;
       let productMap = {};
 
       const now = new Date();
@@ -55,11 +55,10 @@ export default function ReportingModule() {
           yesterdayRev += txAmount;
         }
         
-        // Memproses item di dalam transaksi
         if (tx.items && Array.isArray(tx.items)) {
           tx.items.forEach(item => {
             const qty = Number(item.qty) || 0;
-            totalItemsCount += qty; // Menjumlahkan total porsi/item keluar
+            totalItemsCount += qty;
 
             if (!productMap[item.name]) {
               productMap[item.name] = { name: item.name, sold: 0, revenue: 0 };
@@ -84,7 +83,7 @@ export default function ReportingModule() {
         trendPercentage: Math.round(Math.abs(percentage)),
         isUp: percentage >= 0,
         transactionCount: count, 
-        totalItemsSold: totalItemsCount // Mengirim hasil hitung total item ke metrics
+        totalItemsSold: totalItemsCount
       });
       
       setTransactions(txData);
@@ -100,7 +99,6 @@ export default function ReportingModule() {
     loadReportData();
   }, []);
 
-  // Filter transaksi berdasarkan pilihan di Header
   const filteredTransactions = transactions.filter(tx => {
     const txDate = new Date(tx.created_at);
     const now = new Date();
@@ -117,14 +115,12 @@ export default function ReportingModule() {
       return txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
     }
     if (filter === 'custom' && customDate) {
-      // Mencocokkan tanggal transaksi dengan tanggal yang dipilih dari kalender
       const localISODate = new Date(txDate.getTime() - (txDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
       return localISODate === customDate;
     }
     return true;
   });
 
-  // Tentukan label yang akan tampil di UI
   let fLabel = 'Semua Waktu';
   if (filter === 'today') fLabel = 'Hari Ini';
   else if (filter === 'yesterday') fLabel = 'Kemarin';
@@ -133,7 +129,6 @@ export default function ReportingModule() {
     fLabel = new Date(customDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
-  // Hitung jumlah transaksi, pendapatan, dan item khusus untuk filter yang aktif
   const displayMetrics = {
     ...metrics,
     revenue: filteredTransactions.reduce((sum, tx) => sum + (Number(tx.total_amount) || 0), 0),
@@ -141,14 +136,14 @@ export default function ReportingModule() {
     totalItemsSold: filteredTransactions.reduce((sum, tx) => {
       let itemSum = 0;
       if (tx.items) {
-         tx.items.forEach(i => itemSum += Number(i.qty) || 0);
+        tx.items.forEach(i => itemSum += Number(i.qty) || 0);
       }
       return sum + itemSum;
     }, 0),
     paymentBreakdown: filteredTransactions.reduce((acc, tx) => {
       const method = tx.payment_method || 'cash';
       if (!acc[method]) acc[method] = 0;
-      acc[method] += 1; // hitung jumlah transaksi
+      acc[method] += 1;
       return acc;
     }, { qris: 0, cash: 0, card: 0 }),
     filterLabel: fLabel
@@ -156,11 +151,11 @@ export default function ReportingModule() {
 
   const handleDownloadReport = () => {
     if (transactions.length === 0) return alert("Belum ada data untuk diunduh.");
-    let csvContent = "Tanggal,Waktu,ID Transaksi,Total Item,Total Pendapatan\n";
+    let csvContent = "Tanggal,Waktu,ID Transaksi,Sumber/Meja,Metode Bayar,Total Item,Total Pendapatan\n";
     transactions.forEach(tx => {
       const dateObj = new Date(tx.created_at);
       const totalItem = tx.items ? tx.items.reduce((acc, curr) => acc + Number(curr.qty), 0) : 0;
-      csvContent += `${dateObj.toLocaleDateString('id-ID')},${dateObj.toLocaleTimeString('id-ID')},${tx.id},${totalItem},${tx.total_amount}\n`;
+      csvContent += `${dateObj.toLocaleDateString('id-ID')},${dateObj.toLocaleTimeString('id-ID')},${tx.id},"${tx.table_number || 'Kasir'}",${(tx.payment_method || 'cash').toUpperCase()},${totalItem},${tx.total_amount}\n`;
     });
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -193,6 +188,9 @@ export default function ReportingModule() {
         setFilter={setFilter} 
         customDate={customDate}
         setCustomDate={setCustomDate}
+        subscriptionPlan={subscriptionPlan}
+        activeOutlet={activeOutlet}
+        onUpgradePlan={onUpgradePlan}
       />
       
       <ReportingMetrics metrics={displayMetrics} />

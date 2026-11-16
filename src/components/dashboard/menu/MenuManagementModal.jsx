@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, Sparkles, LayoutGrid, Coffee, Utensils, Croissant, Cake } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
+import { Plus, Search, LayoutGrid, Coffee, Utensils, Croissant, Cake } from 'lucide-react';
 import { supabase } from '../../../services/supabaseClient';
 import MenuCard from './MenuCard';
 import MenuFormModal from './MenuFormModal';
 
-export default function MenuManagementModule({ products, setProducts, ingredients = [] }) {
+export default function MenuManagementModule({ products, setProducts, ingredients = [], subscriptionPlan = 'pro', onUpgradePlan }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('Semua');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -20,7 +20,6 @@ export default function MenuManagementModule({ products, setProducts, ingredient
     recipe: [{ name: '', qty: '', unit: 'gram' }]
   });
 
-  // Daftar kategori lengkap dengan ikon representatifnya
   const categories = [
     { name: 'Semua', icon: LayoutGrid },
     { name: 'Minuman', icon: Coffee },
@@ -46,7 +45,7 @@ export default function MenuManagementModule({ products, setProducts, ingredient
     setEditingProduct(prod);
     setFormData({
       ...prod,
-      recipe: prod.recipe || [{ name: '', qty: '', unit: 'gram' }]
+      recipe: prod.recipe && prod.recipe.length > 0 ? prod.recipe : [{ name: '', qty: '', unit: 'gram' }]
     });
     setIsModalOpen(true);
   };
@@ -69,13 +68,17 @@ export default function MenuManagementModule({ products, setProducts, ingredient
       return;
     }
 
+    const cleanRecipe = subscriptionPlan === 'starter'
+      ? (editingProduct?.recipe || [])
+      : formData.recipe.filter(r => r.name && r.qty);
+
     const payload = {
       name: formData.name.trim(),
       category: formData.category,
       price: Number(formData.price),
       expiry_date: formData.expiryDate || null,
       image: formData.image,
-      recipe: formData.recipe
+      recipe: cleanRecipe
     };
 
     if (editingProduct) {
@@ -120,8 +123,14 @@ export default function MenuManagementModule({ products, setProducts, ingredient
       {/* Banner Header Modern */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900">Kelola Menu & Resep</h1>
-          <p className="text-zinc-500 text-[13px] font-medium mt-1">Atur katalog produk dan komposisi bahan baku (BOM).</p>
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-900">
+            {subscriptionPlan === 'starter' ? 'Kelola Menu Dasar' : 'Kelola Menu & Resep (BOM)'}
+          </h1>
+          <p className="text-zinc-500 text-[13px] font-medium mt-1">
+            {subscriptionPlan === 'starter'
+              ? 'Atur daftar produk dan harga jual untuk kasir POS mandiri (Paket Starter).'
+              : 'Atur katalog produk dan komposisi takaran bahan baku otomatis (BOM).'}
+          </p>
         </div>
         <button onClick={handleOpenAddModal} className="bg-[#E87F24] hover:bg-[#d6731f] text-white font-medium text-[13px] px-5 py-2.5 rounded-full shadow-[0_4px_14px_rgba(232,127,36,0.25)] cursor-pointer flex items-center gap-2 shrink-0 active:scale-[0.98] transition-all">
           <Plus size={16} /> Tambah Menu Baru
@@ -130,8 +139,6 @@ export default function MenuManagementModule({ products, setProducts, ingredient
 
       {/* Filter Kategori & Pencarian */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        
-        {/* Segmented Control */}
         <div className="flex items-center p-1 bg-black/[0.04] rounded-[14px] overflow-x-auto hide-scrollbar">
           {categories.map(cat => {
             const isActive = activeCategory === cat.name;
@@ -151,7 +158,6 @@ export default function MenuManagementModule({ products, setProducts, ingredient
           })}
         </div>
 
-        {/* Search Field */}
         <div className="relative w-full md:w-64">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
           <input 
@@ -178,6 +184,7 @@ export default function MenuManagementModule({ products, setProducts, ingredient
               idx={idx} 
               onEdit={handleOpenEditModal} 
               onDelete={handleDelete} 
+              subscriptionPlan={subscriptionPlan}
             />
           ))}
         </div>
@@ -193,6 +200,8 @@ export default function MenuManagementModule({ products, setProducts, ingredient
           formData={formData}
           setFormData={setFormData}
           ingredients={ingredients}
+          subscriptionPlan={subscriptionPlan}
+          onUpgradePlan={onUpgradePlan}
         />
       </AnimatePresence>
 

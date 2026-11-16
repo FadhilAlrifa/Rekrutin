@@ -25,7 +25,7 @@ export default function WhyChooseUs() {
   ];
 
   return (
-    <section className="py-28 bg-zinc-950 text-white relative border-t border-zinc-900 overflow-hidden">
+    <section id="why-us" className="py-28 bg-zinc-950 text-white relative border-t border-zinc-900 overflow-hidden">
       {/* Ornamen Grid Latar Belakang */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:64px_64px]"></div>
       
