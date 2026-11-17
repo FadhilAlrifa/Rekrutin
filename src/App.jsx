@@ -199,33 +199,33 @@ export default function App() {
   // Komponen Tampilan Pengunci Fitur saat berada di Paket Starter
   const renderStarterLockedFeature = (featureTitle, featureDesc, highlights) => (
     <motion.div
-      initial={{ opacity: 0, y: 15 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-      className="bg-white border border-zinc-200/80 rounded-3xl p-8 md:p-12 shadow-sm max-w-3xl mx-auto my-8 text-center space-y-6"
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      className="bg-white border border-zinc-200 rounded-2xl p-8 md:p-12 shadow-sm max-w-3xl mx-auto my-8 text-center space-y-6"
     >
-      <div className="w-14 h-14 rounded-2xl bg-orange-50 border border-orange-200 text-[#E87F24] flex items-center justify-center mx-auto shadow-xs">
+      <div className="w-14 h-14 rounded-2xl bg-[#FEF3C7] border border-[#FDE68A] text-[#B45309] flex items-center justify-center mx-auto">
         <Lock size={26} />
       </div>
       <div className="space-y-2">
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider px-3.5 py-1 rounded-full bg-zinc-900 text-[#FFC81E]">
+        <span className="inline-flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] px-3.5 py-1 rounded-full bg-[#141414] text-[#F59E0B]">
           <ShieldCheck size={13} /> Fitur Paket Pro & Enterprise
         </span>
-        <h2 className="text-2xl md:text-3xl font-black text-zinc-900 tracking-tight pt-1">
+        <h2 className="text-2xl md:text-3xl font-extrabold text-[#141414] tracking-tight pt-1">
           {featureTitle}
         </h2>
-        <p className="text-xs md:text-sm text-zinc-600 font-medium max-w-xl mx-auto leading-relaxed">
+        <p className="text-xs md:text-sm text-[#52525B] font-medium max-w-xl mx-auto leading-relaxed">
           {featureDesc}
         </p>
       </div>
 
-      <div className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-6 text-left max-w-lg mx-auto space-y-3">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+      <div className="bg-[#FAFAFA] border border-zinc-200 rounded-2xl p-6 text-left max-w-lg mx-auto space-y-3">
+        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#52525B]">
           Keunggulan yang Akan Terbuka:
         </p>
         {highlights.map((h, i) => (
-          <div key={i} className="flex items-start gap-2.5 text-xs font-semibold text-zinc-700">
-            <div className="w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+          <div key={i} className="flex items-start gap-2.5 text-xs font-semibold text-[#141414]">
+            <div className="w-5 h-5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
               <Check size={12} />
             </div>
             <span>{h}</span>
@@ -236,13 +236,13 @@ export default function App() {
       <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
         <button
           onClick={() => setSubscriptionPlan('pro')}
-          className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-gradient-to-r from-[#E87F24] to-[#FFC81E] text-zinc-950 font-bold text-xs shadow-md cursor-pointer active:scale-95 transition-all"
+          className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] font-bold text-xs shadow-sm cursor-pointer active:scale-95 transition-all"
         >
           Aktifkan Paket Pro (Rp149.000/bln)
         </button>
         <button
           onClick={() => setSubscriptionPlan('enterprise')}
-          className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs cursor-pointer active:scale-95 transition-all"
+          className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-[#141414] hover:bg-zinc-800 text-white font-bold text-xs cursor-pointer active:scale-95 transition-all"
         >
           Coba Paket Enterprise (Multi-Outlet)
         </button>
@@ -321,13 +321,13 @@ export default function App() {
         return (
           <motion.div 
             key="app"
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             className="w-full"
           >
-            <div className="min-h-screen bg-[#f5f5f7] text-zinc-900 font-sans flex flex-col lg:flex-row relative selection:bg-[#FFC81E]/30 selection:text-zinc-900">
+            <div className="min-h-screen bg-[#FAFAFA] text-[#141414] font-sans flex flex-col lg:flex-row relative selection:bg-[#F59E0B] selection:text-[#141414]">
               
               {/* Navbar Samping */}
               <DashboardNavbar 
@@ -357,16 +357,16 @@ export default function App() {
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="bg-zinc-900 text-white rounded-2xl px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg border border-zinc-800"
+                      className="bg-[#111111] text-[#FAFAFA] rounded-2xl px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-zinc-800 shadow-sm"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#E87F24] to-[#FFC81E] text-zinc-950 flex items-center justify-center shrink-0">
+                        <div className="w-9 h-9 rounded-xl bg-[#F59E0B] text-[#141414] flex items-center justify-center shrink-0">
                           <Building2 size={18} />
                         </div>
                         <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-black tracking-tight">Enterprise Multi-Outlet & Central Kitchen</span>
-                            <span className="text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-extrabold tracking-tight">Enterprise Multi-Outlet & Central Kitchen</span>
+                            <span className="font-mono text-[9px] font-bold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">
                               Sinkronisasi Aktif
                             </span>
                           </div>
@@ -377,11 +377,11 @@ export default function App() {
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[10px] font-bold text-zinc-400 uppercase">Cabang:</span>
+                        <span className="font-mono text-[10px] font-bold text-zinc-400 uppercase">Cabang:</span>
                         <select
                           value={activeOutlet}
                           onChange={(e) => setActiveOutlet(e.target.value)}
-                          className="bg-zinc-800 border border-zinc-700 text-white text-xs font-bold rounded-xl px-3.5 py-2 focus:outline-none focus:border-[#E87F24] cursor-pointer"
+                          className="bg-zinc-900 border border-zinc-700 text-white text-xs font-bold rounded-xl px-3.5 py-2 focus:outline-none focus:border-[#F59E0B] cursor-pointer"
                         >
                           <option value="Semua Cabang (Terpusat)">Semua Cabang (Terpusat)</option>
                           <option value="Cabang Utama - Makassar">Cabang Utama - Makassar</option>
@@ -479,7 +479,7 @@ export default function App() {
                             ]
                           )
                         ) : (
-                          <AlertsModule ingredients={ingredients} />
+                          <AlertsModule ingredients={ingredients} setActiveTab={setActiveTab} />
                         )
                       )}
 

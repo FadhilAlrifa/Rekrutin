@@ -16,6 +16,12 @@ import {
   Building2,
   TrendingUp
 } from 'lucide-react';
+import MaskedWords from './MaskedWords';
+import {
+  animateMaskedWordsOnScroll,
+  animateSlideUpOnScroll,
+  animateZoomSlideUpOnScroll
+} from './headingReveal';
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
@@ -45,6 +51,7 @@ const SCROLL_STEPS = [
 
 export default function WhyChooseUs() {
   const sectionRef = useRef(null);
+  const headingRef = useRef(null);
   const pinWrapperRef = useRef(null);
   const progressFillRef = useRef(null);
   const [mode, setMode] = useState('stocko');
@@ -52,6 +59,24 @@ export default function WhyChooseUs() {
 
   useGSAP(
     () => {
+      animateMaskedWordsOnScroll(headingRef.current);
+      animateSlideUpOnScroll('.why-sub-reveal', sectionRef.current, {
+        y: 24,
+        duration: 0.85,
+        stagger: 0.08
+      });
+      animateZoomSlideUpOnScroll('.why-compare-card', '.why-compare-card', {
+        y: 30,
+        scale: 0.97,
+        duration: 0.9
+      });
+      animateSlideUpOnScroll('.why-compare-metric', '.why-compare-card', {
+        y: 30,
+        duration: 0.85,
+        stagger: 0.08,
+        delay: 0.1
+      });
+
       const mm = gsap.matchMedia();
 
       mm.add('(min-width: 1024px)', () => {
@@ -142,18 +167,23 @@ export default function WhyChooseUs() {
           {/* Editorial Header */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end pb-6 border-b border-zinc-800">
             <div className="lg:col-span-8 space-y-3">
-              <span className="font-mono text-xs uppercase tracking-[0.2em] text-[#F59E0B] block">
+              <span className="why-sub-reveal font-mono text-xs uppercase tracking-[0.2em] text-[#F59E0B] block gpu-accelerated">
                 [ 02 // PINNED ARCHITECTURE & AKURASI 99.9% ]
               </span>
-              <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-[1.06] text-[#FAFAFA]">
-                Bukan Sekadar Kasir.{' '}
-                <span className="font-serif italic font-normal text-[#F59E0B]">
-                  Kendali Penuh
-                </span>{' '}
-                Gudang Anda.
+              <h2
+                ref={headingRef}
+                className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-[1.08] text-[#FAFAFA]"
+              >
+                <MaskedWords
+                  segments={[
+                    { text: 'Bukan Sekadar Kasir.' },
+                    { text: 'Kendali Penuh', className: 'font-serif italic font-normal text-[#F59E0B]' },
+                    { text: 'Gudang Anda.' }
+                  ]}
+                />
               </h2>
             </div>
-            <div className="lg:col-span-4">
+            <div className="lg:col-span-4 why-sub-reveal gpu-accelerated">
               <p className="text-zinc-400 font-medium text-xs sm:text-sm leading-relaxed">
                 Gulir layar ke bawah (atau ketuk tiap tahap di mobile) untuk menelusuri alur sinkronisasi 3 tahap dari meja kasir hingga stok gudang.
               </p>
@@ -353,7 +383,7 @@ export default function WhyChooseUs() {
 
       {/* EDITORIAL COMPARISON MATRIX */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-24 relative z-10">
-        <div className="agency-card-dark p-6 sm:p-10 space-y-8">
+        <div className="why-compare-card agency-card-dark p-6 sm:p-10 space-y-8 gpu-accelerated">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-6">
             <div className="flex items-center gap-3.5">
               <div className="w-11 h-11 rounded-2xl bg-[#111111] border border-zinc-800 flex items-center justify-center text-[#F59E0B]">
@@ -402,7 +432,7 @@ export default function WhyChooseUs() {
             {current.metrics.map((m, idx) => (
               <div
                 key={idx}
-                className="bg-[#111111] border border-zinc-800 rounded-2xl p-5 space-y-2.5"
+                className="why-compare-metric bg-[#111111] border border-zinc-800 rounded-2xl p-5 space-y-2.5 gpu-accelerated"
               >
                 <span className="font-mono text-[11px] uppercase tracking-wider text-zinc-400 block">
                   {m.label}

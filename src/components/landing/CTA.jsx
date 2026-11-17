@@ -4,6 +4,12 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
 import { Store, CheckCircle2 } from 'lucide-react';
+import MaskedWords from './MaskedWords';
+import {
+  animateMaskedWordsOnScroll,
+  animateSlideUpOnScroll,
+  animateZoomSlideUpOnScroll
+} from './headingReveal';
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
@@ -45,23 +51,21 @@ function MagneticCtaButton({ children, onClick, className, cursorLabel }) {
 
 export default function CTA({ onOpenApp, onOpenRegister }) {
   const sectionRef = useRef(null);
+  const headingRef = useRef(null);
 
   useGSAP(
     () => {
-      gsap.fromTo(
-        '.cta-reveal',
-        { y: 36, opacity: 0 },
-        {
-          y: 0,
-          opacity: 1,
-          duration: 0.85,
-          ease: 'power3.out',
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: 'top 80%'
-          }
-        }
-      );
+      animateZoomSlideUpOnScroll('.cta-card-reveal', sectionRef.current, {
+        y: 30,
+        scale: 0.97,
+        duration: 0.9
+      });
+      animateMaskedWordsOnScroll(headingRef.current);
+      animateSlideUpOnScroll('.cta-reveal', sectionRef.current, {
+        y: 24,
+        duration: 0.85,
+        stagger: 0.08
+      });
     },
     { scope: sectionRef }
   );
@@ -72,24 +76,29 @@ export default function CTA({ onOpenApp, onOpenRegister }) {
       className="relative py-24 md:py-32 overflow-hidden bg-white"
     >
       <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 text-center">
-        <div className="cta-reveal bg-[#FAFAFA] border border-zinc-200 rounded-3xl p-8 sm:p-14 md:p-20 relative overflow-hidden space-y-7 gpu-accelerated">
-          <span className="font-mono text-xs uppercase tracking-[0.2em] text-[#D97706] font-bold block">
+        <div className="cta-card-reveal bg-[#FAFAFA] border border-zinc-200 rounded-3xl p-8 sm:p-14 md:p-20 relative overflow-hidden space-y-7 gpu-accelerated">
+          <span className="cta-reveal font-mono text-xs uppercase tracking-[0.2em] text-[#D97706] font-bold block gpu-accelerated">
             [ READY TO DEPLOY ]
           </span>
 
-          <h2 className="text-4xl sm:text-6xl font-extrabold text-[#141414] tracking-tight leading-[1.04] max-w-3xl mx-auto">
-            Digitalisasi Kasir &{' '}
-            <span className="font-serif italic font-normal text-[#F59E0B]">
-              Gudang Gerai
-            </span>{' '}
-            Anda Hari Ini.
+          <h2
+            ref={headingRef}
+            className="text-4xl sm:text-6xl font-extrabold text-[#141414] tracking-tight leading-[1.08] max-w-3xl mx-auto"
+          >
+            <MaskedWords
+              segments={[
+                { text: 'Digitalisasi Kasir &' },
+                { text: 'Gudang Gerai', className: 'font-serif italic font-normal text-[#F59E0B]' },
+                { text: 'Anda Hari Ini.' }
+              ]}
+            />
           </h2>
 
-          <p className="text-sm sm:text-base text-[#52525B] font-medium max-w-xl mx-auto leading-relaxed">
+          <p className="cta-reveal text-sm sm:text-base text-[#52525B] font-medium max-w-xl mx-auto leading-relaxed gpu-accelerated">
             Integrasikan pencatatan transaksi kasir, pemotongan bahan baku otomatis (BOM), dan peringatan kedaluwarsa FEFO dalam satu sistem terpadu.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
+          <div className="cta-reveal flex flex-col sm:flex-row items-center justify-center gap-4 pt-2 gpu-accelerated">
             <MagneticCtaButton
               onClick={onOpenRegister}
               cursorLabel="Start"

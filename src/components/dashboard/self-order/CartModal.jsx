@@ -56,14 +56,14 @@ export default function CartModal({ cart, tableNumber, onClose, onCheckout }) {
                 animate={{ opacity: 1, y: 0 }} 
                 transition={{ delay: idx * 0.03 }}
                 key={item.id || idx} 
-                className="flex items-center justify-between bg-white p-3.5 rounded-2xl border border-zinc-200/80 shadow-2xs gap-3"
+                className="flex items-center justify-between bg-white p-3.5 rounded-2xl border border-zinc-200 shadow-sm gap-3"
               >
                 {/* Foto Mini Menu */}
                 <div className="flex items-center gap-3.5 flex-1 min-w-0">
                   <img 
                     src={item.image} 
                     alt={item.name} 
-                    className="w-12 h-12 rounded-xl object-cover bg-zinc-100 shrink-0 border border-zinc-100 shadow-2xs" 
+                    className="w-12 h-12 rounded-xl object-cover bg-zinc-100 shrink-0 border border-zinc-200" 
                   />
                   <div className="min-w-0 flex-1">
                     <p className="font-black text-zinc-900 text-xs sm:text-sm truncate">{item.name}</p>
@@ -105,9 +105,9 @@ export default function CartModal({ cart, tableNumber, onClose, onCheckout }) {
           <button 
             onClick={onCheckout}
             disabled={cart.length === 0}
-            className={`w-full font-black py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            className={`w-full font-extrabold py-4 rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
               cart.length > 0 
-                ? 'bg-gradient-to-r from-[#E87F24] to-[#FFC81E] text-zinc-950 active:scale-95 shadow-orange-500/10' 
+                ? 'bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] active:scale-95' 
                 : 'bg-zinc-200 text-zinc-400 cursor-not-allowed shadow-none'
             }`}
           >

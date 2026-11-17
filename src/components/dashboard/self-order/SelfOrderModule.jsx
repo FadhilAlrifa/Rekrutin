@@ -47,12 +47,12 @@ export default function SelfOrderModule({ products = [], ingredients = [], onChe
         <div className="w-full max-w-md mb-4 flex justify-between items-center px-2">
           <button 
             onClick={() => setActiveTab('pos')}
-            className="px-4 py-2 bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 rounded-2xl text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+            className="px-4 py-2 bg-white hover:bg-[#141414] hover:text-white text-[#141414] border border-zinc-200 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer"
           >
             <ArrowLeft size={14} /> Kembali ke Dashboard
           </button>
-          <span className="text-[11px] font-bold text-zinc-400 bg-zinc-200/60 px-3 py-1 rounded-full flex items-center gap-1.5">
-            <Smartphone size={12} /> Preview Mode Kiosk Mobile
+          <span className="font-mono text-[10px] font-bold text-[#52525B] bg-white border border-zinc-200 px-3 py-1 rounded-full flex items-center gap-1.5">
+            <Smartphone size={12} className="text-[#D97706]" /> Preview Kiosk
           </span>
         </div>
 
@@ -105,7 +105,7 @@ export default function SelfOrderModule({ products = [], ingredients = [], onChe
       </div>
 
       {/* TAMPILAN MOBILE (Layar Penuh HP) */}
-      <div className="block md:hidden w-full min-h-screen bg-zinc-50 relative overflow-hidden flex flex-col -m-6 p-0">
+      <div className="block md:hidden w-full min-h-screen bg-[#FAFAFA] relative overflow-hidden flex flex-col">
         {step === 1 && (
           <WelcomeScreen tableNumber={tableNumber} setTableNumber={setTableNumber} onNext={() => setStep(2)} />
         )}

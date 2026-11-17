@@ -16,6 +16,12 @@ import {
   TrendingUp,
   Smartphone
 } from 'lucide-react';
+import MaskedWords from './MaskedWords';
+import {
+  animateMaskedWordsOnScroll,
+  animateSlideUpOnScroll,
+  animateZoomSlideUpOnScroll
+} from './headingReveal';
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
@@ -42,6 +48,7 @@ const FEFO_ITEMS = {
 
 export default function Features() {
   const sectionRef = useRef(null);
+  const headingRef = useRef(null);
   const [coffeeStock, setCoffeeStock] = useState(1000);
   const [milkStock, setMilkStock] = useState(2000);
   const [cupCount, setCupCount] = useState(0);
@@ -52,23 +59,30 @@ export default function Features() {
 
   useGSAP(
     () => {
-      gsap.fromTo(
-        '.features-editorial-head',
-        { y: 30, opacity: 0 },
-        {
-          y: 0,
-          opacity: 1,
-          duration: 0.8,
-          ease: 'power3.out',
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: 'top 80%'
-          }
-        }
-      );
+      animateMaskedWordsOnScroll(headingRef.current);
+      animateSlideUpOnScroll('.features-editorial-sub', sectionRef.current, {
+        y: 24,
+        duration: 0.85,
+        stagger: 0.08
+      });
 
       const cards = gsap.utils.toArray('.stacking-feature-card');
       cards.forEach((card, index) => {
+        const copyEl = card.querySelector('.feature-copy-reveal');
+        const mockupEl = card.querySelector('.feature-mockup-reveal');
+
+        if (copyEl) {
+          animateSlideUpOnScroll(copyEl, card, { y: 35, duration: 0.85 });
+        }
+        if (mockupEl) {
+          animateZoomSlideUpOnScroll(mockupEl, card, {
+            y: 30,
+            scale: 0.97,
+            duration: 0.9,
+            delay: 0.1
+          });
+        }
+
         const nextCard = cards[index + 1];
         if (!nextCard) return;
 
@@ -108,20 +122,25 @@ export default function Features() {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         {/* Editorial Section Header */}
-        <div className="features-editorial-head grid grid-cols-1 lg:grid-cols-12 gap-8 pb-16 border-b border-zinc-200 mb-14 items-end gpu-accelerated">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pb-16 border-b border-zinc-200 mb-14 items-end">
           <div className="lg:col-span-8 space-y-4">
-            <span className="font-mono text-xs uppercase tracking-[0.2em] text-[#D97706] font-bold block">
+            <span className="features-editorial-sub font-mono text-xs uppercase tracking-[0.2em] text-[#D97706] font-bold block gpu-accelerated">
               [ 01 // KAPABILITAS INTI ]
             </span>
-            <h2 className="text-4xl sm:text-6xl font-extrabold tracking-tight leading-[1.02] text-[#141414]">
-              Sistem Operasional{' '}
-              <span className="font-serif italic font-normal text-[#F59E0B]">
-                Berlapis
-              </span>{' '}
-              Untuk Bisnis F&B Modern.
+            <h2
+              ref={headingRef}
+              className="text-4xl sm:text-6xl font-extrabold tracking-tight leading-[1.08] text-[#141414]"
+            >
+              <MaskedWords
+                segments={[
+                  { text: 'Sistem Operasional' },
+                  { text: 'Berlapis', className: 'font-serif italic font-normal text-[#F59E0B]' },
+                  { text: 'Untuk Bisnis F&B Modern.' }
+                ]}
+              />
             </h2>
           </div>
-          <div className="lg:col-span-4">
+          <div className="lg:col-span-4 features-editorial-sub gpu-accelerated">
             <p className="text-sm text-[#52525B] leading-relaxed font-medium">
               Gulir untuk menumpuk setiap modul inti. Seluruh kartu bersifat interaktif dan dapat diuji langsung di tempat.
             </p>
@@ -138,7 +157,7 @@ export default function Features() {
             className="stacking-feature-card lg:sticky bg-white border border-zinc-200 rounded-3xl p-6 sm:p-10 shadow-[0_-16px_44px_-12px_rgba(0,0,0,0.08)] gpu-accelerated"
           >
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-              <div className="lg:col-span-6 space-y-5">
+              <div className="feature-copy-reveal lg:col-span-6 space-y-5 gpu-accelerated">
                 <div className="flex items-center gap-3">
                   <span className="font-mono text-xs font-bold text-[#141414] bg-[#F59E0B] px-3 py-1 rounded-full">
                     01 / 04
@@ -178,7 +197,7 @@ export default function Features() {
               </div>
 
               {/* Interactive Pipeline Showcase */}
-              <div className="lg:col-span-6 bg-[#FAFAFA] border border-zinc-200 rounded-2xl p-5 sm:p-6 space-y-5">
+              <div className="feature-mockup-reveal lg:col-span-6 bg-[#FAFAFA] border border-zinc-200 rounded-2xl p-5 sm:p-6 space-y-5 gpu-accelerated">
                 <div className="flex items-center justify-between border-b border-zinc-200 pb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-[#141414] text-[#F59E0B] flex items-center justify-center font-mono font-bold text-xs">
@@ -232,7 +251,7 @@ export default function Features() {
             className="stacking-feature-card lg:sticky bg-white border border-zinc-200 rounded-3xl p-6 sm:p-10 shadow-[0_-16px_44px_-12px_rgba(0,0,0,0.08)] gpu-accelerated"
           >
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-              <div className="lg:col-span-6 space-y-5">
+              <div className="feature-copy-reveal lg:col-span-6 space-y-5 gpu-accelerated">
                 <div className="flex items-center gap-3">
                   <span className="font-mono text-xs font-bold text-[#141414] bg-[#F59E0B] px-3 py-1 rounded-full">
                     02 / 04
@@ -280,7 +299,7 @@ export default function Features() {
                 </div>
               </div>
 
-              <div className="lg:col-span-6 bg-[#FAFAFA] border border-zinc-200 rounded-2xl p-5 sm:p-6 space-y-3">
+              <div className="feature-mockup-reveal lg:col-span-6 bg-[#FAFAFA] border border-zinc-200 rounded-2xl p-5 sm:p-6 space-y-3 gpu-accelerated">
                 <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
                   <span className="font-mono text-xs text-[#52525B] uppercase tracking-wider flex items-center gap-2 font-semibold">
                     <Bell size={14} className="text-[#D97706]" /> Monitor Gudang Aktif
@@ -326,7 +345,7 @@ export default function Features() {
             className="stacking-feature-card lg:sticky bg-white border border-zinc-200 rounded-3xl p-6 sm:p-10 shadow-[0_-16px_44px_-12px_rgba(0,0,0,0.08)] gpu-accelerated"
           >
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-              <div className="lg:col-span-6 space-y-5">
+              <div className="feature-copy-reveal lg:col-span-6 space-y-5 gpu-accelerated">
                 <div className="flex items-center gap-3">
                   <span className="font-mono text-xs font-bold text-[#141414] bg-[#F59E0B] px-3 py-1 rounded-full">
                     03 / 04
@@ -350,7 +369,7 @@ export default function Features() {
                 </div>
               </div>
 
-              <div className="lg:col-span-6 bg-[#FAFAFA] border border-zinc-200 rounded-2xl p-5 sm:p-6 space-y-4">
+              <div className="feature-mockup-reveal lg:col-span-6 bg-[#FAFAFA] border border-zinc-200 rounded-2xl p-5 sm:p-6 space-y-4 gpu-accelerated">
                 <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
                   <div>
                     <span className="font-mono text-[10px] uppercase text-[#52525B] block">
@@ -405,7 +424,7 @@ export default function Features() {
             className="stacking-feature-card lg:sticky bg-white border border-zinc-200 rounded-3xl p-6 sm:p-10 shadow-[0_-16px_44px_-12px_rgba(0,0,0,0.08)] gpu-accelerated"
           >
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-              <div className="lg:col-span-6 space-y-5">
+              <div className="feature-copy-reveal lg:col-span-6 space-y-5 gpu-accelerated">
                 <div className="flex items-center gap-3">
                   <span className="font-mono text-xs font-bold text-[#141414] bg-[#F59E0B] px-3 py-1 rounded-full">
                     04 / 04
@@ -455,7 +474,7 @@ export default function Features() {
                 </div>
               </div>
 
-              <div className="lg:col-span-6 bg-[#FAFAFA] border border-zinc-200 rounded-2xl p-5 sm:p-6 space-y-4">
+              <div className="feature-mockup-reveal lg:col-span-6 bg-[#FAFAFA] border border-zinc-200 rounded-2xl p-5 sm:p-6 space-y-4 gpu-accelerated">
                 <div className="grid grid-cols-3 gap-2.5">
                   {[
                     { id: 'qris', label: 'QRIS', icon: QrCode },

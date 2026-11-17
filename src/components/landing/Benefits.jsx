@@ -4,11 +4,17 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
 import { Package, Store, Check } from 'lucide-react';
+import MaskedWords from './MaskedWords';
+import {
+  animateMaskedWordsOnScroll,
+  animateSlideUpOnScroll
+} from './headingReveal';
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 export default function Benefits() {
   const sectionRef = useRef(null);
+  const headingRef = useRef(null);
   const [activeOwnerIdx, setActiveOwnerIdx] = useState(0);
   const [activeCashierIdx, setActiveCashierIdx] = useState(0);
 
@@ -60,21 +66,12 @@ export default function Benefits() {
 
   useGSAP(
     () => {
-      gsap.fromTo(
-        '.benefits-reveal',
-        { y: 36, opacity: 0 },
-        {
-          y: 0,
-          opacity: 1,
-          duration: 0.85,
-          stagger: 0.14,
-          ease: 'power3.out',
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: 'top 78%'
-          }
-        }
-      );
+      animateMaskedWordsOnScroll(headingRef.current);
+      animateSlideUpOnScroll('.benefits-reveal', sectionRef.current, {
+        y: 35,
+        duration: 0.85,
+        stagger: 0.08
+      });
     },
     { scope: sectionRef }
   );
@@ -87,19 +84,24 @@ export default function Benefits() {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-16">
         {/* Editorial Header */}
-        <div className="benefits-reveal grid grid-cols-1 lg:grid-cols-12 gap-6 items-end pb-10 border-b border-zinc-200 gpu-accelerated">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end pb-10 border-b border-zinc-200">
           <div className="lg:col-span-8 space-y-3">
-            <span className="font-mono text-xs uppercase tracking-[0.2em] text-[#D97706] font-bold block">
+            <span className="benefits-reveal font-mono text-xs uppercase tracking-[0.2em] text-[#D97706] font-bold block gpu-accelerated">
               [ 03 // SINERGI OPERASIONAL ]
             </span>
-            <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-[1.06] text-[#141414]">
-              Dirancang Untuk Pemilik &{' '}
-              <span className="font-serif italic font-normal text-[#F59E0B]">
-                Tim Operasional.
-              </span>
+            <h2
+              ref={headingRef}
+              className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-[1.08] text-[#141414]"
+            >
+              <MaskedWords
+                segments={[
+                  { text: 'Dirancang Untuk Pemilik &' },
+                  { text: 'Tim Operasional.', className: 'font-serif italic font-normal text-[#F59E0B]' }
+                ]}
+              />
             </h2>
           </div>
-          <div className="lg:col-span-4">
+          <div className="lg:col-span-4 benefits-reveal gpu-accelerated">
             <p className="text-[#52525B] font-medium text-sm leading-relaxed">
               Klik atau arahkan kursor pada tiap poin untuk melihat metrik efisiensi bagi back-of-house maupun front-of-house.
             </p>

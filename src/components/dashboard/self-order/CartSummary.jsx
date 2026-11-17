@@ -52,16 +52,16 @@ export default function CartSummary({ cart, tableNumber, onCheckout }) {
       )}
 
       <div className="border-t-2 border-dashed border-zinc-200 pt-4 space-y-2">
-        <div className="flex justify-between text-base font-black text-zinc-900">
+        <div className="flex justify-between text-base font-extrabold text-[#141414]">
           <span>Total</span>
-          <span className="font-mono text-[#E87F24]">Rp {totalAmount.toLocaleString('id-ID')}</span>
+          <span className="font-mono text-[#D97706]">Rp {totalAmount.toLocaleString('id-ID')}</span>
         </div>
       </div>
 
       <button 
         onClick={onCheckout}
         disabled={cart.length === 0}
-        className="w-full bg-gradient-to-r from-[#E87F24] to-[#FFC81E] text-zinc-950 font-black py-4 rounded-2xl shadow-lg cursor-pointer disabled:opacity-50 disabled:grayscale transition-transform hover:scale-[1.02]"
+        className="w-full bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] font-extrabold py-4 rounded-xl shadow-sm cursor-pointer disabled:opacity-50 disabled:grayscale transition-all active:scale-95"
       >
         Pesan Sekarang
       </button>

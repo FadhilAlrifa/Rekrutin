@@ -27,7 +27,7 @@ export default function EditItemModal({ isOpen, onClose, onSubmit, editingItem, 
         {/* Header Modal */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-zinc-100 bg-white shrink-0">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-orange-50 border border-orange-100 text-[#E87F24] flex items-center justify-center shadow-2xs">
+            <div className="w-11 h-11 rounded-2xl bg-[#FEF3C7] border border-[#FDE68A] text-[#B45309] flex items-center justify-center shadow-sm">
               <Edit3 size={20} />
             </div>
             <div>
@@ -65,7 +65,7 @@ export default function EditItemModal({ isOpen, onClose, onSubmit, editingItem, 
                     type="text" 
                     value={editingItem.nameOnly} 
                     onChange={(e) => setEditingItem({...editingItem, nameOnly: e.target.value})} 
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#E87F24] focus:ring-3 focus:ring-[#E87F24]/15 transition-all"
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all"
                     required
                   />
                 </div>
@@ -76,7 +76,7 @@ export default function EditItemModal({ isOpen, onClose, onSubmit, editingItem, 
                   <select 
                     value={editingItem.category} 
                     onChange={(e) => setEditingItem({...editingItem, category: e.target.value})} 
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 focus:outline-none focus:bg-white focus:border-[#E87F24] focus:ring-3 focus:ring-[#E87F24]/15 transition-all cursor-pointer"
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all cursor-pointer"
                   >
                     <option value="Bahan Minuman">Bahan Minuman</option>
                     <option value="Bahan Makanan">Bahan Makanan</option>
@@ -94,7 +94,7 @@ export default function EditItemModal({ isOpen, onClose, onSubmit, editingItem, 
                     step="any"
                     value={editingItem.stock} 
                     onChange={(e) => setEditingItem({...editingItem, stock: e.target.value})} 
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#E87F24] focus:ring-3 focus:ring-[#E87F24]/15 transition-all font-mono" 
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all font-mono" 
                     required 
                   />
                 </div>
@@ -107,7 +107,7 @@ export default function EditItemModal({ isOpen, onClose, onSubmit, editingItem, 
                     placeholder="kg / liter / pcs / gram" 
                     value={editingItem.unit} 
                     onChange={(e) => setEditingItem({...editingItem, unit: e.target.value})} 
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#E87F24] focus:ring-3 focus:ring-[#E87F24]/15 transition-all" 
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all" 
                     required 
                   />
                 </div>
@@ -119,7 +119,7 @@ export default function EditItemModal({ isOpen, onClose, onSubmit, editingItem, 
                     type="number" 
                     value={editingItem.minLimit} 
                     onChange={(e) => setEditingItem({...editingItem, minLimit: e.target.value})} 
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#E87F24] focus:ring-3 focus:ring-[#E87F24]/15 transition-all font-mono" 
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all font-mono" 
                   />
                 </div>
               </div>
@@ -139,7 +139,7 @@ export default function EditItemModal({ isOpen, onClose, onSubmit, editingItem, 
                     type="date" 
                     value={editingItem.entryDate || ''} 
                     onChange={(e) => setEditingItem({...editingItem, entryDate: e.target.value})} 
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-xs font-bold text-zinc-900 focus:outline-none focus:bg-white focus:border-[#E87F24] focus:ring-3 focus:ring-[#E87F24]/15 transition-all cursor-pointer"
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-xs font-bold text-zinc-900 focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all cursor-pointer"
                   />
                 </div>
 
@@ -149,7 +149,7 @@ export default function EditItemModal({ isOpen, onClose, onSubmit, editingItem, 
                     type="date" 
                     value={editingItem.expiryDate || ''} 
                     onChange={(e) => setEditingItem({...editingItem, expiryDate: e.target.value})} 
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-xs font-bold text-zinc-900 focus:outline-none focus:bg-white focus:border-[#E87F24] focus:ring-3 focus:ring-[#E87F24]/15 transition-all cursor-pointer"
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-xs font-bold text-zinc-900 focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all cursor-pointer"
                   />
                 </div>
               </div>
@@ -162,17 +162,17 @@ export default function EditItemModal({ isOpen, onClose, onSubmit, editingItem, 
           </div>
 
           {/* Footer Modal */}
-          <div className="px-6 py-4 bg-zinc-50 border-t border-zinc-100 flex items-center justify-end gap-3 shrink-0">
+          <div className="px-6 py-4 bg-[#FAFAFA] border-t border-zinc-200 flex items-center justify-end gap-3 shrink-0">
             <button 
               type="button" 
               onClick={onClose} 
-              className="px-5 py-3 rounded-xl bg-white border border-zinc-200 hover:bg-zinc-100 text-xs font-black text-zinc-600 transition-colors cursor-pointer"
+              className="px-5 py-3 rounded-xl bg-white border border-zinc-200 hover:bg-zinc-100 text-xs font-bold text-[#52525B] transition-colors cursor-pointer"
             >
               Batal
             </button>
             <button 
               type="submit" 
-              className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#E87F24] to-[#FFC81E] hover:from-[#d6731f] hover:to-[#e6b419] text-zinc-950 text-xs font-black shadow-lg shadow-[#E87F24]/20 inline-flex items-center gap-2 transition-all cursor-pointer active:scale-95"
+              className="px-6 py-3 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] text-xs font-extrabold shadow-sm inline-flex items-center gap-2 transition-all cursor-pointer active:scale-95"
             >
               <Check size={16} /> Simpan Perubahan
             </button>

@@ -64,7 +64,7 @@ export default function InventoryTable({
         <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0">
             <table className="w-full text-left border-collapse min-w-[750px]">
                 <thead>
-                    <tr className="border-b border-black/[0.04] text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                    <tr className="border-b border-zinc-200 font-mono text-[10px] font-bold uppercase tracking-wider text-[#52525B]">
                         <th className="pb-3 px-3 md:px-4">Nama Barang Gudang</th>
                         <th className="pb-3 px-3 md:px-4">Total Stok</th>
                         <th className="pb-3 px-3 md:px-4">Tgl. Masuk</th>
@@ -73,7 +73,7 @@ export default function InventoryTable({
                         <th className="pb-3 px-3 md:px-4 text-right">Aksi</th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-black/[0.04] text-[13px] font-medium text-zinc-700">
+                <tbody className="divide-y divide-zinc-100 text-[13px] font-medium text-[#52525B]">
                     {filteredIngredients.map((ing, idx) => {
                         const nameParts = (ing.name || '').split(' | ');
                         const ingName = nameParts[0];
@@ -81,38 +81,48 @@ export default function InventoryTable({
                         
                         const isBelowMin = ing.stock <= ing.minLimit;
                         const expiryStatus = checkExpiryStatus(ing.expiryDate);
+                        const ratioCap = Math.max(Number(ing.minLimit) * 3 || 10, Number(ing.stock) || 1);
+                        const stockPct = Math.min(100, Math.max(6, Math.round((Number(ing.stock) / ratioCap) * 100)));
 
-                        let rowColor = 'hover:bg-black/[0.02]';
-                        if (expiryStatus === 'expired' || isBelowMin) rowColor = 'bg-red-50/30 hover:bg-red-50/60';
-                        else if (expiryStatus === 'hampir') rowColor = 'bg-orange-50/30 hover:bg-orange-50/60';
+                        let rowColor = 'hover:bg-[#FAFAFA]';
+                        if (expiryStatus === 'expired' || isBelowMin) rowColor = 'bg-red-50/40 hover:bg-red-50/70';
+                        else if (expiryStatus === 'hampir') rowColor = 'bg-[#FEF3C7]/35 hover:bg-[#FEF3C7]/60';
 
                         return (
                             <motion.tr initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03 }} key={ing.id} className={`${rowColor} transition-colors`}>
-                                <td className="py-3.5 px-3 md:px-4 font-semibold text-zinc-900 text-[14px] flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-[10px] bg-black/[0.04] text-[#E87F24] flex items-center justify-center shrink-0 border border-black/[0.02]">
+                                <td className="py-3.5 px-3 md:px-4 font-bold text-[#141414] text-[14px] flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-[#FAFAFA] text-[#D97706] flex items-center justify-center shrink-0 border border-zinc-200">
                                         <Package size={14} />
                                     </div>
                                     <div className="flex flex-col">
                                         <span className="truncate max-w-[140px] sm:max-w-[200px] md:max-w-xs">{ingName}</span>
-                                        <span className="text-[11px] font-medium text-zinc-400">{ingCategory}</span>
+                                        <span className="text-[11px] font-medium text-[#52525B]">{ingCategory}</span>
                                     </div>
                                 </td>
 
-                                <td className={`py-3.5 px-3 md:px-4 font-mono font-semibold text-[14px] whitespace-nowrap ${isBelowMin ? 'text-red-600' : 'text-zinc-900'}`}>
-                                    {ing.stock} <span className="text-[11px] text-zinc-500 font-medium ml-0.5">{ing.unit}</span>
+                                <td className="py-3.5 px-3 md:px-4 whitespace-nowrap">
+                                    <div className={`font-mono font-bold text-[14px] ${isBelowMin ? 'text-red-600' : 'text-[#141414]'}`}>
+                                        {ing.stock} <span className="text-[11px] text-[#52525B] font-medium ml-0.5">{ing.unit}</span>
+                                    </div>
+                                    <div className="w-20 h-1.5 bg-zinc-200 rounded-full overflow-hidden mt-1.5">
+                                        <div
+                                            style={{ width: `${stockPct}%` }}
+                                            className={`h-full rounded-full ${isBelowMin ? 'bg-red-600' : expiryStatus === 'hampir' ? 'bg-[#F59E0B]' : 'bg-emerald-600'}`}
+                                        />
+                                    </div>
                                 </td>
 
-                                <td className="py-3.5 px-3 md:px-4 text-zinc-600 whitespace-nowrap">
+                                <td className="py-3.5 px-3 md:px-4 text-[#52525B] whitespace-nowrap">
                                     <div className="flex items-center gap-1.5">
                                         <CalendarDays size={14} className="text-zinc-400 shrink-0" />
                                         <span>{formatTanggal(ing.entryDate)}</span>
                                     </div>
                                 </td>
 
-                                <td className="py-3.5 px-3 md:px-4 text-zinc-600 whitespace-nowrap">
+                                <td className="py-3.5 px-3 md:px-4 text-[#52525B] whitespace-nowrap">
                                     <div className="flex items-center gap-1.5">
-                                        <Clock size={14} className={expiryStatus === 'aman' ? 'text-zinc-400 shrink-0' : 'text-red-500 shrink-0'} />
-                                        <span className={expiryStatus !== 'aman' ? 'font-semibold text-red-600' : ''}>
+                                        <Clock size={14} className={expiryStatus === 'aman' ? 'text-zinc-400 shrink-0' : 'text-red-600 shrink-0'} />
+                                        <span className={expiryStatus !== 'aman' ? 'font-bold text-red-600' : ''}>
                                             {formatTanggal(ing.expiryDate)}
                                         </span>
                                     </div>
@@ -120,15 +130,15 @@ export default function InventoryTable({
 
                                 <td className="py-3.5 px-3 md:px-4 whitespace-nowrap">
                                     {isBelowMin ? (
-                                        <span className="bg-red-50 text-red-600 border border-red-100 px-2.5 py-1 rounded-md text-[11px] font-semibold inline-flex items-center gap-1">
+                                        <span className="bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-md font-mono text-[10px] font-bold inline-flex items-center gap-1">
                                             <AlertTriangle size={12} /> Restock
                                         </span>
                                     ) : expiryStatus === 'hampir' ? (
-                                        <span className="bg-orange-50 text-orange-600 border border-orange-100 px-2.5 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap">
+                                        <span className="bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] px-2.5 py-1 rounded-md font-mono text-[10px] font-bold whitespace-nowrap">
                                             Hampir Exp
                                         </span>
                                     ) : (
-                                        <span className="bg-emerald-50 text-emerald-600 border border-emerald-100 px-2.5 py-1 rounded-md text-[11px] font-semibold inline-flex items-center gap-1 whitespace-nowrap">
+                                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-md font-mono text-[10px] font-bold inline-flex items-center gap-1 whitespace-nowrap">
                                             <ShieldCheck size={12} /> Aman
                                         </span>
                                     )}
@@ -137,14 +147,14 @@ export default function InventoryTable({
                                 <td className="py-3.5 px-3 md:px-4 text-right space-x-1.5 whitespace-nowrap">
                                     <button 
                                         onClick={() => handleOpenEdit(ing)} 
-                                        className="px-2.5 py-1.5 bg-black/[0.04] hover:bg-black/[0.08] text-zinc-700 rounded-[8px] font-medium transition-colors cursor-pointer inline-flex items-center gap-1 text-[12px] active:scale-95"
+                                        className="px-2.5 py-1.5 bg-[#FAFAFA] hover:bg-zinc-200 border border-zinc-200 text-[#141414] rounded-lg font-bold transition-colors cursor-pointer inline-flex items-center gap-1 text-[12px] active:scale-95"
                                         title="Edit Barang"
                                     >
                                         <Edit3 size={12} /> <span className="hidden lg:inline">Edit</span>
                                     </button>
                                     <button 
                                         onClick={() => handleDeleteIngredient(ing.id, ing.name)} 
-                                        className="px-2.5 py-1.5 bg-red-50 hover:bg-red-500 hover:text-white text-red-500 rounded-[8px] font-medium transition-colors cursor-pointer inline-flex items-center gap-1 text-[12px] active:scale-95"
+                                        className="px-2.5 py-1.5 bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-600 rounded-lg font-bold transition-colors cursor-pointer inline-flex items-center gap-1 text-[12px] active:scale-95"
                                         title="Hapus Barang"
                                     >
                                         <Trash2 size={12} /> <span className="hidden lg:inline">Hapus</span>

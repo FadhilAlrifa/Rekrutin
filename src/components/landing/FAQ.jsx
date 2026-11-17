@@ -4,11 +4,17 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
 import { ChevronDown, MessageSquare } from 'lucide-react';
+import MaskedWords from './MaskedWords';
+import {
+  animateMaskedWordsOnScroll,
+  animateSlideUpOnScroll
+} from './headingReveal';
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 export default function FAQ() {
   const sectionRef = useRef(null);
+  const headingRef = useRef(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
   const faqs = [
@@ -36,21 +42,12 @@ export default function FAQ() {
 
   useGSAP(
     () => {
-      gsap.fromTo(
-        '.faq-reveal',
-        { y: 28, opacity: 0 },
-        {
-          y: 0,
-          opacity: 1,
-          duration: 0.75,
-          stagger: 0.1,
-          ease: 'power3.out',
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: 'top 80%'
-          }
-        }
-      );
+      animateMaskedWordsOnScroll(headingRef.current);
+      animateSlideUpOnScroll('.faq-reveal', sectionRef.current, {
+        y: 35,
+        duration: 0.85,
+        stagger: 0.08
+      });
     },
     { scope: sectionRef }
   );
@@ -64,23 +61,28 @@ export default function FAQ() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
           {/* Left Column */}
-          <div className="faq-reveal lg:col-span-4 lg:sticky lg:top-28 space-y-6 gpu-accelerated">
+          <div className="lg:col-span-4 lg:sticky lg:top-28 space-y-6">
             <div className="space-y-3">
-              <span className="font-mono text-xs uppercase tracking-[0.2em] text-[#D97706] font-bold block">
+              <span className="faq-reveal font-mono text-xs uppercase tracking-[0.2em] text-[#D97706] font-bold block gpu-accelerated">
                 [ 05 // PUSAT INFORMASI ]
               </span>
-              <h2 className="text-3xl sm:text-5xl font-extrabold text-[#141414] tracking-tight leading-[1.06]">
-                Pertanyaan{' '}
-                <span className="font-serif italic font-normal text-[#F59E0B]">
-                  Umum.
-                </span>
+              <h2
+                ref={headingRef}
+                className="text-3xl sm:text-5xl font-extrabold text-[#141414] tracking-tight leading-[1.08]"
+              >
+                <MaskedWords
+                  segments={[
+                    { text: 'Pertanyaan' },
+                    { text: 'Umum.', className: 'font-serif italic font-normal text-[#F59E0B]' }
+                  ]}
+                />
               </h2>
-              <p className="text-[#52525B] text-sm font-medium leading-relaxed">
+              <p className="faq-reveal text-[#52525B] text-sm font-medium leading-relaxed gpu-accelerated">
                 Pelajari cara kerja otomatisasi resep BOM, peringatan dini FEFO, dan manajemen operasional di Stocko.
               </p>
             </div>
 
-            <div className="bg-white border border-zinc-200 rounded-3xl p-6 space-y-4 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.06)]">
+            <div className="faq-reveal bg-white border border-zinc-200 rounded-3xl p-6 space-y-4 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.06)] gpu-accelerated">
               <div className="w-10 h-10 rounded-xl bg-[#FEF3C7] border border-[#FDE68A] text-[#D97706] flex items-center justify-center">
                 <MessageSquare size={18} />
               </div>

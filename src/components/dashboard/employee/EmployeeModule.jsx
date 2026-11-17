@@ -76,15 +76,15 @@ export default function EmployeeModule({ subscriptionPlan = 'pro', onUpgradePlan
   return (
     <div className="space-y-6 pb-16">
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 mb-2">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 pb-5 border-b border-zinc-200">
         <div className="space-y-1">
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="bg-orange-50 text-[#E87F24] border border-orange-200 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
-              <ShieldCheck size={12} /> {isStarter ? 'Akses Terbatas (Paket Starter)' : 'Manajemen Hak Akses Karyawan (RBAC)'}
+          <div className="flex items-center gap-2 mb-2">
+            <span className="font-mono bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-[0.14em] inline-flex items-center gap-1.5">
+              <ShieldCheck size={12} /> {isStarter ? 'Akses Terbatas (Paket Starter)' : '[ 05 // HAK AKSES TIM (RBAC) ]'}
             </span>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900">Kelola Karyawan</h1>
-          <p className="text-xs font-medium text-zinc-600 max-w-lg">
+          <h1 className="text-3xl font-extrabold tracking-tight text-[#141414]">Kelola Karyawan</h1>
+          <p className="text-xs font-medium text-[#52525B] max-w-lg">
             {isStarter
               ? 'Paket Starter mendukung 1 Superadmin dan maksimal 1 akun Kasir POS. Upgrade ke Paket Pro untuk mengaktifkan peran Stocker Gudang.'
               : 'Tambahkan akun staf dan pisahkan hak akses operasional antara Kasir POS dan Stocker Gudang.'}
@@ -95,7 +95,7 @@ export default function EmployeeModule({ subscriptionPlan = 'pro', onUpgradePlan
           {starterLimitReached && onUpgradePlan ? (
             <button
               onClick={() => onUpgradePlan('pro')}
-              className="bg-[#E87F24] hover:bg-[#d6731f] text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
+              className="bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] font-extrabold text-xs px-5 py-2.5 rounded-xl shadow-sm flex items-center gap-2 cursor-pointer transition-colors"
             >
               <UserPlus size={15} /> Upgrade ke Pro (Tambah Staf)
             </button>
@@ -105,7 +105,7 @@ export default function EmployeeModule({ subscriptionPlan = 'pro', onUpgradePlan
                 setErrorMessage('');
                 setIsModalOpen(true);
               }}
-              className="bg-[#E87F24] hover:bg-[#d6731f] text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
+              className="bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] font-extrabold text-xs px-5 py-2.5 rounded-xl shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
             >
               <Plus size={16} /> Tambah Karyawan
             </button>
@@ -113,19 +113,37 @@ export default function EmployeeModule({ subscriptionPlan = 'pro', onUpgradePlan
         </div>
       </div>
 
+      {/* Ringkasan Kuota & Peran Staf */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="bg-white border border-zinc-200 rounded-2xl p-4">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#52525B]">Total Akun Staf</span>
+          <p className="text-2xl font-extrabold font-mono text-[#141414] mt-1">{employees.length}</p>
+        </div>
+        <div className="bg-white border border-zinc-200 rounded-2xl p-4">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#D97706]">Kasir POS</span>
+          <p className="text-2xl font-extrabold font-mono text-[#141414] mt-1">{kasirCount}</p>
+        </div>
+        <div className="bg-white border border-zinc-200 rounded-2xl p-4">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#52525B]">Stocker Gudang</span>
+          <p className="text-2xl font-extrabold font-mono text-[#141414] mt-1">
+            {employees.filter(e => e.role === 'stocker').length}
+          </p>
+        </div>
+      </div>
+
       {/* BANNER KUOTA STARTER */}
       {isStarter && (
-        <div className="bg-orange-50/80 border border-orange-200/80 rounded-2xl px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 text-xs font-bold text-zinc-700">
-            <Lock size={15} className="text-[#E87F24] shrink-0" />
+        <div className="bg-[#FEF3C7]/60 border border-[#FDE68A] rounded-2xl px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 text-xs font-bold text-[#141414]">
+            <Lock size={15} className="text-[#D97706] shrink-0" />
             <span>
-              Kuota Akun Kasir Paket Starter: <strong className="text-[#E87F24]">{kasirCount} / 1 Kasir</strong> (Peran Stocker Gudang terkunci di Paket Starter).
+              Kuota Akun Kasir Paket Starter: <strong className="text-[#B45309]">{kasirCount} / 1 Kasir</strong> (Peran Stocker Gudang terkunci di Paket Starter).
             </span>
           </div>
           {onUpgradePlan && (
             <button
               onClick={() => onUpgradePlan('pro')}
-              className="text-[11px] font-black text-[#E87F24] hover:underline cursor-pointer shrink-0"
+              className="text-[11px] font-extrabold text-[#B45309] hover:underline cursor-pointer shrink-0"
             >
               Buka Full RBAC di Paket Pro →
             </button>
@@ -138,49 +156,49 @@ export default function EmployeeModule({ subscriptionPlan = 'pro', onUpgradePlan
         {successMsg && (
           <motion.div 
             initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-            className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-6 py-4 rounded-2xl flex items-center gap-3 text-sm font-bold shadow-sm"
+            className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-6 py-4 rounded-2xl flex items-center gap-3 text-sm font-bold shadow-sm"
           >
-            <CheckCircle2 size={20} className="text-emerald-500" /> {successMsg}
+            <CheckCircle2 size={20} className="text-emerald-600" /> {successMsg}
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* TABEL KARYAWAN */}
-      <div className="bg-white border border-zinc-200/80 rounded-3xl shadow-xl overflow-hidden">
+      <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-zinc-50/50 border-b border-zinc-100 text-[10px] font-black text-zinc-400 uppercase tracking-wider">
-                <th className="p-5 pl-6 w-12">#</th>
-                <th className="p-5">Email Karyawan</th>
-                <th className="p-5">Jabatan (Role)</th>
-                <th className="p-5 text-right pr-6">Aksi</th>
+              <tr className="bg-[#FAFAFA] border-b border-zinc-200 font-mono text-[10px] font-bold text-[#52525B] uppercase tracking-wider">
+                <th className="p-4 pl-6 w-12">#</th>
+                <th className="p-4">Email Karyawan</th>
+                <th className="p-4">Jabatan (Role)</th>
+                <th className="p-4 text-right pr-6">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
               {employees.map((emp, index) => (
-                <tr key={emp.id} className="hover:bg-zinc-50/50 transition-colors group">
-                  <td className="p-5 pl-6 text-xs font-bold text-zinc-400">{index + 1}</td>
-                  <td className="p-5">
+                <tr key={emp.id} className="hover:bg-[#FAFAFA] transition-colors group">
+                  <td className="p-4 pl-6 font-mono text-xs font-bold text-[#52525B]">{index + 1}</td>
+                  <td className="p-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-zinc-100 text-zinc-500 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-xl bg-[#FAFAFA] border border-zinc-200 text-[#52525B] flex items-center justify-center">
                         <UserCog size={18} />
                       </div>
-                      <span className="font-bold text-zinc-900 text-sm">{emp.email}</span>
+                      <span className="font-bold text-[#141414] text-sm">{emp.email}</span>
                     </div>
                   </td>
-                  <td className="p-5">
-                    <span className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 w-max ${
-                      emp.role === 'kasir' ? 'bg-orange-50 text-[#E87F24] border border-orange-200/60' : 'bg-zinc-100 text-zinc-800 border border-zinc-200'
+                  <td className="p-4">
+                    <span className={`px-3 py-1 rounded-lg font-mono text-[11px] font-bold flex items-center gap-1.5 w-max ${
+                      emp.role === 'kasir' ? 'bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]' : 'bg-[#FAFAFA] text-[#141414] border border-zinc-200'
                     }`}>
-                      <Briefcase size={14} />
+                      <Briefcase size={13} />
                       {emp.role === 'kasir' ? 'Kasir POS' : 'Stocker Gudang'}
                     </span>
                   </td>
-                  <td className="p-5 text-right pr-6">
+                  <td className="p-4 text-right pr-6">
                     <button 
                       onClick={() => handleDelete(emp)}
-                      className="w-8 h-8 rounded-xl bg-red-50 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center ml-auto transition-colors cursor-pointer"
+                      className="w-8 h-8 rounded-xl bg-red-50 border border-red-200 text-red-600 hover:bg-red-600 hover:text-white flex items-center justify-center ml-auto transition-colors cursor-pointer"
                       title="Cabut Akses"
                     >
                       <Trash2 size={14} />
@@ -190,7 +208,7 @@ export default function EmployeeModule({ subscriptionPlan = 'pro', onUpgradePlan
               ))}
               {employees.length === 0 && (
                 <tr>
-                  <td colSpan="4" className="text-center py-12 text-zinc-400 text-sm font-medium">
+                  <td colSpan="4" className="text-center py-12 text-[#52525B] text-sm font-medium">
                     Belum ada karyawan yang terdaftar.
                   </td>
                 </tr>
@@ -219,7 +237,7 @@ export default function EmployeeModule({ subscriptionPlan = 'pro', onUpgradePlan
               {/* Header Modal */}
               <div className="flex items-center justify-between px-6 py-5 border-b border-zinc-100 bg-white shrink-0">
                 <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-2xl bg-orange-50 border border-orange-100 text-[#E87F24] flex items-center justify-center shadow-2xs">
+                  <div className="w-11 h-11 rounded-2xl bg-[#FEF3C7] border border-[#FDE68A] text-[#B45309] flex items-center justify-center shadow-sm">
                     <Users size={20} />
                   </div>
                   <div>
@@ -253,7 +271,7 @@ export default function EmployeeModule({ subscriptionPlan = 'pro', onUpgradePlan
                       <input 
                         type="email" required placeholder="karyawan@toko.com"
                         value={newEmployee.email} onChange={e => setNewEmployee({...newEmployee, email: e.target.value})}
-                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 pl-11 text-sm text-zinc-900 font-bold placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#E87F24] focus:ring-3 focus:ring-[#E87F24]/15 transition-all"
+                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 pl-11 text-sm text-zinc-900 font-bold placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all"
                       />
                     </div>
                   </div>
@@ -265,7 +283,7 @@ export default function EmployeeModule({ subscriptionPlan = 'pro', onUpgradePlan
                       <input 
                         type="text" required placeholder="Buat sandi yang mudah diingat"
                         value={newEmployee.password} onChange={e => setNewEmployee({...newEmployee, password: e.target.value})}
-                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 pl-11 text-sm text-zinc-900 font-bold placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#E87F24] focus:ring-3 focus:ring-[#E87F24]/15 transition-all"
+                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 pl-11 text-sm text-zinc-900 font-bold placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all"
                       />
                     </div>
                   </div>
@@ -276,13 +294,13 @@ export default function EmployeeModule({ subscriptionPlan = 'pro', onUpgradePlan
                       <button
                         type="button"
                         onClick={() => setNewEmployee({...newEmployee, role: 'kasir'})}
-                        className={`p-4 rounded-2xl border text-xs font-black transition-all flex flex-col items-center gap-2 cursor-pointer ${
+                        className={`p-4 rounded-2xl border text-xs font-extrabold transition-all flex flex-col items-center gap-2 cursor-pointer ${
                           newEmployee.role === 'kasir' 
-                          ? 'bg-orange-50 border-[#E87F24] text-[#E87F24] ring-3 ring-[#E87F24]/15' 
-                          : 'bg-zinc-50 border-zinc-200 text-zinc-500 hover:bg-zinc-100'
+                          ? 'bg-[#FEF3C7] border-[#F59E0B] text-[#B45309] ring-2 ring-[#F59E0B]/20' 
+                          : 'bg-[#FAFAFA] border-zinc-200 text-[#52525B] hover:bg-zinc-100'
                         }`}
                       >
-                        <Store size={22} className={newEmployee.role === 'kasir' ? 'text-[#E87F24]' : 'text-zinc-400'} />
+                        <Store size={22} className={newEmployee.role === 'kasir' ? 'text-[#D97706]' : 'text-zinc-400'} />
                         <span>Kasir POS</span>
                       </button>
                       
@@ -295,18 +313,18 @@ export default function EmployeeModule({ subscriptionPlan = 'pro', onUpgradePlan
                           }
                           setNewEmployee({...newEmployee, role: 'stocker'});
                         }}
-                        className={`p-4 rounded-2xl border text-xs font-black transition-all flex flex-col items-center gap-2 cursor-pointer relative ${
+                        className={`p-4 rounded-2xl border text-xs font-extrabold transition-all flex flex-col items-center gap-2 cursor-pointer relative ${
                           newEmployee.role === 'stocker' 
-                          ? 'bg-orange-50 border-[#E87F24] text-[#E87F24] ring-3 ring-[#E87F24]/15' 
-                          : 'bg-zinc-50 border-zinc-200 text-zinc-500 hover:bg-zinc-100'
+                          ? 'bg-[#FEF3C7] border-[#F59E0B] text-[#B45309] ring-2 ring-[#F59E0B]/20' 
+                          : 'bg-[#FAFAFA] border-zinc-200 text-[#52525B] hover:bg-zinc-100'
                         }`}
                       >
                         {isStarter && (
-                          <span className="absolute top-2 right-2 bg-zinc-900 text-[#FFC81E] text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="absolute top-2 right-2 bg-[#141414] text-[#F59E0B] text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                             <Lock size={9} /> PRO
                           </span>
                         )}
-                        <Package size={22} className={newEmployee.role === 'stocker' ? 'text-[#E87F24]' : 'text-zinc-400'} />
+                        <Package size={22} className={newEmployee.role === 'stocker' ? 'text-[#D97706]' : 'text-zinc-400'} />
                         <span>Stocker Gudang</span>
                       </button>
                     </div>
@@ -314,18 +332,18 @@ export default function EmployeeModule({ subscriptionPlan = 'pro', onUpgradePlan
                 </div>
 
                 {/* Footer Modal */}
-                <div className="px-6 py-4 bg-zinc-50 border-t border-zinc-100 flex items-center justify-end gap-3 shrink-0">
+                <div className="px-6 py-4 bg-[#FAFAFA] border-t border-zinc-200 flex items-center justify-end gap-3 shrink-0">
                   <button 
                     type="button" 
                     onClick={() => setIsModalOpen(false)} 
-                    className="px-5 py-3 rounded-xl bg-white border border-zinc-200 hover:bg-zinc-100 text-xs font-black text-zinc-600 transition-colors cursor-pointer"
+                    className="px-5 py-3 rounded-xl bg-white border border-zinc-200 hover:bg-zinc-100 text-xs font-bold text-[#52525B] transition-colors cursor-pointer"
                   >
                     Batal
                   </button>
                   <button 
                     type="submit" 
                     disabled={isSubmitting}
-                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#E87F24] to-[#FFC81E] hover:from-[#d6731f] hover:to-[#e6b419] text-zinc-950 text-xs font-black shadow-lg shadow-[#E87F24]/20 inline-flex items-center gap-2 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                    className="px-6 py-3 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] text-xs font-extrabold shadow-sm inline-flex items-center gap-2 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                   >
                     {isSubmitting ? 'Memproses...' : 'Simpan & Daftarkan'}
                   </button>

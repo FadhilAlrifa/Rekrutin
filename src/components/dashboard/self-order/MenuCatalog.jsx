@@ -62,7 +62,7 @@ export default function MenuCatalog({ products = [], ingredients = [], cart = []
             placeholder="Cari makanan atau minuman..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-medium focus:outline-none focus:border-[#E87F24] transition-all shadow-2xs"
+            className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl pl-11 pr-4 py-3 text-xs font-medium text-[#141414] focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all"
           />
         </div>
 
@@ -93,11 +93,11 @@ export default function MenuCatalog({ products = [], ingredients = [], cart = []
       {/* Grid Katalog Menu */}
       <div className="flex-1 overflow-y-auto px-6 pt-6 pb-28">
         {filteredProducts.length === 0 ? (
-          <div className="bg-white border border-zinc-200/80 rounded-[2.5rem] p-12 text-center text-zinc-400 text-xs font-bold shadow-xs">
+          <div className="bg-white border border-zinc-200 rounded-2xl p-12 text-center text-[#52525B] text-xs font-bold shadow-sm">
             Tidak ada menu ditemukan dalam pencarian ini.
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-3.5">
             {filteredProducts.map((menu, idx) => {
               const cartItem = cart.find(item => item.id === menu.id);
               const qty = cartItem ? cartItem.qty : 0;
@@ -143,9 +143,9 @@ export default function MenuCatalog({ products = [], ingredients = [], cart = []
                         <button 
                           onClick={() => handleAddClick(menu, isAvailable, stockCheck)} 
                           disabled={!isAvailable}
-                          className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all ${
+                          className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-all ${
                             isAvailable 
-                              ? 'bg-orange-50 text-[#E87F24] hover:bg-[#E87F24] hover:text-white cursor-pointer active:scale-95 shadow-2xs' 
+                              ? 'bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] hover:bg-[#F59E0B] hover:text-[#141414] cursor-pointer active:scale-95' 
                               : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'
                           }`}
                         >

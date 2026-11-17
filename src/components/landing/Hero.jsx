@@ -17,6 +17,7 @@ import {
   Building2,
   Activity
 } from 'lucide-react';
+import MaskedWords from './MaskedWords';
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
@@ -110,30 +111,49 @@ export default function Hero({ onOpenApp, onOpenRegister }) {
 
   useGSAP(
     () => {
-      const tl = gsap.timeline({ defaults: { ease: 'power4.out' } });
+      const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
 
+      // 1. Badge atas
       tl.fromTo(
         '.hero-eyebrow',
-        { y: 18, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.65 }
+        { y: 20, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.7 },
+        0
       )
+        // 2. Judul Utama (Masked Word Slide-Up + Slight Rotation)
         .fromTo(
-          '.hero-mask-line',
-          { yPercent: 115, opacity: 0 },
-          { yPercent: 0, opacity: 1, duration: 0.95, stagger: 0.12 },
-          '-=0.4'
+          '.hero-mask-word',
+          { yPercent: 110, rotate: 2, opacity: 0 },
+          { yPercent: 0, rotate: 0, opacity: 1, duration: 0.9, stagger: 0.06 },
+          0.1
         )
+        // 3. Subjudul / Paragraf Deskripsi (delay 0.25)
         .fromTo(
-          '.hero-meta-reveal',
-          { y: 20, opacity: 0 },
-          { y: 0, opacity: 1, duration: 0.75, stagger: 0.08 },
-          '-=0.55'
+          '.hero-subtitle',
+          { y: 24, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.85 },
+          0.25
         )
+        // 4. Tombol CTA & Bukti Sosial (stagger 0.1)
+        .fromTo(
+          '.hero-cta-reveal',
+          { y: 22, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.8, stagger: 0.1 },
+          0.4
+        )
+        // 5. Studio Mockup Window
         .fromTo(
           studioWindowRef.current,
-          { y: 45, opacity: 0, scale: 0.97 },
-          { y: 0, opacity: 1, scale: 1, duration: 0.95, ease: 'power3.out' },
-          '-=0.45'
+          { y: 30, opacity: 0, scale: 0.97 },
+          { y: 0, opacity: 1, scale: 1, duration: 0.9 },
+          0.55
+        )
+        // 6. Floating Stat Badges di dalam Studio Showcase
+        .fromTo(
+          '.hero-float-badge',
+          { scale: 0.92, y: 20, opacity: 0 },
+          { scale: 1, y: 0, opacity: 1, duration: 0.8, stagger: 0.08 },
+          0.7
         );
 
       // Scroll-Driven Parallax pada Studio Window
@@ -220,29 +240,31 @@ export default function Hero({ onOpenApp, onOpenRegister }) {
           </div>
 
           {/* Oversized Display Headline (Solid Deep Charcoal + Solid Amber Serif Italic) */}
-          <h1 className="text-5xl sm:text-7xl lg:text-[5.75rem] font-extrabold text-[#141414] leading-[0.98] tracking-tight max-w-5xl">
-            <span className="block overflow-hidden pb-2">
-              <span className="hero-mask-line inline-block gpu-accelerated">
-                Kasir Kilat,
-              </span>
+          <h1 className="text-5xl sm:text-7xl lg:text-[5.75rem] font-extrabold text-[#141414] leading-[1.06] tracking-tight max-w-5xl">
+            <span className="block">
+              <MaskedWords
+                segments={[{ text: 'Kasir Kilat,' }]}
+                wordClass="hero-mask-word"
+              />
             </span>
-            <span className="block overflow-hidden pb-3">
-              <span className="hero-mask-line inline-block gpu-accelerated">
-                Gudang{' '}
-                <span className="font-serif italic font-normal text-[#F59E0B] pr-1">
-                  Presisi.
-                </span>
-              </span>
+            <span className="block mt-1">
+              <MaskedWords
+                segments={[
+                  { text: 'Gudang' },
+                  { text: 'Presisi.', className: 'font-serif italic font-normal text-[#F59E0B] pr-1' }
+                ]}
+                wordClass="hero-mask-word"
+              />
             </span>
           </h1>
 
           {/* Subtitle */}
-          <p className="hero-meta-reveal mt-6 text-sm sm:text-lg text-[#52525B] font-medium max-w-2xl leading-relaxed gpu-accelerated">
+          <p className="hero-subtitle mt-6 text-sm sm:text-lg text-[#52525B] font-medium max-w-2xl leading-relaxed gpu-accelerated">
             Setiap pesanan di meja kasir maupun QR Self-Order otomatis memotong stok bahan mentah (Bill of Materials) hingga 3 angka desimal dan menjaga kualitas lewat peringatan FEFO.
           </p>
 
           {/* Magnetic CTAs (Solid Amber + Solid White) */}
-          <div className="hero-meta-reveal mt-9 flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto gpu-accelerated">
+          <div className="hero-cta-reveal mt-9 flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto gpu-accelerated">
             <MagneticButton
               onClick={onOpenApp}
               cursorLabel="Try POS"
@@ -263,7 +285,7 @@ export default function Hero({ onOpenApp, onOpenRegister }) {
           </div>
 
           {/* Architectural Grid Metrics Strip */}
-          <div className="hero-meta-reveal mt-12 w-full max-w-4xl grid grid-cols-1 sm:grid-cols-3 border border-zinc-200 rounded-2xl bg-white divide-y sm:divide-y-0 sm:divide-x divide-zinc-200 gpu-accelerated">
+          <div className="hero-cta-reveal mt-12 w-full max-w-4xl grid grid-cols-1 sm:grid-cols-3 border border-zinc-200 rounded-2xl bg-white divide-y sm:divide-y-0 sm:divide-x divide-zinc-200 gpu-accelerated">
             <div className="px-6 py-4 flex items-center justify-between sm:justify-center gap-3">
               <span className="font-mono text-xs text-[#52525B] uppercase tracking-wider">Gerai Aktif</span>
               <span className="font-mono text-sm font-bold text-[#141414]">2,000+ UMKM</span>
@@ -333,7 +355,7 @@ export default function Hero({ onOpenApp, onOpenRegister }) {
           <div className="p-5 sm:p-8 bg-[#FAFAFA] space-y-6">
             {/* Live Metrics Row */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-white border border-zinc-200 rounded-2xl p-4 flex items-center justify-between">
+              <div className="hero-float-badge bg-white border border-zinc-200 rounded-2xl p-4 flex items-center justify-between gpu-accelerated">
                 <div>
                   <p className="font-mono text-[10px] uppercase tracking-wider text-[#52525B]">
                     Transaksi Hari Ini
@@ -356,7 +378,7 @@ export default function Hero({ onOpenApp, onOpenRegister }) {
                 </div>
               </div>
 
-              <div className="bg-white border border-zinc-200 rounded-2xl p-4 flex items-center justify-between">
+              <div className="hero-float-badge bg-white border border-zinc-200 rounded-2xl p-4 flex items-center justify-between gpu-accelerated">
                 <div>
                   <p className="font-mono text-[10px] uppercase tracking-wider text-[#52525B]">
                     Omzet Kotor Berjalan
@@ -379,7 +401,7 @@ export default function Hero({ onOpenApp, onOpenRegister }) {
                 </div>
               </div>
 
-              <div className="bg-[#141414] text-[#FAFAFA] rounded-2xl p-4 border border-[#141414] flex items-center justify-between">
+              <div className="hero-float-badge bg-[#141414] text-[#FAFAFA] rounded-2xl p-4 border border-[#141414] flex items-center justify-between gpu-accelerated">
                 <div>
                   <div className="flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-[#F59E0B]" />

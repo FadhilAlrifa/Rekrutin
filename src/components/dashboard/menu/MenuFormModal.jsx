@@ -47,7 +47,7 @@ export default function MenuFormModal({ isOpen, onClose, onSubmit, editingProduc
         {/* Header Modal */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-zinc-100 bg-white shrink-0">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-orange-50 border border-orange-100 text-[#E87F24] flex items-center justify-center shadow-2xs">
+            <div className="w-11 h-11 rounded-2xl bg-[#FEF3C7] border border-[#FDE68A] text-[#B45309] flex items-center justify-center shadow-sm">
               {editingProduct ? <Edit3 size={20} /> : <UtensilsCrossed size={20} />}
             </div>
             <div>
@@ -88,7 +88,7 @@ export default function MenuFormModal({ isOpen, onClose, onSubmit, editingProduc
                     placeholder="Contoh: Kopi Susu Aren" 
                     value={formData.name} 
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#E87F24] focus:ring-3 focus:ring-[#E87F24]/15 transition-all" 
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all" 
                     required 
                   />
                 </div>
@@ -99,7 +99,7 @@ export default function MenuFormModal({ isOpen, onClose, onSubmit, editingProduc
                   <select 
                     value={formData.category} 
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })} 
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 focus:outline-none focus:bg-white focus:border-[#E87F24] focus:ring-3 focus:ring-[#E87F24]/15 transition-all cursor-pointer"
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all cursor-pointer"
                   >
                     <option value="Minuman">Minuman</option>
                     <option value="Makanan">Makanan</option>
@@ -118,7 +118,7 @@ export default function MenuFormModal({ isOpen, onClose, onSubmit, editingProduc
                       placeholder="20000" 
                       value={formData.price} 
                       onChange={(e) => setFormData({ ...formData, price: e.target.value })} 
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded-xl pl-10 pr-4 py-3 text-sm font-bold text-zinc-900 placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#E87F24] focus:ring-3 focus:ring-[#E87F24]/15 transition-all font-mono" 
+                      className="w-full bg-zinc-50 border border-zinc-200 rounded-xl pl-10 pr-4 py-3 text-sm font-bold text-zinc-900 placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all font-mono" 
                       required 
                     />
                   </div>
@@ -135,7 +135,7 @@ export default function MenuFormModal({ isOpen, onClose, onSubmit, editingProduc
                         placeholder="https://images.unsplash.com/..." 
                         value={formData.image} 
                         onChange={(e) => setFormData({ ...formData, image: e.target.value })} 
-                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl pl-11 pr-4 py-3 text-xs font-semibold text-zinc-700 placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#E87F24] focus:ring-3 focus:ring-[#E87F24]/15 transition-all" 
+                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl pl-11 pr-4 py-3 text-xs font-semibold text-zinc-700 placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all" 
                       />
                     </div>
                     {formData.image && (
@@ -267,17 +267,17 @@ export default function MenuFormModal({ isOpen, onClose, onSubmit, editingProduc
           </div>
 
           {/* Footer Modal */}
-          <div className="px-6 py-4 bg-zinc-50 border-t border-zinc-100 flex items-center justify-end gap-3 shrink-0">
+          <div className="px-6 py-4 bg-[#FAFAFA] border-t border-zinc-200 flex items-center justify-end gap-3 shrink-0">
             <button 
               type="button" 
               onClick={onClose} 
-              className="px-5 py-3 rounded-xl bg-white border border-zinc-200 hover:bg-zinc-100 text-xs font-black text-zinc-600 transition-colors cursor-pointer"
+              className="px-5 py-3 rounded-xl bg-white border border-zinc-200 hover:bg-zinc-100 text-xs font-bold text-[#52525B] transition-colors cursor-pointer"
             >
               Batal
             </button>
             <button 
               type="submit" 
-              className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#E87F24] to-[#FFC81E] hover:from-[#d6731f] hover:to-[#e6b419] text-zinc-950 text-xs font-black shadow-lg shadow-[#E87F24]/20 inline-flex items-center gap-2 transition-all cursor-pointer active:scale-95"
+              className="px-6 py-3 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] text-xs font-extrabold shadow-sm inline-flex items-center gap-2 transition-all cursor-pointer active:scale-95"
             >
               <Check size={16} /> {editingProduct ? 'Simpan Perubahan' : 'Simpan Menu Baru'}
             </button>

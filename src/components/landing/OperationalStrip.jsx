@@ -3,6 +3,7 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
 import { Layers, Clock, ShieldCheck, Zap, ArrowUpRight } from 'lucide-react';
+import { animateSlideUpOnScroll } from './headingReveal';
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
@@ -46,21 +47,11 @@ export default function OperationalStrip() {
 
   useGSAP(
     () => {
-      gsap.fromTo(
-        '.op-strip-card',
-        { y: 20, opacity: 0 },
-        {
-          y: 0,
-          opacity: 1,
-          duration: 0.65,
-          stagger: 0.08,
-          ease: 'power3.out',
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: 'top 88%'
-          }
-        }
-      );
+      animateSlideUpOnScroll('.op-strip-card', sectionRef.current, {
+        y: 35,
+        duration: 0.85,
+        stagger: 0.08
+      });
     },
     { scope: sectionRef }
   );

@@ -118,65 +118,72 @@ export default function MenuManagementModule({ products, setProducts, ingredient
   });
 
   return (
-    <div className="space-y-8 pb-16">
+    <div className="space-y-6 pb-16">
       
       {/* Banner Header Modern */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 mb-8">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 pb-5 border-b border-zinc-200">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] inline-block mb-2">
+            [ 02 // MANAJEMEN MENU & RESEP ]
+          </span>
+          <h1 className="text-3xl font-extrabold tracking-tight text-[#141414]">
             {subscriptionPlan === 'starter' ? 'Kelola Menu Dasar' : 'Kelola Menu & Resep (BOM)'}
           </h1>
-          <p className="text-zinc-500 text-[13px] font-medium mt-1">
+          <p className="text-[#52525B] text-[13px] font-medium mt-1">
             {subscriptionPlan === 'starter'
               ? 'Atur daftar produk dan harga jual untuk kasir POS mandiri (Paket Starter).'
               : 'Atur katalog produk dan komposisi takaran bahan baku otomatis (BOM).'}
           </p>
         </div>
-        <button onClick={handleOpenAddModal} className="bg-[#E87F24] hover:bg-[#d6731f] text-white font-medium text-[13px] px-5 py-2.5 rounded-full shadow-[0_4px_14px_rgba(232,127,36,0.25)] cursor-pointer flex items-center gap-2 shrink-0 active:scale-[0.98] transition-all">
+        <button onClick={handleOpenAddModal} className="bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] font-extrabold text-xs px-5 py-2.5 rounded-xl shadow-sm cursor-pointer flex items-center gap-2 shrink-0 active:scale-[0.98] transition-all">
           <Plus size={16} /> Tambah Menu Baru
         </button>
       </div>
 
       {/* Filter Kategori & Pencarian */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center p-1 bg-black/[0.04] rounded-[14px] overflow-x-auto hide-scrollbar">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center p-1 bg-zinc-200/70 rounded-xl overflow-x-auto hide-scrollbar w-fit max-w-full">
           {categories.map(cat => {
             const isActive = activeCategory === cat.name;
+            const catCount = cat.name === 'Semua' ? products.length : products.filter(p => p.category === cat.name).length;
             return (
               <button
                 key={cat.name}
                 onClick={() => setActiveCategory(cat.name)}
-                className={`px-4 py-1.5 rounded-[10px] text-[13px] font-medium transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                   isActive 
-                    ? 'bg-white text-zinc-900 shadow-[0_1px_4px_rgba(0,0,0,0.12)] border border-black/[0.04]' 
-                    : 'text-zinc-500 hover:text-zinc-700 hover:bg-black/[0.02] border border-transparent'
+                    ? 'bg-[#141414] text-white shadow-sm' 
+                    : 'text-[#52525B] hover:text-[#141414]'
                 }`}
               >
                 <span>{cat.name}</span>
+                <span className={`font-mono text-[10px] ${isActive ? 'text-[#F59E0B]' : 'text-zinc-400'}`}>
+                  {catCount}
+                </span>
               </button>
             );
           })}
         </div>
 
-        <div className="relative w-full md:w-64">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+        <div className="relative w-full md:w-72">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
           <input 
             type="text" 
             placeholder="Cari nama menu..." 
             value={searchQuery} 
             onChange={(e) => setSearchQuery(e.target.value)} 
-            className="w-full bg-black/[0.04] border-transparent text-zinc-900 text-[13px] rounded-[12px] pl-9 pr-4 py-2 focus:outline-none focus:bg-white focus:border-zinc-300 focus:shadow-[0_0_0_4px_rgba(232,127,36,0.1)] transition-all font-medium" 
+            className="w-full bg-white border border-zinc-200 text-[#141414] text-[13px] rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all font-medium shadow-sm" 
           />
         </div>
       </div>
 
       {/* Grid Kartu Menu */}
       {filteredProducts.length === 0 ? (
-        <div className="bg-white border border-zinc-200/80 rounded-[2.5rem] p-16 text-center text-zinc-400 text-xs font-bold">
+        <div className="bg-white border border-zinc-200 rounded-2xl p-16 text-center text-[#52525B] text-xs font-bold">
           Tidak ada menu ditemukan dalam kategori ini.
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredProducts.map((prod, idx) => (
             <MenuCard 
               key={prod.id} 

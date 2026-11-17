@@ -271,26 +271,31 @@ export default function InventoryModule({
     return matchSearch;
   });
 
+  const healthyCount = ingredients.filter(i => {
+    const expStatus = checkExpiryStatus(i.expiryDate);
+    return i.stock > i.minLimit && expStatus === 'aman';
+  }).length;
+
   const tabs = [
-    { name: 'Semua', icon: LayoutGrid, activeColor: 'text-[#FFC81E]' },
+    { name: 'Semua', icon: LayoutGrid, activeColor: 'text-[#F59E0B]' },
     { name: 'Kritis', icon: AlertTriangle, activeColor: 'text-red-500' },
-    { name: 'Hampir Exp', icon: Clock, activeColor: 'text-orange-500' },
+    { name: 'Hampir Exp', icon: Clock, activeColor: 'text-[#F59E0B]' },
     { name: 'Aman', icon: ShieldCheck, activeColor: 'text-emerald-500' }
   ];
 
   return (
-    <div className="space-y-8 pb-16">
+    <div className="space-y-6 pb-16">
       
       {/* Banner Header Modern */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 mb-6">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 pb-5 border-b border-zinc-200">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-orange-50 text-[#E87F24] border border-orange-200">
-              {isEnterprise ? `Multi-Outlet & Central Kitchen • ${activeOutlet}` : 'Smart Inventory & BOM (Paket Pro)'}
+          <div className="flex items-center gap-2 mb-2">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]">
+              {isEnterprise ? `[ 03 // MULTI-OUTLET • ${activeOutlet} ]` : '[ 03 // SMART INVENTORY & BOM ]'}
             </span>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900">Stok Gudang & BOM</h1>
-          <p className="text-zinc-500 text-[13px] font-medium mt-1">
+          <h1 className="text-3xl font-extrabold tracking-tight text-[#141414]">Stok Gudang & BOM</h1>
+          <p className="text-[#52525B] text-[13px] font-medium mt-1">
             Pantau persediaan bahan baku mentah, tanggal kedaluwarsa (FIFO/FEFO), dan riwayat keluar-masuk stok.
           </p>
         </div>
@@ -304,57 +309,108 @@ export default function InventoryModule({
                 }
                 setIsCentralKitchenOpen(true);
               }} 
-              className="bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-[13px] px-5 py-2.5 rounded-full shadow-md cursor-pointer flex items-center gap-2 shrink-0 active:scale-[0.98] transition-all"
+              className="bg-[#141414] hover:bg-zinc-800 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-sm cursor-pointer flex items-center gap-2 shrink-0 active:scale-[0.98] transition-all"
             >
-              <ArrowRightLeft size={15} className="text-[#FFC81E]" /> Pasok dari Central Kitchen
+              <ArrowRightLeft size={15} className="text-[#F59E0B]" /> Pasok dari Central Kitchen
             </button>
           )}
           <button 
             onClick={() => setIsStockInModalOpen(true)} 
-            className="bg-[#E87F24] hover:bg-[#d6731f] text-white font-medium text-[13px] px-5 py-2.5 rounded-full shadow-[0_4px_14px_rgba(232,127,36,0.25)] cursor-pointer flex items-center gap-2 shrink-0 active:scale-[0.98] transition-all"
+            className="bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] font-extrabold text-xs px-5 py-2.5 rounded-xl shadow-sm cursor-pointer flex items-center gap-2 shrink-0 active:scale-[0.98] transition-all"
           >
             <ArrowDownToLine size={16} /> Catat Barang Masuk
           </button>
         </div>
       </div>
 
+      {/* Ringkasan KPI Gudang (Clickable Quick Filters) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <button
+          type="button"
+          onClick={() => setActiveTab('Semua')}
+          className={`text-left bg-white border rounded-2xl p-4 transition-all cursor-pointer ${
+            activeTab === 'Semua' ? 'border-[#141414] shadow-sm' : 'border-zinc-200 hover:border-zinc-300'
+          }`}
+        >
+          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#52525B]">Total Bahan Baku</span>
+          <p className="text-2xl font-extrabold font-mono text-[#141414] mt-1">{ingredients.length}</p>
+          <span className="text-[11px] font-medium text-[#52525B] block mt-0.5">Item terdaftar</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('Kritis')}
+          className={`text-left bg-white border rounded-2xl p-4 transition-all cursor-pointer ${
+            activeTab === 'Kritis' ? 'border-red-500 shadow-sm' : 'border-zinc-200 hover:border-zinc-300'
+          }`}
+        >
+          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-red-600">Stok Kritis</span>
+          <p className="text-2xl font-extrabold font-mono text-red-600 mt-1">{lowStockCount}</p>
+          <span className="text-[11px] font-medium text-[#52525B] block mt-0.5">Perlu restock segera</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('Hampir Exp')}
+          className={`text-left bg-white border rounded-2xl p-4 transition-all cursor-pointer ${
+            activeTab === 'Hampir Exp' ? 'border-[#F59E0B] shadow-sm' : 'border-zinc-200 hover:border-zinc-300'
+          }`}
+        >
+          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#D97706]">Isu FEFO / Exp</span>
+          <p className="text-2xl font-extrabold font-mono text-[#D97706] mt-1">{nearExpiryCount}</p>
+          <span className="text-[11px] font-medium text-[#52525B] block mt-0.5">≤ 30 hari / kedaluwarsa</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('Aman')}
+          className={`text-left bg-white border rounded-2xl p-4 transition-all cursor-pointer ${
+            activeTab === 'Aman' ? 'border-emerald-500 shadow-sm' : 'border-zinc-200 hover:border-zinc-300'
+          }`}
+        >
+          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-700">Kondisi Aman</span>
+          <p className="text-2xl font-extrabold font-mono text-emerald-700 mt-1">{healthyCount}</p>
+          <span className="text-[11px] font-medium text-[#52525B] block mt-0.5">Siap operasional</span>
+        </button>
+      </div>
+
       {/* Filter Tabs & Search */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center p-1 bg-black/[0.04] rounded-[14px] overflow-x-auto hide-scrollbar">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center p-1 bg-zinc-200/70 rounded-xl overflow-x-auto hide-scrollbar w-fit max-w-full">
           {tabs.map(tab => {
             const isActive = activeTab === tab.name;
             return (
               <button
                 key={tab.name}
                 onClick={() => setActiveTab(tab.name)}
-                className={`px-4 py-1.5 rounded-[10px] text-[13px] font-medium transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                   isActive 
-                    ? 'bg-white text-zinc-900 shadow-[0_1px_4px_rgba(0,0,0,0.12)] border border-black/[0.04]' 
-                    : 'text-zinc-500 hover:text-zinc-700 hover:bg-black/[0.02] border border-transparent'
+                    ? 'bg-[#141414] text-white shadow-sm' 
+                    : 'text-[#52525B] hover:text-[#141414]'
                 }`}
               >
                 <span>{tab.name}</span>
-                {tab.name === 'Kritis' && <span className="opacity-80 font-semibold">({lowStockCount})</span>}
-                {tab.name === 'Hampir Exp' && <span className="opacity-80 font-semibold">({nearExpiryCount})</span>}
+                {tab.name === 'Kritis' && <span className={`font-mono text-[10px] ${isActive ? 'text-red-400' : 'text-zinc-500'}`}>({lowStockCount})</span>}
+                {tab.name === 'Hampir Exp' && <span className={`font-mono text-[10px] ${isActive ? 'text-[#F59E0B]' : 'text-zinc-500'}`}>({nearExpiryCount})</span>}
               </button>
             );
           })}
         </div>
 
-        <div className="relative w-full md:w-64">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+        <div className="relative w-full md:w-72">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
           <input 
             type="text" 
             placeholder="Cari bahan baku..." 
             value={searchTerm} 
             onChange={(e) => setSearchTerm(e.target.value)} 
-            className="w-full bg-black/[0.04] border-transparent text-zinc-900 text-[13px] rounded-[12px] pl-9 pr-4 py-2 focus:outline-none focus:bg-white focus:border-zinc-300 focus:shadow-[0_0_0_4px_rgba(232,127,36,0.1)] transition-all font-medium" 
+            className="w-full bg-white border border-zinc-200 text-[#141414] text-[13px] rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all font-medium shadow-sm" 
           />
         </div>
       </div>
 
       {/* Area Tabel Utama */}
-      <div className="bg-white border border-black/[0.04] rounded-[24px] p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04)] overflow-hidden">
+      <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm overflow-hidden">
         <InventoryTable 
           activeSub="ingredients"
           filteredProducts={[]}
@@ -366,24 +422,24 @@ export default function InventoryModule({
       </div>
 
       {/* TABEL LOG MUTASI STOK KELUAR-MASUK (Riwayat Gudang & Antar-Cabang) */}
-      <div className="bg-white border border-zinc-200/80 rounded-[24px] p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04)] space-y-4">
+      <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 text-[#E87F24] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-[#FEF3C7] border border-[#FDE68A] text-[#B45309] flex items-center justify-center">
               <History size={18} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-zinc-900 text-base">
+                <h3 className="font-bold text-[#141414] text-base">
                   {isEnterprise ? 'Advanced Log Mutasi Stok Antar-Cabang' : 'Riwayat Keluar-Masuk Barang Gudang'}
                 </h3>
                 {isEnterprise && (
-                  <span className="text-[10px] font-black uppercase bg-zinc-900 text-[#FFC81E] px-2.5 py-0.5 rounded-full">
+                  <span className="font-mono text-[9px] font-bold uppercase bg-[#141414] text-[#F59E0B] px-2.5 py-0.5 rounded-full">
                     Enterprise
                   </span>
                 )}
               </div>
-              <p className="text-xs text-zinc-500 font-medium">
+              <p className="text-xs text-[#52525B] font-medium">
                 Pelacakan real-time barang masuk (restock), distribusi Central Kitchen, dan pemotongan otomatis resep POS (BOM).
               </p>
             </div>
@@ -392,7 +448,7 @@ export default function InventoryModule({
           {!isEnterprise && onUpgradePlan && (
             <button
               onClick={() => onUpgradePlan('enterprise')}
-              className="text-xs font-bold text-[#E87F24] bg-orange-50 hover:bg-orange-100 border border-orange-200 px-3.5 py-2 rounded-xl transition-colors cursor-pointer shrink-0"
+              className="text-xs font-bold text-[#B45309] bg-[#FEF3C7] hover:bg-[#FDE68A] border border-[#FDE68A] px-3.5 py-2 rounded-xl transition-colors cursor-pointer shrink-0"
             >
               Buka Multi-Outlet & Central Kitchen (Enterprise)
             </button>
@@ -402,7 +458,7 @@ export default function InventoryModule({
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[650px]">
             <thead>
-              <tr className="border-b border-zinc-100 text-[11px] font-bold uppercase text-zinc-500">
+              <tr className="border-b border-zinc-200 font-mono text-[10px] font-bold uppercase tracking-wider text-[#52525B]">
                 <th className="pb-3 px-3">Waktu</th>
                 <th className="pb-3 px-3">Nama Bahan Baku</th>
                 <th className="pb-3 px-3">Tipe Mutasi</th>
@@ -411,39 +467,39 @@ export default function InventoryModule({
                 <th className="pb-3 px-3">Keterangan</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-50 text-xs font-medium text-zinc-700">
+            <tbody className="divide-y divide-zinc-100 text-xs font-medium text-[#52525B]">
               {stockLogs.map((log, i) => {
                 const isOut = log.qty.startsWith('-');
                 const isCK = log.type.includes('CENTRAL KITCHEN');
                 return (
-                  <tr key={log.id || i} className="hover:bg-zinc-50/80 transition-colors">
-                    <td className="py-3 px-3 text-zinc-500 whitespace-nowrap">
+                  <tr key={log.id || i} className="hover:bg-[#FAFAFA] transition-colors">
+                    <td className="py-3 px-3 text-[#52525B] whitespace-nowrap font-mono text-[11px]">
                       {new Date(log.timestamp).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     </td>
-                    <td className="py-3 px-3 font-bold text-zinc-900">{log.itemName}</td>
+                    <td className="py-3 px-3 font-bold text-[#141414]">{log.itemName}</td>
                     <td className="py-3 px-3">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black ${
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-mono text-[10px] font-bold ${
                         isOut
-                          ? 'bg-red-50 text-red-600 border border-red-100'
+                          ? 'bg-red-50 text-red-700 border border-red-200'
                           : isCK
-                          ? 'bg-amber-50 text-[#E87F24] border border-orange-200'
-                          : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                          ? 'bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]'
+                          : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                       }`}>
                         {isOut ? <ArrowUpRight size={11} /> : <ArrowDownLeft size={11} />}
                         {log.type}
                       </span>
                     </td>
-                    <td className={`py-3 px-3 font-mono font-bold ${isOut ? 'text-red-600' : 'text-emerald-600'}`}>
+                    <td className={`py-3 px-3 font-mono font-bold ${isOut ? 'text-red-600' : 'text-emerald-700'}`}>
                       {log.qty}
                     </td>
                     {isEnterprise && (
                       <td className="py-3 px-3">
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-zinc-700 bg-zinc-100 px-2.5 py-1 rounded-lg">
-                          <Building2 size={11} className="text-[#E87F24]" /> {log.outlet || 'Cabang Utama - Makassar'}
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#141414] bg-[#FAFAFA] border border-zinc-200 px-2.5 py-1 rounded-lg">
+                          <Building2 size={11} className="text-[#D97706]" /> {log.outlet || 'Cabang Utama - Makassar'}
                         </span>
                       </td>
                     )}
-                    <td className="py-3 px-3 text-zinc-500">{log.note}</td>
+                    <td className="py-3 px-3 text-[#52525B]">{log.note}</td>
                   </tr>
                 );
               })}
@@ -578,7 +634,7 @@ export default function InventoryModule({
                   </button>
                   <button
                     type="submit"
-                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#E87F24] to-[#FFC81E] text-zinc-950 text-xs font-black shadow-lg shadow-[#E87F24]/20 inline-flex items-center gap-2 cursor-pointer"
+                    className="px-6 py-3 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] text-xs font-extrabold shadow-sm inline-flex items-center gap-2 cursor-pointer transition-colors"
                   >
                     <Check size={16} /> Kirim & Sinkronkan Stok
                   </button>

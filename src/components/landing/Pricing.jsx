@@ -5,11 +5,18 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
 import { Check, X, Award } from 'lucide-react';
 import { SUBSCRIPTION_PLANS } from '../../data/subscriptionPlans';
+import MaskedWords from './MaskedWords';
+import {
+  animateMaskedWordsOnScroll,
+  animateSlideUpOnScroll,
+  animateZoomSlideUpOnScroll
+} from './headingReveal';
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 export default function Pricing({ onSelectPlan, onSimulatePlan }) {
   const sectionRef = useRef(null);
+  const headingRef = useRef(null);
   const [billingCycle, setBillingCycle] = useState('monthly');
 
   const annualPrices = {
@@ -20,21 +27,18 @@ export default function Pricing({ onSelectPlan, onSimulatePlan }) {
 
   useGSAP(
     () => {
-      gsap.fromTo(
-        '.pricing-card-reveal',
-        { y: 40, opacity: 0 },
-        {
-          y: 0,
-          opacity: 1,
-          duration: 0.8,
-          stagger: 0.12,
-          ease: 'power3.out',
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: 'top 78%'
-          }
-        }
-      );
+      animateMaskedWordsOnScroll(headingRef.current);
+      animateSlideUpOnScroll('.pricing-sub-reveal', sectionRef.current, {
+        y: 24,
+        duration: 0.85,
+        stagger: 0.08
+      });
+      animateZoomSlideUpOnScroll('.pricing-card-reveal', '.pricing-grid-trigger', {
+        y: 35,
+        scale: 0.97,
+        duration: 0.9,
+        stagger: 0.08
+      });
     },
     { scope: sectionRef }
   );
@@ -49,19 +53,24 @@ export default function Pricing({ onSelectPlan, onSimulatePlan }) {
         {/* Editorial Section Header */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end pb-12 border-b border-zinc-200 mb-14">
           <div className="lg:col-span-7 space-y-3">
-            <span className="font-mono text-xs uppercase tracking-[0.2em] text-[#D97706] font-bold block">
+            <span className="pricing-sub-reveal font-mono text-xs uppercase tracking-[0.2em] text-[#D97706] font-bold block gpu-accelerated">
               [ 04 // INVESTASI TRANSPARAN ]
             </span>
-            <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-[1.06] text-[#141414]">
-              Skema Paket{' '}
-              <span className="font-serif italic font-normal text-[#F59E0B]">
-                Skalabel
-              </span>{' '}
-              Sesuai Gerai Anda.
+            <h2
+              ref={headingRef}
+              className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-[1.08] text-[#141414]"
+            >
+              <MaskedWords
+                segments={[
+                  { text: 'Skema Paket' },
+                  { text: 'Skalabel', className: 'font-serif italic font-normal text-[#F59E0B]' },
+                  { text: 'Sesuai Gerai Anda.' }
+                ]}
+              />
             </h2>
           </div>
 
-          <div className="lg:col-span-5 flex flex-col lg:items-end gap-4">
+          <div className="pricing-sub-reveal lg:col-span-5 flex flex-col lg:items-end gap-4 gpu-accelerated">
             <p className="text-[#52525B] font-medium text-sm lg:text-right">
               Mulai dari kasir mandiri hingga otomatisasi BOM dan manajemen multi-outlet terpusat.
             </p>
@@ -109,7 +118,7 @@ export default function Pricing({ onSelectPlan, onSimulatePlan }) {
         </div>
 
         {/* 3-Column Editorial Pricing Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+        <div className="pricing-grid-trigger grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
           {SUBSCRIPTION_PLANS.map((plan) => {
             const Icon = plan.icon;
             const displayPrice = billingCycle === 'annual' ? annualPrices[plan.id] : plan.price;

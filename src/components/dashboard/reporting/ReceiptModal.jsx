@@ -38,8 +38,8 @@ export default function ReceiptModal({ selectedTx, onClose, formatDateTime }) {
           </div>
 
           <div className="border-t border-dashed border-zinc-300 pt-4 flex justify-between items-center">
-            <span className="text-sm font-black text-zinc-900">Total Transaksi</span>
-            <span className="text-base font-black font-mono text-[#E87F24]">
+            <span className="text-sm font-extrabold text-[#141414]">Total Transaksi</span>
+            <span className="text-base font-extrabold font-mono text-[#D97706]">
               Rp {Number(selectedTx.total_amount).toLocaleString('id-ID')}
             </span>
           </div>
