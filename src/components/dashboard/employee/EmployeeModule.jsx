@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Plus, ShieldCheck, Mail, Lock, X, Trash2, CheckCircle2, UserCog, Briefcase, Store, Package, Sparkles } from 'lucide-react';
+import { Users, Plus, ShieldCheck, Mail, Lock, X, Trash2, CheckCircle2, UserCog, Briefcase, Store, Package, UserPlus } from 'lucide-react';
 import { fetchEmployees, addEmployee, deleteEmployeeRole } from '../../../services/stockoService';
 
 export default function EmployeeModule({ subscriptionPlan = 'pro', onUpgradePlan }) {
@@ -15,13 +15,21 @@ export default function EmployeeModule({ subscriptionPlan = 'pro', onUpgradePlan
   const kasirCount = employees.filter(e => e.role === 'kasir').length;
   const starterLimitReached = isStarter && kasirCount >= 1;
 
-  const loadEmployees = async () => {
+  const refreshEmployees = async () => {
     const result = await fetchEmployees();
     if (result.success) setEmployees(result.data || []);
   };
 
   useEffect(() => {
-    loadEmployees();
+    let active = true;
+    fetchEmployees().then((result) => {
+      if (active && result.success) {
+        setEmployees(result.data || []);
+      }
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const handleAddEmployee = async (e) => {
@@ -42,7 +50,7 @@ export default function EmployeeModule({ subscriptionPlan = 'pro', onUpgradePlan
     const result = await addEmployee(newEmployee.email, newEmployee.password, newEmployee.role);
     
     if (result.success) {
-      await loadEmployees();
+      await refreshEmployees();
       setSuccessMsg('Karyawan berhasil didaftarkan ke sistem!');
       setNewEmployee({ email: '', password: '', role: 'kasir' });
       setIsModalOpen(false);
@@ -68,38 +76,39 @@ export default function EmployeeModule({ subscriptionPlan = 'pro', onUpgradePlan
   return (
     <div className="space-y-6 pb-16">
       {/* HEADER */}
-      <div className="bg-white border border-zinc-200/80 rounded-[2.5rem] p-7 md:p-8 shadow-xl relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="space-y-2 relative z-10">
-          <span className="bg-orange-50 text-[#E87F24] border border-orange-200 px-3.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5">
-            <ShieldCheck size={13} /> {isStarter ? 'Akses Terbatas (Paket Starter)' : 'Full RBAC • Manajemen Akses'}
-          </span>
-          <h2 className="text-2xl md:text-3xl font-black text-zinc-900 tracking-tight">Kelola Karyawan</h2>
-          <p className="text-xs font-medium text-zinc-500 max-w-lg">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 mb-2">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="bg-orange-50 text-[#E87F24] border border-orange-200 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+              <ShieldCheck size={12} /> {isStarter ? 'Akses Terbatas (Paket Starter)' : 'Manajemen Hak Akses Karyawan (RBAC)'}
+            </span>
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-900">Kelola Karyawan</h1>
+          <p className="text-xs font-medium text-zinc-600 max-w-lg">
             {isStarter
               ? 'Paket Starter mendukung 1 Superadmin dan maksimal 1 akun Kasir POS. Upgrade ke Paket Pro untuk mengaktifkan peran Stocker Gudang.'
-              : 'Tambahkan akun karyawan baru dan pisahkan hak akses antara Kasir POS dan Stocker Gudang (Full RBAC).'}
+              : 'Tambahkan akun staf dan pisahkan hak akses operasional antara Kasir POS dan Stocker Gudang.'}
           </p>
         </div>
         
-        <div className="flex items-center gap-3 z-10">
+        <div className="flex items-center gap-3">
           {starterLimitReached && onUpgradePlan ? (
             <button
               onClick={() => onUpgradePlan('pro')}
-              className="bg-gradient-to-r from-[#E87F24] to-[#FFC81E] text-zinc-950 font-black text-xs px-5 py-3.5 rounded-2xl shadow-lg flex items-center gap-2 cursor-pointer"
+              className="bg-[#E87F24] hover:bg-[#d6731f] text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
             >
-              <Sparkles size={15} /> Upgrade ke Pro (Tambah Staf)
+              <UserPlus size={15} /> Upgrade ke Pro (Tambah Staf)
             </button>
           ) : (
-            <motion.button 
-              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            <button 
               onClick={() => {
                 setErrorMessage('');
                 setIsModalOpen(true);
               }}
-              className="bg-[#E87F24] hover:bg-[#d6731f] text-white font-black text-xs px-6 py-3.5 rounded-2xl shadow-lg shadow-[#E87F24]/20 flex items-center justify-center gap-2 cursor-pointer"
+              className="bg-[#E87F24] hover:bg-[#d6731f] text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
             >
               <Plus size={16} /> Tambah Karyawan
-            </motion.button>
+            </button>
           )}
         </div>
       </div>

@@ -1,6 +1,5 @@
-import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileText, X } from 'lucide-react';
+import { X } from 'lucide-react';
 
 export default function ReceiptModal({ selectedTx, onClose, formatDateTime }) {
   if (!selectedTx) return null;

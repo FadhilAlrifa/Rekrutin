@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertTriangle, Clock, Sparkles, BellRing, PackageCheck, AlertOctagon, ShieldAlert, LayoutGrid } from 'lucide-react';
+import { AlertTriangle, Clock, PackageCheck, AlertOctagon, LayoutGrid } from 'lucide-react';
 
-export default function AlertsModule({ ingredients = [], setActiveTab }) {
+export default function AlertsModule({ ingredients = [] }) {
   const [filterType, setFilterType] = useState('all'); // 'all', 'stock', 'expiry'
 
   const getExpiryStatus = (dateString) => {

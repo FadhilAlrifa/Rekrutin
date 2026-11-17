@@ -1,138 +1,626 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { ArrowRight, PlayCircle, Store, CheckCircle2, Package, Sparkles, TrendingUp } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { motion, AnimatePresence, useMotionValue, useSpring } from 'framer-motion';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useGSAP } from '@gsap/react';
+import {
+  PlayCircle,
+  Store,
+  CheckCircle2,
+  Package,
+  TrendingUp,
+  ShieldCheck,
+  Plus,
+  RotateCcw,
+  Layers,
+  Clock,
+  Building2,
+  Activity
+} from 'lucide-react';
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 30 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 50, damping: 20 } }
+gsap.registerPlugin(ScrollTrigger, useGSAP);
+
+function MagneticButton({ children, onClick, className, cursorLabel }) {
+  const ref = useRef(null);
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const springX = useSpring(x, { stiffness: 180, damping: 22, mass: 0.4 });
+  const springY = useSpring(y, { stiffness: 180, damping: 22, mass: 0.4 });
+
+  const handleMouseMove = (e) => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    x.set((e.clientX - (rect.left + rect.width / 2)) * 0.24);
+    y.set((e.clientY - (rect.top + rect.height / 2)) * 0.24);
+  };
+
+  const handleMouseLeave = () => {
+    x.set(0);
+    y.set(0);
+  };
+
+  return (
+    <motion.button
+      ref={ref}
+      type="button"
+      onClick={onClick}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      data-cursor={cursorLabel}
+      style={{ x: springX, y: springY }}
+      whileTap={{ scale: 0.97 }}
+      className={`${className} gpu-accelerated`}
+    >
+      {children}
+    </motion.button>
+  );
+}
+
+const DEMO_MENUS = [
+  {
+    id: 'kopi',
+    name: 'Kopi Susu Aren',
+    category: 'Signature Coffee',
+    price: 22000,
+    image: 'https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&w=400&q=80',
+    recipeText: '18g Kopi • 120ml Susu • 25ml Aren',
+    shortDeduct: '-18g Kopi, -120ml Susu',
+    deduct: { kopi: 18, susu: 120, aren: 25 }
+  },
+  {
+    id: 'matcha',
+    name: 'Matcha Oat Latte',
+    category: 'Artisan Tea',
+    price: 28000,
+    image: 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=400&q=80',
+    recipeText: '150ml Susu • 15ml Aren',
+    shortDeduct: '-150ml Susu, -15ml Aren',
+    deduct: { kopi: 0, susu: 150, aren: 15 }
+  },
+  {
+    id: 'croissant',
+    name: 'Butter Croissant',
+    category: 'Fresh Bakery',
+    price: 25000,
+    image: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=400&q=80',
+    recipeText: '10g Kopi Espresso Glaze',
+    shortDeduct: '-10g Kopi',
+    deduct: { kopi: 10, susu: 0, aren: 0 }
+  }
+];
+
+const INITIAL_STOCK = {
+  kopi: 1000,
+  susu: 2000,
+  aren: 500
 };
 
 export default function Hero({ onOpenApp, onOpenRegister }) {
+  const heroRef = useRef(null);
+  const studioWindowRef = useRef(null);
+
+  const [previewTab, setPreviewTab] = useState('pos');
+  const [demoTxCount, setDemoTxCount] = useState(1248);
+  const [demoRevenue, setDemoRevenue] = useState(12420000);
+  const [stock, setStock] = useState(INITIAL_STOCK);
+  const [activePulseId, setActivePulseId] = useState(null);
+  const [feedLogs, setFeedLogs] = useState([
+    { id: 1, menu: 'Kopi Susu Aren', detail: '-18g Kopi, -120ml Susu, -25ml Aren', time: 'Baru saja' }
+  ]);
+
+  useGSAP(
+    () => {
+      const tl = gsap.timeline({ defaults: { ease: 'power4.out' } });
+
+      tl.fromTo(
+        '.hero-eyebrow',
+        { y: 18, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.65 }
+      )
+        .fromTo(
+          '.hero-mask-line',
+          { yPercent: 115, opacity: 0 },
+          { yPercent: 0, opacity: 1, duration: 0.95, stagger: 0.12 },
+          '-=0.4'
+        )
+        .fromTo(
+          '.hero-meta-reveal',
+          { y: 20, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.75, stagger: 0.08 },
+          '-=0.55'
+        )
+        .fromTo(
+          studioWindowRef.current,
+          { y: 45, opacity: 0, scale: 0.97 },
+          { y: 0, opacity: 1, scale: 1, duration: 0.95, ease: 'power3.out' },
+          '-=0.45'
+        );
+
+      // Scroll-Driven Parallax pada Studio Window
+      gsap.to(studioWindowRef.current, {
+        y: -28,
+        ease: 'none',
+        scrollTrigger: {
+          trigger: heroRef.current,
+          start: 'top top',
+          end: 'bottom top',
+          scrub: 1
+        }
+      });
+
+      // Cursor-Responsive 3D Tilt (GPU-Composited quickTo)
+      const rotX = gsap.quickTo(studioWindowRef.current, 'rotationX', { duration: 0.6, ease: 'power3.out' });
+      const rotY = gsap.quickTo(studioWindowRef.current, 'rotationY', { duration: 0.6, ease: 'power3.out' });
+
+      const handlePointerMove = (e) => {
+        const nx = (e.clientX / window.innerWidth - 0.5) * 2;
+        const ny = (e.clientY / window.innerHeight - 0.5) * 2;
+        rotY(nx * 2.2);
+        rotX(-ny * 1.8);
+      };
+
+      window.addEventListener('mousemove', handlePointerMove, { passive: true });
+      return () => window.removeEventListener('mousemove', handlePointerMove);
+    },
+    { scope: heroRef }
+  );
+
+  const handleSimulateOrder = (menu) => {
+    setStock((prev) => ({
+      kopi: Math.max(0, prev.kopi - menu.deduct.kopi),
+      susu: Math.max(0, prev.susu - menu.deduct.susu),
+      aren: Math.max(0, prev.aren - menu.deduct.aren)
+    }));
+    setDemoTxCount((c) => c + 1);
+    setDemoRevenue((r) => r + menu.price);
+    setActivePulseId(menu.id);
+    setTimeout(() => setActivePulseId(null), 500);
+
+    setFeedLogs((prev) => [
+      {
+        id: Date.now(),
+        menu: menu.name,
+        detail: menu.shortDeduct,
+        time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      },
+      ...prev.slice(0, 2)
+    ]);
+  };
+
+  const handleResetDemo = () => {
+    setStock(INITIAL_STOCK);
+    setDemoTxCount(1248);
+    setDemoRevenue(12420000);
+    setFeedLogs([
+      { id: Date.now(), menu: 'Reset Gudang', detail: 'Stok dikembalikan ke kapasitas awal', time: 'Siap' }
+    ]);
+  };
+
+  const stockItems = [
+    { key: 'kopi', label: 'Biji Kopi Arabika', current: stock.kopi, max: INITIAL_STOCK.kopi, unit: 'g', batch: '#KP-09' },
+    { key: 'susu', label: 'Susu Segar UHT', current: stock.susu, max: INITIAL_STOCK.susu, unit: 'ml', batch: '#MK-14' },
+    { key: 'aren', label: 'Gula Aren Organik', current: stock.aren, max: INITIAL_STOCK.aren, unit: 'ml', batch: '#AR-03' }
+  ];
+
   return (
-    <section className="relative pt-32 pb-16 px-6 max-w-7xl mx-auto flex flex-col items-center text-center overflow-hidden bg-[#f8f9fb] text-zinc-900">
-      
-      {/* BACKGROUND ORNAMENTS */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] -z-20"></div>
-      
-      <motion.div animate={{ scale: [1, 1.1, 1], opacity: [0.2, 0.4, 0.2] }} transition={{ duration: 8, repeat: Infinity }} className="absolute top-10 left-1/4 w-[500px] h-[500px] bg-[#E87F24]/10 rounded-full blur-[100px] -z-10"></motion.div>
-      <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.15, 0.3, 0.15] }} transition={{ duration: 10, repeat: Infinity, delay: 1 }} className="absolute top-20 right-1/4 w-[400px] h-[400px] bg-[#FFC81E]/15 rounded-full blur-[100px] -z-10"></motion.div>
-      
-      <motion.div variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } }} initial="hidden" animate="show" className="relative z-10 w-full flex flex-col items-center">
-        
-        {/* Badge Atas */}
-        <motion.div variants={fadeUp} className="flex items-center gap-2 bg-zinc-50 backdrop-blur-md px-5 py-2 rounded-full border border-zinc-200 shadow-sm mb-4 hover:shadow-md transition-shadow cursor-default">
-          <Sparkles size={14} className="text-[#E87F24]" />
-          <span className="text-[11px] font-black text-zinc-700 uppercase tracking-widest">Solusi Track 4.2 Duluinnovation 2026</span>
-        </motion.div>
-
-        {/* CONTAINER TEKS UTAMA (Ditambah padding vertikal py-12 agar elemen melayang punya ruang) */}
-        <div className="relative w-full max-w-5xl py-12 lg:py-16">
-          
-          {/* Elemen Melayang Kiri (Dipindah ke Kiri Atas & ditarik keluar) */}
-          <motion.div 
-            initial={{ opacity: 0, x: -30, y: 10 }} animate={{ opacity: 1, x: 0, y: 0 }} transition={{ duration: 1, delay: 0.5, type: "spring" }}
-            className="absolute left-2 sm:-left-8 md:-left-12 lg:-left-24 -top-4 sm:-top-6 lg:top-4 hidden sm:flex items-center gap-3 bg-white p-3 pr-5 rounded-2xl shadow-xl border border-zinc-200/80 z-20"
-          >
-            <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center"><CheckCircle2 className="text-emerald-600" size={18} /></div>
-            <div className="text-left"><p className="text-[9px] font-bold text-zinc-400 uppercase">Kasir (POS)</p><p className="text-xs font-black text-zinc-900">Transaksi Super Kilat</p></div>
-          </motion.div>
-
-          {/* Elemen Melayang Kanan (Dipindah ke Kanan Bawah & ditarik keluar) */}
-          <motion.div 
-            initial={{ opacity: 0, x: 30, y: 10 }} animate={{ opacity: 1, x: 0, y: 0 }} transition={{ duration: 1, delay: 0.7, type: "spring" }}
-            className="absolute right-2 sm:-right-8 md:-right-12 lg:-right-24 bottom-0 sm:-bottom-8 lg:bottom-4 top-auto hidden sm:flex items-center gap-3 bg-zinc-900 p-3 pr-5 rounded-2xl shadow-xl border border-zinc-800 z-20 text-white"
-          >
-            <div className="w-9 h-9 rounded-full bg-zinc-800 flex items-center justify-center"><Package className="text-[#FFC81E]" size={18} /></div>
-            <div className="text-left"><p className="text-[9px] font-bold text-zinc-400 uppercase">Stok Gudang & BOM</p><p className="text-xs font-black text-white">Akurasi FEFO 99.9%</p></div>
-          </motion.div>
-
-          <motion.h1 variants={fadeUp} className="text-4xl sm:text-6xl lg:text-[5rem] font-black text-zinc-900 leading-[1.1] tracking-tighter relative z-10 px-4">
-            Sistem Pintar untuk <br className="hidden md:block" />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#E87F24] via-[#f09a4d] to-[#FFC81E]">
-              Masa Depan Bisnis F&B.
+    <section
+      ref={heroRef}
+      style={{ perspective: '1400px' }}
+      className="relative pt-28 md:pt-36 pb-20 bg-[#FAFAFA] text-[#141414] overflow-hidden"
+    >
+      {/* Architectural Grid Container */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
+        <div className="border-x border-zinc-200 px-4 sm:px-10 pt-6 pb-14 flex flex-col items-center text-center">
+          {/* Monospace Agency Eyebrow */}
+          <div className="hero-eyebrow inline-flex items-center gap-2.5 bg-white border border-zinc-200 px-4 py-1.5 rounded-full mb-8 shadow-sm gpu-accelerated">
+            <span className="w-2 h-2 rounded-full bg-[#F59E0B]" />
+            <span className="font-mono text-[11px] font-semibold text-[#52525B] uppercase tracking-[0.16em]">
+              SYS // SMART POS & AUTOMATED BOM ENGINE
             </span>
-          </motion.h1>
-        </div>
-        
-        <motion.p variants={fadeUp} className="text-base md:text-xl text-zinc-600 font-medium max-w-2xl leading-relaxed px-4">
-          Tinggalkan pencatatan manual. Percepat transaksi kasir, potong stok otomatis via resep (BOM), dan pantau kedaluwarsa dalam satu layar.
-        </motion.p>
-
-        {/* Tumpukan Avatar (Social Proof) */}
-        <motion.div variants={fadeUp} className="mt-8 flex flex-col items-center gap-2">
-          <div className="flex -space-x-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <img key={i} src={`https://i.pravatar.cc/100?img=${i + 20}`} alt="User" className="w-9 h-9 rounded-full border-2 border-white shadow-sm" />
-            ))}
-            <div className="w-9 h-9 rounded-full border-2 border-white bg-zinc-100 flex items-center justify-center text-xs font-bold text-zinc-600 shadow-sm z-10">+2k</div>
-          </div>
-          <p className="text-xs md:text-sm font-bold text-zinc-600">Dipercaya oleh 2.000+ UMKM & Pemilik Gerai</p>
-        </motion.div>
-
-        {/* Tombol Aksi (CTA) */}
-        <motion.div variants={fadeUp} className="mt-8 flex flex-col sm:flex-row gap-4 w-full sm:w-auto px-6 relative z-30">
-          <button 
-            onClick={onOpenApp}
-            className="group w-full sm:w-auto bg-zinc-900 hover:bg-zinc-800 text-white font-bold px-8 h-14 rounded-full shadow-xl shadow-zinc-900/10 text-base transition-all hover:-translate-y-1 flex items-center justify-center gap-2 overflow-hidden relative cursor-pointer"
-          >
-            <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]"></span>
-            Buka Simulasi POS <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-          </button>
-          <button 
-            onClick={onOpenRegister}
-            className="group w-full sm:w-auto bg-white hover:bg-zinc-50 text-zinc-900 border-2 border-zinc-200 font-bold px-8 h-14 rounded-full text-base transition-all flex items-center justify-center gap-2 hover:-translate-y-1 hover:shadow-lg cursor-pointer"
-          >
-            <PlayCircle size={18} className="text-[#E87F24] group-hover:scale-110 transition-transform" /> Coba Gratis 14 Hari
-          </button>
-        </motion.div>
-      </motion.div>
-
-      {/* Mockup Dashboard */}
-      <motion.div 
-        initial={{ opacity: 0, y: 100, rotateX: 10 }} animate={{ opacity: 1, y: 0, rotateX: 0 }} transition={{ duration: 1.2, delay: 0.4, type: "spring", bounce: 0.2 }} style={{ perspective: 1200 }}
-        className="mt-14 w-full max-w-5xl mx-auto relative z-20 px-4"
-      >
-        <div className="rounded-t-[2rem] rounded-b-xl border-[6px] border-zinc-900 bg-zinc-900 shadow-[0_30px_60px_rgb(0,0,0,0.15)] overflow-hidden relative">
-          
-          <div className="h-10 bg-zinc-900 flex items-center px-4 gap-2">
-            <div className="w-3 h-3 rounded-full bg-zinc-700 hover:bg-[#FF5F56] transition-colors cursor-pointer"></div>
-            <div className="w-3 h-3 rounded-full bg-zinc-700 hover:bg-[#FFBD2E] transition-colors cursor-pointer"></div>
-            <div className="w-3 h-3 rounded-full bg-zinc-700 hover:bg-[#27C93F] transition-colors cursor-pointer"></div>
           </div>
 
-          <div className="bg-zinc-50 flex flex-col md:flex-row h-full rounded-b-md overflow-hidden text-left">
-            <div className="w-full md:w-64 p-6 space-y-4 border-r border-zinc-200/60 bg-white">
-              <div className="h-8 bg-zinc-100 rounded-lg animate-pulse mb-8"></div>
-              <div className="h-10 bg-[#E87F24]/10 border border-[#E87F24]/20 rounded-lg flex items-center px-4 gap-3">
-                <Store size={16} className="text-[#E87F24]" /> <span className="text-sm font-bold text-[#E87F24]">Dashboard Stocko</span>
-              </div>
-              <div className="h-8 bg-zinc-50 rounded-lg"></div>
-              <div className="h-8 bg-zinc-50 rounded-lg w-3/4"></div>
+          {/* Oversized Display Headline (Solid Deep Charcoal + Solid Amber Serif Italic) */}
+          <h1 className="text-5xl sm:text-7xl lg:text-[5.75rem] font-extrabold text-[#141414] leading-[0.98] tracking-tight max-w-5xl">
+            <span className="block overflow-hidden pb-2">
+              <span className="hero-mask-line inline-block gpu-accelerated">
+                Kasir Kilat,
+              </span>
+            </span>
+            <span className="block overflow-hidden pb-3">
+              <span className="hero-mask-line inline-block gpu-accelerated">
+                Gudang{' '}
+                <span className="font-serif italic font-normal text-[#F59E0B] pr-1">
+                  Presisi.
+                </span>
+              </span>
+            </span>
+          </h1>
+
+          {/* Subtitle */}
+          <p className="hero-meta-reveal mt-6 text-sm sm:text-lg text-[#52525B] font-medium max-w-2xl leading-relaxed gpu-accelerated">
+            Setiap pesanan di meja kasir maupun QR Self-Order otomatis memotong stok bahan mentah (Bill of Materials) hingga 3 angka desimal dan menjaga kualitas lewat peringatan FEFO.
+          </p>
+
+          {/* Magnetic CTAs (Solid Amber + Solid White) */}
+          <div className="hero-meta-reveal mt-9 flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto gpu-accelerated">
+            <MagneticButton
+              onClick={onOpenApp}
+              cursorLabel="Try POS"
+              className="w-full sm:w-auto bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] font-extrabold px-8 h-14 rounded-full text-sm transition-colors flex items-center justify-center gap-2.5 cursor-pointer shadow-sm"
+            >
+              <Store size={17} />
+              <span>Buka Simulasi POS Lengkap</span>
+            </MagneticButton>
+
+            <MagneticButton
+              onClick={onOpenRegister}
+              cursorLabel="Start"
+              className="w-full sm:w-auto bg-white hover:bg-zinc-100 text-[#141414] border border-zinc-300 font-bold px-8 h-14 rounded-full text-sm transition-colors flex items-center justify-center gap-2.5 cursor-pointer"
+            >
+              <PlayCircle size={17} className="text-[#D97706]" />
+              <span>Mulai Uji Coba 14 Hari</span>
+            </MagneticButton>
+          </div>
+
+          {/* Architectural Grid Metrics Strip */}
+          <div className="hero-meta-reveal mt-12 w-full max-w-4xl grid grid-cols-1 sm:grid-cols-3 border border-zinc-200 rounded-2xl bg-white divide-y sm:divide-y-0 sm:divide-x divide-zinc-200 gpu-accelerated">
+            <div className="px-6 py-4 flex items-center justify-between sm:justify-center gap-3">
+              <span className="font-mono text-xs text-[#52525B] uppercase tracking-wider">Gerai Aktif</span>
+              <span className="font-mono text-sm font-bold text-[#141414]">2,000+ UMKM</span>
             </div>
-
-            <div className="flex-1 p-6 md:p-8 space-y-6">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-1 bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm">
-                  <div className="text-xs font-bold text-zinc-400 mb-2">Total Transaksi Hari Ini</div>
-                  <div className="text-3xl font-black text-zinc-900">1,248</div>
-                </div>
-                <div className="flex-1 bg-gradient-to-br from-[#E87F24] to-[#FFC81E] rounded-2xl p-6 shadow-lg text-white">
-                  <div className="text-xs font-bold text-white/90 mb-2">Pendapatan Kotor</div>
-                  <div className="text-3xl font-black">Rp 12,4 Jt</div>
-                  <div className="text-xs text-white font-medium mt-2 flex items-center gap-1"><TrendingUp size={14}/> Naik 15% dari kemarin</div>
-                </div>
-              </div>
-              
-              <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm h-40">
-                <div className="h-5 w-40 bg-zinc-100 rounded-md mb-4"></div>
-                <div className="space-y-3">
-                  <div className="h-10 bg-zinc-50 rounded-xl border border-zinc-100 flex items-center px-4"><div className="h-3 w-3/4 bg-zinc-200 rounded"></div></div>
-                </div>
-              </div>
+            <div className="px-6 py-4 flex items-center justify-between sm:justify-center gap-3">
+              <span className="font-mono text-xs text-[#52525B] uppercase tracking-wider">Akurasi BOM</span>
+              <span className="font-mono text-sm font-bold text-[#D97706]">99.9% Presisi</span>
+            </div>
+            <div className="px-6 py-4 flex items-center justify-between sm:justify-center gap-3">
+              <span className="font-mono text-xs text-[#52525B] uppercase tracking-wider">Radar FEFO</span>
+              <span className="font-mono text-sm font-bold text-emerald-700">≤ 30 Hari Alert</span>
             </div>
           </div>
         </div>
-      </motion.div>
+
+        {/* ========================================================= */}
+        {/* INTERACTIVE LIGHT EDITORIAL STUDIO SHOWCASE (POS & BOM)   */}
+        {/* ========================================================= */}
+        <div
+          ref={studioWindowRef}
+          style={{ transformStyle: 'preserve-3d' }}
+          className="agency-card-light overflow-hidden text-left gpu-accelerated"
+        >
+          {/* Studio Top Bar */}
+          <div className="h-12 bg-white flex items-center justify-between px-4 sm:px-6 border-b border-zinc-200">
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-zinc-300" />
+              <div className="w-2.5 h-2.5 rounded-full bg-zinc-300" />
+              <div className="w-2.5 h-2.5 rounded-full bg-[#F59E0B]" />
+              <div className="hidden sm:flex items-center gap-2 ml-3 pl-3 border-l border-zinc-200 font-mono text-[11px] text-[#52525B]">
+                <Building2 size={13} className="text-[#D97706]" />
+                <span>OUTLET // CABANG UTAMA - MAKASSAR</span>
+              </div>
+            </div>
+
+            {/* Segmented Mode Control */}
+            <div className="flex items-center bg-[#FAFAFA] p-1 rounded-full border border-zinc-200">
+              {[
+                { id: 'pos', label: 'Kasir & BOM Live' },
+                { id: 'alerts', label: 'Monitor FEFO' }
+              ].map((tab) => {
+                const active = previewTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setPreviewTab(tab.id)}
+                    className={`relative px-3.5 py-1 rounded-full text-[11px] font-bold transition-colors cursor-pointer ${
+                      active ? 'text-[#141414]' : 'text-[#52525B] hover:text-[#141414]'
+                    }`}
+                  >
+                    {active && (
+                      <motion.div
+                        layoutId="heroPreviewTab"
+                        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                        className="absolute inset-0 bg-[#F59E0B] rounded-full"
+                      />
+                    )}
+                    <span className="relative z-10">{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Studio Body */}
+          <div className="p-5 sm:p-8 bg-[#FAFAFA] space-y-6">
+            {/* Live Metrics Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-white border border-zinc-200 rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-[#52525B]">
+                    Transaksi Hari Ini
+                  </p>
+                  <AnimatePresence mode="popLayout">
+                    <motion.p
+                      key={demoTxCount}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                      className="text-2xl font-black text-[#141414] font-mono mt-1"
+                    >
+                      {demoTxCount.toLocaleString('id-ID')}
+                    </motion.p>
+                  </AnimatePresence>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-[#FEF3C7] border border-[#FDE68A] text-[#D97706] flex items-center justify-center">
+                  <Store size={18} />
+                </div>
+              </div>
+
+              <div className="bg-white border border-zinc-200 rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-[#52525B]">
+                    Omzet Kotor Berjalan
+                  </p>
+                  <AnimatePresence mode="popLayout">
+                    <motion.p
+                      key={demoRevenue}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                      className="text-2xl font-black text-emerald-700 font-mono mt-1"
+                    >
+                      Rp {(demoRevenue / 1000000).toFixed(3)} Jt
+                    </motion.p>
+                  </AnimatePresence>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center">
+                  <TrendingUp size={18} />
+                </div>
+              </div>
+
+              <div className="bg-[#141414] text-[#FAFAFA] rounded-2xl p-4 border border-[#141414] flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-[#F59E0B]" />
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-400">
+                      Automated BOM
+                    </span>
+                  </div>
+                  <p className="text-sm font-bold text-[#FAFAFA] mt-1">
+                    Sinkronisasi Presisi 3 Desimal
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-[#F59E0B] text-[#141414] flex items-center justify-center shrink-0">
+                  <Layers size={18} />
+                </div>
+              </div>
+            </div>
+
+            <AnimatePresence mode="wait">
+              {previewTab === 'pos' ? (
+                <motion.div
+                  key="pos"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                  className="grid grid-cols-1 lg:grid-cols-12 gap-5"
+                >
+                  {/* Left: Interactive Menu Demo */}
+                  <div className="lg:col-span-7 bg-white border border-zinc-200 rounded-2xl p-5 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-[#141414]">
+                          01 // Klik Menu Untuk Simulasi Kasir
+                        </h3>
+                        <p className="text-[11px] text-[#52525B] mt-0.5">
+                          Setiap klik memicu pemotongan bahan baku di gudang secara langsung.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleResetDemo}
+                        className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#141414] bg-[#FAFAFA] hover:bg-zinc-200 border border-zinc-200 px-3 py-1.5 rounded-full transition-colors cursor-pointer"
+                      >
+                        <RotateCcw size={12} /> Reset
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                      {DEMO_MENUS.map((menu) => {
+                        const isPulsing = activePulseId === menu.id;
+                        return (
+                          <motion.button
+                            key={menu.id}
+                            type="button"
+                            data-cursor="Order"
+                            whileHover={{ y: -3 }}
+                            whileTap={{ scale: 0.97 }}
+                            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                            onClick={() => handleSimulateOrder(menu)}
+                            className={`text-left rounded-2xl border overflow-hidden flex flex-col justify-between transition-all cursor-pointer group bg-white ${
+                              isPulsing
+                                ? 'border-[#F59E0B] ring-2 ring-[#F59E0B]/30'
+                                : 'border-zinc-200 hover:border-[#F59E0B]'
+                            }`}
+                          >
+                            <div className="relative h-24 w-full overflow-hidden bg-zinc-100">
+                              <img
+                                src={menu.image}
+                                alt={menu.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                              />
+                              <span className="absolute bottom-2 left-2.5 font-mono text-[9px] uppercase tracking-wider text-[#141414] bg-white/95 px-2 py-0.5 rounded font-bold border border-zinc-200">
+                                {menu.category}
+                              </span>
+                              <div className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white group-hover:bg-[#F59E0B] text-[#141414] border border-zinc-200 flex items-center justify-center transition-colors">
+                                <Plus size={14} />
+                              </div>
+                            </div>
+
+                            <div className="p-3 space-y-1.5">
+                              <p className="text-xs font-bold text-[#141414] truncate">{menu.name}</p>
+                              <p className="text-[10px] text-[#52525B] line-clamp-1">{menu.recipeText}</p>
+                              <p className="text-xs font-mono font-bold text-[#D97706] pt-1 border-t border-zinc-200">
+                                Rp {menu.price.toLocaleString('id-ID')}
+                              </p>
+                            </div>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Live Log Ticker */}
+                    <div className="bg-[#FAFAFA] border border-zinc-200 rounded-xl p-3 space-y-2">
+                      <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-[#52525B]">
+                        <span className="flex items-center gap-1.5">
+                          <Activity size={12} className="text-[#D97706]" /> Log Pemotongan Resep
+                        </span>
+                        <span>Real-Time</span>
+                      </div>
+                      <AnimatePresence mode="popLayout">
+                        {feedLogs.slice(0, 1).map((log) => (
+                          <motion.div
+                            key={log.id}
+                            initial={{ opacity: 0, y: -6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 6 }}
+                            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                            className="flex items-center justify-between text-xs bg-white border border-zinc-200 rounded-lg px-3 py-2"
+                          >
+                            <span className="font-semibold text-[#141414] truncate">
+                              {log.menu}: <span className="text-[#D97706] font-mono font-bold">{log.detail}</span>
+                            </span>
+                            <span className="font-mono text-[10px] text-[#52525B] shrink-0 ml-2">
+                              {log.time}
+                            </span>
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+
+                  {/* Right: Live Warehouse Ingredient Meters */}
+                  <div className="lg:col-span-5 bg-white border border-zinc-200 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-[#141414]">
+                          02 // Stok Gudang Live
+                        </h3>
+                        <span className="font-mono text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                          SYNCED
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#52525B]">
+                        Persediaan bahan mentah berkurang sesuai formula resep.
+                      </p>
+                    </div>
+
+                    <div className="space-y-3.5 my-auto">
+                      {stockItems.map((item) => {
+                        const pct = Math.round((item.current / item.max) * 100);
+                        return (
+                          <div
+                            key={item.key}
+                            className="bg-[#FAFAFA] border border-zinc-200 rounded-xl p-3.5 space-y-2"
+                          >
+                            <div className="flex items-center justify-between text-xs">
+                              <div>
+                                <span className="font-bold text-[#141414]">{item.label}</span>
+                                <span className="ml-2 font-mono text-[10px] text-[#52525B] bg-white border border-zinc-200 px-1.5 py-0.5 rounded">
+                                  {item.batch}
+                                </span>
+                              </div>
+                              <span className="font-mono font-bold text-[#141414]">
+                                {item.current} <span className="text-[#52525B] font-normal">/ {item.max}{item.unit}</span>
+                              </span>
+                            </div>
+                            <div className="h-2 w-full bg-zinc-200 rounded-full overflow-hidden">
+                              <motion.div
+                                animate={{ width: `${pct}%` }}
+                                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                                className={`h-full rounded-full ${
+                                  pct < 35
+                                    ? 'bg-red-600'
+                                    : pct < 65
+                                    ? 'bg-[#F59E0B]'
+                                    : 'bg-emerald-600'
+                                }`}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="pt-2 border-t border-zinc-200 flex items-center justify-between font-mono text-[11px] text-[#52525B]">
+                      <span className="flex items-center gap-1.5">
+                        <ShieldCheck size={14} className="text-emerald-600" /> Cross-menu validation
+                      </span>
+                      <span className="text-[#141414] font-bold">99.9%</span>
+                    </div>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="alerts"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                  className="grid grid-cols-1 md:grid-cols-3 gap-4"
+                >
+                  <div className="bg-white border border-zinc-200 rounded-2xl p-5 space-y-3 border-l-4 border-l-emerald-600">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[10px] uppercase font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded">
+                        Stok Aman
+                      </span>
+                      <Package size={16} className="text-emerald-600" />
+                    </div>
+                    <div>
+                      <p className="text-base font-bold text-[#141414]">Biji Kopi Arabika</p>
+                      <p className="text-xs text-[#52525B] mt-1">
+                        Sisa: <strong className="text-[#141414] font-mono">{stock.kopi}g</strong> • Exp: 120 hari
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-zinc-200 rounded-2xl p-5 space-y-3 border-l-4 border-l-[#F59E0B]">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[10px] uppercase font-bold text-[#B45309] bg-[#FEF3C7] border border-[#FDE68A] px-2.5 py-0.5 rounded">
+                        Prioritas FEFO (≤ 14 Hari)
+                      </span>
+                      <Clock size={16} className="text-[#D97706]" />
+                    </div>
+                    <div>
+                      <p className="text-base font-bold text-[#141414]">Susu Segar UHT</p>
+                      <p className="text-xs text-[#52525B] mt-1">
+                        Sisa: <strong className="text-[#141414] font-mono">{stock.susu}ml</strong> • Pakai lebih dulu
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-zinc-200 rounded-2xl p-5 space-y-3 border-l-4 border-l-[#141414]">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[10px] uppercase font-bold text-[#141414] bg-[#FAFAFA] border border-zinc-200 px-2.5 py-0.5 rounded">
+                        Terpantau Otomatis
+                      </span>
+                      <CheckCircle2 size={16} className="text-[#141414]" />
+                    </div>
+                    <div>
+                      <p className="text-base font-bold text-[#141414]">Gula Aren Organik</p>
+                      <p className="text-xs text-[#52525B] mt-1">
+                        Sisa: <strong className="text-[#141414] font-mono">{stock.aren}ml</strong> • Exp: 45 hari
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }

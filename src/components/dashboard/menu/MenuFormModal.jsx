@@ -1,6 +1,5 @@
-import React from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Edit3, X, Tag, Image, Layers, Trash2, UtensilsCrossed, Check, Lock, Sparkles } from 'lucide-react';
+import { Plus, Edit3, X, Tag, Image, Layers, Trash2, UtensilsCrossed, Check, Lock } from 'lucide-react';
 
 export default function MenuFormModal({ isOpen, onClose, onSubmit, editingProduct, formData, setFormData, ingredients = [], subscriptionPlan = 'pro', onUpgradePlan }) {
   if (!isOpen) return null;
@@ -187,7 +186,7 @@ export default function MenuFormModal({ isOpen, onClose, onSubmit, editingProduc
                       onClick={() => onUpgradePlan('pro')}
                       className="px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-[11px] font-black shrink-0 inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
                     >
-                      <Sparkles size={13} className="text-[#FFC81E]" /> Aktifkan Mode Pro
+                      <Layers size={13} className="text-[#FFC81E]" /> Aktifkan Mode Pro
                     </button>
                   )}
                 </div>

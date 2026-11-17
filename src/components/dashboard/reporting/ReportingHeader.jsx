@@ -1,99 +1,89 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Sparkles, Download, Lock, Building2 } from 'lucide-react';
+import { Download, Lock, Building2 } from 'lucide-react';
 
 export default function ReportingHeader({ onDownload, currentFilter, setFilter, customDate, setCustomDate, subscriptionPlan = 'pro', activeOutlet = 'Semua Cabang (Terpusat)', onUpgradePlan }) {
   const isStarter = subscriptionPlan === 'starter';
   const isEnterprise = subscriptionPlan === 'enterprise';
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-      className="bg-gradient-to-br from-zinc-900 via-zinc-950 to-zinc-900 text-white rounded-[2.5rem] p-7 md:p-8 shadow-xl relative overflow-hidden border border-zinc-800"
-    >
-      <div className="absolute top-0 right-0 w-72 h-72 bg-[#E87F24]/20 rounded-full blur-[80px] pointer-events-none"></div>
-      
-      <div className="relative z-10 flex flex-col xl:flex-row xl:items-end justify-between gap-6">
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="bg-[#E87F24]/20 text-[#FFC81E] border border-[#E87F24]/30 px-3.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5">
-              <Sparkles size={13} /> {isStarter ? 'Laporan Dasar (Paket Starter)' : 'Advanced Reporting & Analitik'}
+    <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 mb-8">
+      <div>
+        <div className="flex items-center gap-2 mb-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-orange-50 text-[#E87F24] border border-orange-200">
+            {isStarter ? 'Laporan Dasar • Paket Starter' : 'Analitik & Rekapitulasi Penjualan'}
+          </span>
+          {isEnterprise && (
+            <span className="text-[10px] font-bold text-zinc-600 bg-zinc-100 border border-zinc-200 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+              <Building2 size={12} className="text-[#E87F24]" /> {activeOutlet}
             </span>
-            {isEnterprise && (
-              <span className="bg-white/10 text-white border border-white/15 px-3 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1.5">
-                <Building2 size={12} className="text-[#FFC81E]" /> {activeOutlet}
-              </span>
-            )}
-          </div>
-          <h1 className="text-2xl md:text-3xl font-black tracking-tight">
-            {isEnterprise ? 'Laporan Performa Multi-Outlet' : 'Laporan Performa Bisnis'}
-          </h1>
-          <p className="text-zinc-400 text-xs font-medium max-w-lg">
-            Ringkasan omzet, jumlah transaksi berhasil, metode pembayaran, serta rekapitulasi riwayat pesanan berdasarkan rentang waktu.
-          </p>
-        </div>
-
-        <div className="flex flex-col md:flex-row items-center gap-4 shrink-0">
-          
-          {/* TOMBOL FILTER & KALENDER */}
-          <div className="bg-zinc-800/80 p-1.5 rounded-2xl flex items-center flex-wrap gap-1 border border-zinc-700/50">
-            {[
-              { id: 'today', label: 'Hari Ini' },
-              { id: 'yesterday', label: 'Kemarin' },
-              { id: 'month', label: 'Bulan Ini' },
-              { id: 'all', label: 'Semua Waktu' }
-            ].map(f => (
-              <button
-                key={f.id}
-                onClick={() => setFilter(f.id)}
-                className={`px-3 py-2.5 sm:px-4 text-[11px] sm:text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                  currentFilter === f.id 
-                  ? 'bg-[#E87F24] text-zinc-950 shadow-md' 
-                  : 'text-zinc-400 hover:text-white hover:bg-zinc-700/50'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-
-            {/* Input Kalender Khusus */}
-            <div className="flex items-center pl-1 sm:pl-2 ml-1 border-l border-zinc-700/60">
-              <input 
-                type="date"
-                value={customDate}
-                onChange={(e) => {
-                  setCustomDate(e.target.value);
-                  setFilter('custom');
-                }}
-                title="Pilih Tanggal Bebas"
-                className={`px-2 sm:px-3 py-2 bg-zinc-900 rounded-xl text-[11px] sm:text-xs font-bold outline-none cursor-pointer transition-all ${
-                  currentFilter === 'custom' 
-                  ? 'text-[#E87F24] ring-1 ring-[#E87F24]/50' 
-                  : 'text-zinc-400 hover:text-white'
-                }`}
-              />
-            </div>
-          </div>
-
-          {isStarter ? (
-            <button
-              onClick={() => onUpgradePlan?.('pro')}
-              className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-black text-xs px-5 py-3.5 rounded-2xl cursor-pointer flex items-center gap-2"
-              title="Ekspor CSV tersedia pada Paket Pro & Enterprise"
-            >
-              <Lock size={14} className="text-[#FFC81E]" /> Unduh CSV (Pro)
-            </button>
-          ) : (
-            <motion.button 
-              whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-              onClick={onDownload}
-              className="bg-gradient-to-r from-[#E87F24] to-[#FFC81E] text-zinc-950 font-black text-xs px-5 py-3.5 rounded-2xl shadow-lg cursor-pointer flex items-center gap-2"
-            >
-              <Download size={16} /> Unduh CSV
-            </motion.button>
           )}
         </div>
+        <h1 className="text-3xl font-bold tracking-tight text-zinc-900">
+          {isEnterprise ? 'Laporan Performa Multi-Outlet' : 'Laporan Performa Bisnis'}
+        </h1>
+        <p className="text-zinc-600 text-[13px] font-medium mt-1">
+          Ringkasan omzet, riwayat transaksi kasir, metode pembayaran, dan produk terlaris.
+        </p>
       </div>
-    </motion.div>
+
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+        
+        {/* TOMBOL FILTER & KALENDER */}
+        <div className="bg-black/[0.04] p-1 rounded-xl flex items-center flex-wrap gap-1">
+          {[
+            { id: 'today', label: 'Hari Ini' },
+            { id: 'yesterday', label: 'Kemarin' },
+            { id: 'month', label: 'Bulan Ini' },
+            { id: 'all', label: 'Semua' }
+          ].map(f => (
+            <button
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap min-h-[34px] ${
+                currentFilter === f.id 
+                ? 'bg-white text-zinc-900 shadow-xs border border-black/[0.04]' 
+                : 'text-zinc-600 hover:text-zinc-900 hover:bg-black/[0.02]'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+
+          {/* Input Kalender Khusus */}
+          <div className="flex items-center pl-1 ml-1 border-l border-zinc-200">
+            <input 
+              type="date"
+              value={customDate}
+              onChange={(e) => {
+                setCustomDate(e.target.value);
+                setFilter('custom');
+              }}
+              title="Pilih Tanggal Bebas"
+              className={`px-2.5 py-1 bg-white rounded-lg text-xs font-medium outline-none cursor-pointer border transition-all ${
+                currentFilter === 'custom' 
+                ? 'border-[#E87F24] text-[#E87F24] ring-2 ring-[#E87F24]/15' 
+                : 'border-zinc-200 text-zinc-600 hover:text-zinc-900'
+              }`}
+            />
+          </div>
+        </div>
+
+        {isStarter ? (
+          <button
+            onClick={() => onUpgradePlan?.('pro')}
+            className="bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200 font-bold text-xs px-4 py-2 rounded-xl cursor-pointer flex items-center justify-center gap-2 transition-colors min-h-[36px]"
+            title="Ekspor CSV tersedia pada Paket Pro & Enterprise"
+          >
+            <Lock size={13} className="text-[#E87F24]" /> Unduh CSV (Pro)
+          </button>
+        ) : (
+          <button 
+            onClick={onDownload}
+            className="bg-[#E87F24] hover:bg-[#d6731f] text-white font-bold text-xs px-4 py-2 rounded-xl shadow-xs cursor-pointer flex items-center justify-center gap-2 transition-all min-h-[36px] active:scale-95"
+          >
+            <Download size={14} /> Unduh CSV
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

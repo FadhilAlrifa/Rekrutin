@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Minus, Plus, Search, AlertCircle, LayoutGrid, Coffee, Utensils, Croissant, Cake } from 'lucide-react';
 import { checkMenuStockAvailability } from '../../../utils/stockValidator';

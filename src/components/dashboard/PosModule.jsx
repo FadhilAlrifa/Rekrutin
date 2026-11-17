@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ShoppingCart, CheckCircle2, MessageSquare, Sparkles, 
-  Search, Trash2, Plus, CreditCard, Wallet, QrCode, ArrowRight, AlertTriangle, X, ShieldAlert, Store 
+  ShoppingCart, CheckCircle2, MessageSquare, 
+  Search, Trash2, Plus, CreditCard, Wallet, QrCode, AlertTriangle, ShieldAlert 
 } from 'lucide-react';
 
-export default function PosModule({ products, ingredients = [], onCheckout, subscriptionPlan = 'pro', activeOutlet = 'Cabang Utama — Makassar' }) {
+export default function PosModule({ products, ingredients = [], onCheckout, subscriptionPlan = 'pro', activeOutlet = 'Cabang Utama - Makassar' }) {
   const [cart, setCart] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('Semua');
   const [searchQuery, setSearchQuery] = useState('');
@@ -213,7 +213,7 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
 
   const finalizeCheckout = (received = 0) => {
     const sourceLabel = subscriptionPlan === 'enterprise'
-      ? `Kasir (${activeOutlet.replace('Semua Cabang (Terpusat)', 'Cabang Utama — Makassar')})`
+      ? `Kasir (${activeOutlet.replace('Semua Cabang (Terpusat)', 'Cabang Utama - Makassar')})`
       : 'Kasir Utama';
 
     onCheckout(cart, sourceLabel, paymentMethod);
@@ -243,166 +243,320 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
   });
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pb-16">
+    <div className="space-y-6 pb-16">
       
-      <div className="lg:col-span-7 xl:col-span-8 space-y-6">
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-br from-zinc-900 via-zinc-950 to-zinc-900 text-white rounded-[2.5rem] p-7 md:p-8 shadow-xl relative overflow-hidden border border-zinc-800">
-          <div className="absolute top-0 right-0 w-80 h-80 bg-[#E87F24]/15 rounded-full blur-[90px] pointer-events-none"></div>
-          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <span className="bg-[#E87F24]/20 text-[#FFC81E] border border-[#E87F24]/30 px-3.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5">
-                {isStarter ? <Store size={13} /> : <Sparkles size={13} />}
-                {isStarter ? 'Paket Starter • Basic POS & Kasir Mandiri' : 'POS Kasir Pintar (Real-Time BOM Connected)'}
+      {/* 1. Header POS ala macOS / Apple HIG */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-5">
+        <div>
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-orange-50 text-[#E87F24] border border-orange-200">
+              {isStarter ? 'Paket Starter • Kasir Mandiri' : 'POS Kasir • Stok Terhubung Otomatis'}
+            </span>
+            {subscriptionPlan === 'enterprise' && (
+              <span className="text-[10px] font-bold text-zinc-600 bg-zinc-100 border border-zinc-200 px-2.5 py-0.5 rounded-full">
+                {activeOutlet}
               </span>
-              <h2 className="text-2xl md:text-3xl font-black tracking-tight">Katalog Penjualan</h2>
-              <p className="text-zinc-400 text-xs font-medium">
-                {isStarter
-                  ? 'Mode pencatatan kasir cepat, catatan dapur, dan cetak struk instan.'
-                  : 'Validasi stok bahan baku lintas menu secara real-time di keranjang.'}
-              </p>
-            </div>
-            <div className="relative w-full sm:w-64">
-              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
-              <input type="text" placeholder="Cari menu..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-white/10 border border-white/15 text-white placeholder-zinc-400 text-xs rounded-2xl pl-10 pr-4 py-3.5 focus:outline-none focus:border-[#E87F24] transition-all font-medium backdrop-blur-md" />
-            </div>
+            )}
           </div>
-        </motion.div>
-
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 hide-scrollbar">
-          {categories.map((cat, idx) => (
-            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} key={idx} onClick={() => setSelectedCategory(cat)} className={`px-5 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer whitespace-nowrap shadow-xs ${selectedCategory === cat ? 'bg-zinc-900 text-white shadow-md' : 'bg-white border border-zinc-200/80 text-zinc-600 hover:bg-zinc-50'}`}>
-              {cat}
-            </motion.button>
-          ))}
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-900">Katalog Penjualan</h1>
+          <p className="text-zinc-600 text-[13px] font-medium mt-1">
+            {isStarter
+              ? 'Pencatatan kasir cepat, catatan pesanan dapur, dan cetak struk transaksi.'
+              : 'Pilih menu pesanan. Stok bahan baku otomatis dicek dan dihitung secara presisi.'}
+          </p>
         </div>
 
-        <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-          <AnimatePresence mode="popLayout">
-            {filteredProducts.map((prod) => {
-              const isAvailable = checkIsIngredientAvailable(prod);
-              const maxPortions = getMaxPossiblePortions(prod);
-
-              return (
-                <motion.div layout initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -10 }} transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} key={prod.id} onClick={() => isAvailable && addToCart(prod)} className={`bg-white border rounded-[2rem] overflow-hidden flex flex-col justify-between transition-all shadow-sm relative group ${!isAvailable ? 'border-red-200 bg-red-50/20 opacity-60 cursor-not-allowed' : 'border-zinc-200/80 hover:border-zinc-300 hover:shadow-xl cursor-pointer'}`}>
-                  <div className="relative h-36 w-full overflow-hidden bg-zinc-100">
-                    <img src={prod.image} alt={prod.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60"></div>
-                    <div className="absolute top-3 left-3"><span className="bg-white/90 backdrop-blur-md text-zinc-900 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider shadow-sm">{prod.category}</span></div>
-                    <div className="absolute top-3 right-3">
-                      <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider shadow-md flex items-center gap-1.5 ${!isAvailable ? 'bg-red-600 text-white' : 'bg-zinc-900/90 backdrop-blur-md text-white border border-white/20'}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${!isAvailable ? 'bg-white animate-ping' : 'bg-emerald-400'}`}></span>
-                        {isStarter ? 'Tersedia' : !isAvailable ? 'Habis' : `Maks: ${maxPortions}`}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="p-5 flex flex-col justify-between space-y-4 flex-1 bg-white">
-                    <div className="space-y-1">
-                      <h3 className="font-black text-zinc-900 text-sm leading-snug group-hover:text-[#E87F24] transition-colors line-clamp-1">{prod.name}</h3>
-                      <p className="text-[11px] text-zinc-400 font-medium line-clamp-1">{getSubDescription(prod)}</p>
-                    </div>
-                    {!isAvailable && (
-                      <div className="bg-red-50 border border-red-200 text-red-600 px-2.5 py-1.5 rounded-xl text-[10px] font-bold flex items-center gap-1.5">
-                        <AlertTriangle size={13} className="shrink-0" /> Bahan baku di gudang kurang
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between pt-3 border-t border-zinc-100">
-                      <span className="font-mono font-black text-emerald-600 text-sm">Rp {prod.price.toLocaleString('id-ID')}</span>
-                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-transform shadow-sm ${!isAvailable ? 'bg-zinc-100 text-zinc-300' : 'bg-zinc-900 group-hover:bg-[#E87F24] group-hover:scale-110 text-white'}`}><Plus size={14} /></div>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
-        </motion.div>
+        <div className="relative w-full md:w-72">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+          <input 
+            type="text" 
+            placeholder="Cari menu pesanan..." 
+            value={searchQuery} 
+            onChange={(e) => setSearchQuery(e.target.value)} 
+            className="w-full bg-white border border-zinc-200 text-zinc-900 text-[13px] rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-[#E87F24] focus:ring-2 focus:ring-[#E87F24]/15 transition-all font-medium shadow-xs" 
+          />
+        </div>
       </div>
 
-      <div className="lg:col-span-5 xl:col-span-4">
-        <div className="bg-white border border-zinc-200/80 rounded-[2.5rem] p-6 md:p-7 shadow-xl flex flex-col h-fit sticky top-6 space-y-6">
-          <div className="flex items-center gap-2.5 border-b border-zinc-100 pb-4">
-            <div className="w-10 h-10 rounded-2xl bg-orange-50 text-[#E87F24] flex items-center justify-center font-bold border border-orange-100 shadow-2xs">
-              <ShoppingCart size={18} />
-            </div>
-            <div>
-              <h3 className="font-black text-zinc-900 text-sm">Keranjang Pesanan</h3>
-              <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Live POS Session</p>
-            </div>
-            <span className="ml-auto bg-zinc-900 text-white text-xs font-black px-2.5 py-1 rounded-xl shadow-2xs">{cart.reduce((t, i) => t + i.qty, 0)} Item</span>
-          </div>
+      {/* 2. Sistem Filter Kategori */}
+      <div className="flex items-center p-1 bg-black/[0.04] rounded-xl overflow-x-auto hide-scrollbar w-fit max-w-full">
+        {categories.map((cat, idx) => {
+          const isActive = selectedCategory === cat;
+          return (
+            <button
+              key={idx}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap min-h-[36px] ${
+                isActive 
+                  ? 'bg-white text-zinc-900 shadow-xs border border-black/[0.04]' 
+                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-black/[0.02]'
+              }`}
+            >
+              {cat}
+            </button>
+          );
+        })}
+      </div>
 
-          <div className="min-h-[220px] max-h-[280px] overflow-y-auto pr-1 space-y-3 hide-scrollbar">
-            <AnimatePresence>
-              {cart.length === 0 ? (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-48 flex flex-col items-center justify-center text-zinc-400 space-y-2">
-                  <ShoppingCart size={32} className="opacity-20 animate-pulse" />
-                  <p className="text-xs font-medium">Belum ada menu dipilih.</p>
-                </motion.div>
-              ) : (
-                cart.map(item => (
-                  <motion.div layout initial={{ opacity: 0, x: 15 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }} key={item.id} className="bg-zinc-50 border border-zinc-200/60 p-3 rounded-2xl space-y-2 shadow-2xs">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <img src={item.image} alt={item.name} className="w-10 h-10 rounded-xl object-cover shrink-0 border border-zinc-200" />
-                        <div>
-                          <p className="text-xs font-black text-zinc-900 leading-tight">{item.name}</p>
-                          <p className="text-[11px] font-mono font-bold text-emerald-600 mt-0.5">Rp {(item.price * item.qty).toLocaleString('id-ID')}</p>
+      {/* 3. Grid Menu dan Keranjang Penjualan */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* Katalog Produk (Kiri) */}
+        <div className="lg:col-span-7 xl:col-span-8">
+          {filteredProducts.length === 0 ? (
+            <div className="bg-white border border-zinc-200/80 rounded-2xl p-12 text-center text-zinc-500 text-xs font-medium space-y-2">
+              <p className="font-semibold text-zinc-700">Menu tidak ditemukan</p>
+              <p>Coba gunakan kata kunci pencarian lain atau pilih kategori Semua.</p>
+            </div>
+          ) : (
+            <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              <AnimatePresence mode="popLayout">
+                {filteredProducts.map((prod) => {
+                  const isAvailable = checkIsIngredientAvailable(prod);
+                  const maxPortions = getMaxPossiblePortions(prod);
+
+                  return (
+                    <motion.div 
+                      layout 
+                      initial={{ opacity: 0, scale: 0.96 }} 
+                      animate={{ opacity: 1, scale: 1 }} 
+                      exit={{ opacity: 0, scale: 0.96 }} 
+                      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }} 
+                      key={prod.id} 
+                      onClick={() => isAvailable && addToCart(prod)} 
+                      className={`bg-white border rounded-2xl overflow-hidden flex flex-col justify-between transition-all relative group ${
+                        !isAvailable 
+                          ? 'border-red-200 bg-red-50/20 opacity-60 cursor-not-allowed' 
+                          : 'border-zinc-200/80 hover:border-zinc-300 hover:shadow-md cursor-pointer'
+                      }`}
+                    >
+                      <div className="relative h-36 w-full overflow-hidden bg-zinc-100">
+                        <img 
+                          src={prod.image} 
+                          alt={prod.name} 
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out" 
+                        />
+                        <div className="absolute top-2.5 left-2.5">
+                          <span className="bg-white/95 text-zinc-800 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border border-zinc-200/60 shadow-xs">
+                            {prod.category}
+                          </span>
+                        </div>
+                        <div className="absolute top-2.5 right-2.5">
+                          <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5 shadow-xs ${
+                            !isAvailable 
+                              ? 'bg-red-600 text-white' 
+                              : 'bg-zinc-900/90 text-white'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${!isAvailable ? 'bg-white' : 'bg-emerald-400'}`}></span>
+                            {isStarter ? 'Tersedia' : !isAvailable ? 'Habis' : `Maks: ${maxPortions}`}
+                          </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 bg-white border border-zinc-200 rounded-xl p-1 shadow-2xs shrink-0">
-                        <button onClick={() => updateQty(item.id, -1)} className="w-6 h-6 flex items-center justify-center bg-zinc-50 hover:bg-zinc-100 rounded-lg text-zinc-600 font-black text-xs cursor-pointer">-</button>
-                        <span className="text-xs font-black w-5 text-center">{item.qty}</span>
-                        <button onClick={() => updateQty(item.id, 1)} className="w-6 h-6 flex items-center justify-center bg-zinc-50 hover:bg-zinc-100 rounded-lg text-zinc-600 font-black text-xs cursor-pointer">+</button>
+
+                      <div className="p-4 flex flex-col justify-between space-y-3 flex-1 bg-white">
+                        <div className="space-y-1">
+                          <h3 className="font-bold text-zinc-900 text-sm leading-snug group-hover:text-[#E87F24] transition-colors line-clamp-1">
+                            {prod.name}
+                          </h3>
+                          <p className="text-[11px] text-zinc-500 font-medium line-clamp-1">
+                            {getSubDescription(prod)}
+                          </p>
+                        </div>
+
+                        {!isAvailable && (
+                          <div className="bg-red-50 border border-red-200 text-red-600 px-2.5 py-1.5 rounded-xl text-[10px] font-semibold flex items-center gap-1.5">
+                            <AlertTriangle size={13} className="shrink-0" /> Stok bahan baku gudang habis
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between pt-2.5 border-t border-zinc-100">
+                          <span className="font-mono font-bold text-zinc-900 text-sm">
+                            Rp {prod.price.toLocaleString('id-ID')}
+                          </span>
+                          <button 
+                            type="button"
+                            aria-label={`Tambah ${prod.name}`}
+                            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+                              !isAvailable 
+                                ? 'bg-zinc-100 text-zinc-400' 
+                                : 'bg-zinc-900 group-hover:bg-[#E87F24] text-white active:scale-95'
+                            }`}
+                          >
+                            <Plus size={15} />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex justify-between items-center pt-2 border-t border-zinc-200/40 text-[10px]">
-                      <span className="text-zinc-500 italic truncate max-w-[140px]">{item.note ? `* ${item.note}` : 'Tanpa catatan dapur'}</span>
-                      <div className="flex items-center gap-3">
-                        <button onClick={() => { setNoteModalItem(item); setCustomNote(item.note); }} className="text-[#E87F24] font-black hover:underline cursor-pointer">Catatan</button>
-                        <button onClick={() => removeItem(item.id)} className="text-red-400 hover:text-red-600 cursor-pointer"><Trash2 size={13} /></button>
-                      </div>
-                    </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </div>
+
+        {/* Keranjang Pesanan (Kanan) */}
+        <div className="lg:col-span-5 xl:col-span-4">
+          <div className="bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-sm flex flex-col h-fit sticky top-6 space-y-5">
+            <div className="flex items-center gap-2.5 border-b border-zinc-100 pb-3.5">
+              <div className="w-9 h-9 rounded-xl bg-orange-50 text-[#E87F24] flex items-center justify-center font-bold border border-orange-100 shadow-2xs">
+                <ShoppingCart size={17} />
+              </div>
+              <div>
+                <h3 className="font-bold text-zinc-900 text-sm">Keranjang Pesanan</h3>
+                <p className="text-[10px] text-zinc-500 font-medium">Sesi Kasir Aktif</p>
+              </div>
+              <span className="ml-auto bg-zinc-900 text-white text-xs font-bold px-2.5 py-1 rounded-lg">
+                {cart.reduce((t, i) => t + i.qty, 0)} Item
+              </span>
+            </div>
+
+            {/* Daftar Item Keranjang */}
+            <div className="min-h-[200px] max-h-[290px] overflow-y-auto pr-1 space-y-2.5 hide-scrollbar">
+              <AnimatePresence>
+                {cart.length === 0 ? (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-44 flex flex-col items-center justify-center text-zinc-500 space-y-2 text-center p-4">
+                    <ShoppingCart size={28} className="text-zinc-300" />
+                    <p className="text-xs font-medium text-zinc-600">Keranjang masih kosong</p>
+                    <p className="text-[11px] text-zinc-400">Pilih menu dari katalog di sebelah kiri untuk memulai pesanan.</p>
                   </motion.div>
-                ))
-              )}
-            </AnimatePresence>
-          </div>
+                ) : (
+                  cart.map(item => (
+                    <motion.div 
+                      layout 
+                      initial={{ opacity: 0, x: 10 }} 
+                      animate={{ opacity: 1, x: 0 }} 
+                      exit={{ opacity: 0, scale: 0.95 }} 
+                      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }} 
+                      key={item.id} 
+                      className="bg-zinc-50 border border-zinc-200/70 p-3 rounded-xl space-y-2"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <img src={item.image} alt={item.name} className="w-10 h-10 rounded-lg object-cover shrink-0 border border-zinc-200" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-zinc-900 leading-tight truncate">{item.name}</p>
+                            <p className="text-[11px] font-mono font-bold text-zinc-700 mt-0.5">
+                              Rp {(item.price * item.qty).toLocaleString('id-ID')}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 bg-white border border-zinc-200 rounded-lg p-1 shrink-0">
+                          <button 
+                            type="button"
+                            aria-label={`Kurangi ${item.name}`}
+                            onClick={() => updateQty(item.id, -1)} 
+                            className="w-7 h-7 flex items-center justify-center bg-zinc-50 hover:bg-zinc-100 rounded-md text-zinc-700 font-bold text-xs cursor-pointer active:scale-95 transition-all"
+                          >
+                            -
+                          </button>
+                          <span className="text-xs font-bold w-5 text-center text-zinc-900">{item.qty}</span>
+                          <button 
+                            type="button"
+                            aria-label={`Tambah ${item.name}`}
+                            onClick={() => updateQty(item.id, 1)} 
+                            className="w-7 h-7 flex items-center justify-center bg-zinc-50 hover:bg-zinc-100 rounded-md text-zinc-700 font-bold text-xs cursor-pointer active:scale-95 transition-all"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center pt-2 border-t border-zinc-200/50 text-[11px]">
+                        <span className="text-zinc-500 italic truncate max-w-[140px]">
+                          {item.note ? `* ${item.note}` : 'Tanpa catatan dapur'}
+                        </span>
+                        <div className="flex items-center gap-2.5">
+                          <button 
+                            onClick={() => { setNoteModalItem(item); setCustomNote(item.note); }} 
+                            className="text-[#E87F24] font-bold hover:underline cursor-pointer"
+                          >
+                            Catatan
+                          </button>
+                          <button 
+                            type="button"
+                            aria-label={`Hapus ${item.name}`}
+                            onClick={() => removeItem(item.id)} 
+                            className="text-red-500 hover:text-red-700 cursor-pointer p-1"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))
+                )}
+              </AnimatePresence>
+            </div>
 
-          <div className="space-y-2 pt-1">
-            <p className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">Metode Pembayaran</p>
-            <div className="grid grid-cols-3 gap-2">
-              <button onClick={() => setPaymentMethod('qris')} className={`py-2 px-3 rounded-xl text-xs font-black border transition-all flex flex-col items-center gap-1 cursor-pointer ${paymentMethod === 'qris' ? 'bg-orange-50 border-[#E87F24] text-[#E87F24] shadow-2xs' : 'bg-zinc-50 border-zinc-200 text-zinc-600'}`}>
-                <QrCode size={15} /> QRIS
-              </button>
-              <button onClick={() => setPaymentMethod('cash')} className={`py-2 px-3 rounded-xl text-xs font-black border transition-all flex flex-col items-center gap-1 cursor-pointer ${paymentMethod === 'cash' ? 'bg-orange-50 border-[#E87F24] text-[#E87F24] shadow-2xs' : 'bg-zinc-50 border-zinc-200 text-zinc-600'}`}>
-                <Wallet size={15} /> Tunai
-              </button>
-              <button onClick={() => setPaymentMethod('card')} className={`py-2 px-3 rounded-xl text-xs font-black border transition-all flex flex-col items-center gap-1 cursor-pointer ${paymentMethod === 'card' ? 'bg-orange-50 border-[#E87F24] text-[#E87F24] shadow-2xs' : 'bg-zinc-50 border-zinc-200 text-zinc-600'}`}>
-                <CreditCard size={15} /> Kartu
+            {/* Pilihan Metode Pembayaran */}
+            <div className="space-y-1.5 pt-1">
+              <p className="text-[11px] font-bold text-zinc-600">Metode Pembayaran</p>
+              <div className="grid grid-cols-3 gap-2">
+                <button 
+                  onClick={() => setPaymentMethod('qris')} 
+                  className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                    paymentMethod === 'qris' 
+                      ? 'bg-orange-50 border-[#E87F24] text-[#E87F24] shadow-xs' 
+                      : 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100'
+                  }`}
+                >
+                  <QrCode size={15} /> QRIS
+                </button>
+                <button 
+                  onClick={() => setPaymentMethod('cash')} 
+                  className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                    paymentMethod === 'cash' 
+                      ? 'bg-orange-50 border-[#E87F24] text-[#E87F24] shadow-xs' 
+                      : 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100'
+                  }`}
+                >
+                  <Wallet size={15} /> Tunai
+                </button>
+                <button 
+                  onClick={() => setPaymentMethod('card')} 
+                  className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                    paymentMethod === 'card' 
+                      ? 'bg-orange-50 border-[#E87F24] text-[#E87F24] shadow-xs' 
+                      : 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100'
+                  }`}
+                >
+                  <CreditCard size={15} /> Kartu
+                </button>
+              </div>
+            </div>
+
+            {/* Total & Checkout */}
+            <div className="border-t border-zinc-100 pt-3.5 space-y-3">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-zinc-500 font-medium">Subtotal Produk</span>
+                <span className="font-mono font-bold text-zinc-800">Rp {totalPrice.toLocaleString('id-ID')}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm font-bold pt-1.5 border-t border-zinc-100">
+                <span className="text-zinc-900">Total Pembayaran</span>
+                <span className="font-mono text-lg text-emerald-700 font-extrabold">Rp {totalPrice.toLocaleString('id-ID')}</span>
+              </div>
+
+              <AnimatePresence>
+                {successMsg && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -5 }} 
+                    animate={{ opacity: 1, y: 0 }} 
+                    exit={{ opacity: 0 }} 
+                    transition={{ duration: 0.25 }} 
+                    className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-xl text-xs font-bold text-center flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle2 size={16} className="text-emerald-600" /> {isStarter ? 'Transaksi Kasir Berhasil' : 'Transaksi Sukses • Stok gudang terpotong'}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <button 
+                onClick={handleProcessPayment} 
+                disabled={cart.length === 0} 
+                className="w-full bg-[#E87F24] hover:bg-[#d6731f] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl text-xs shadow-md cursor-pointer transition-all active:scale-[0.98]"
+              >
+                Proses Pembayaran
               </button>
             </div>
-          </div>
-
-          <div className="border-t border-zinc-100 pt-4 space-y-3">
-            <div className="flex justify-between items-center text-xs">
-              <span className="text-zinc-400 font-bold">Subtotal Produk</span>
-              <span className="font-mono font-bold text-zinc-700">Rp {totalPrice.toLocaleString('id-ID')}</span>
-            </div>
-            <div className="flex justify-between items-center text-sm font-black pt-2 border-t border-zinc-100">
-              <span className="text-zinc-900">Total Pembayaran</span>
-              <span className="font-mono text-lg text-emerald-600">Rp {totalPrice.toLocaleString('id-ID')}</span>
-            </div>
-
-            <AnimatePresence>
-              {successMsg && (
-                <motion.div initial={{ opacity: 0, scale: 0.95, y: -5 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }} className="bg-emerald-50 border border-emerald-200 text-emerald-700 p-3 rounded-2xl text-xs font-bold text-center flex items-center justify-center gap-2 shadow-sm">
-                  <CheckCircle2 size={16} /> {isStarter ? 'Transaksi Kasir Berhasil!' : 'Transaksi Sukses! Stok gudang terpotong.'}
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleProcessPayment} disabled={cart.length === 0} className="w-full bg-gradient-to-r from-[#E87F24] to-[#FFC81E] disabled:opacity-40 disabled:cursor-not-allowed text-zinc-950 font-black py-4 rounded-2xl text-sm shadow-lg shadow-orange-500/20 cursor-pointer flex items-center justify-center gap-2 mt-2">
-              Proses Pembayaran <ArrowRight size={16} />
-            </motion.button>
           </div>
         </div>
       </div>
@@ -411,16 +565,24 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
       <AnimatePresence>
         {noteModalItem && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setNoteModalItem(null)} className="absolute inset-0 bg-zinc-900/50 backdrop-blur-xs cursor-pointer"></motion.div>
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }} className="relative w-full max-w-md bg-white rounded-[2rem] p-7 shadow-2xl border border-zinc-100 space-y-5">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setNoteModalItem(null)} className="absolute inset-0 bg-zinc-950/40 cursor-pointer"></motion.div>
+            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }} className="relative w-full max-w-md bg-white rounded-2xl p-6 shadow-xl border border-zinc-200 space-y-4">
               <div className="flex justify-between items-center">
-                <h4 className="font-black text-zinc-900 text-base flex items-center gap-2"><MessageSquare size={18} className="text-[#E87F24]" /> Catatan Dapur</h4>
+                <h4 className="font-bold text-zinc-900 text-base flex items-center gap-2">
+                  <MessageSquare size={18} className="text-[#E87F24]" /> Catatan Dapur
+                </h4>
                 <span className="text-xs font-bold bg-orange-50 text-[#E87F24] px-3 py-1 rounded-full border border-orange-200">{noteModalItem.name}</span>
               </div>
-              <textarea placeholder="Contoh: Kurang manis, tanpa es batu..." value={customNote} onChange={(e) => setCustomNote(e.target.value)} rows={3} className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 text-xs font-medium focus:outline-none focus:border-[#E87F24] focus:ring-4 focus:ring-[#E87F24]/10 resize-none transition-all" />
-              <div className="flex justify-end gap-3 pt-2">
-                <button onClick={() => setNoteModalItem(null)} className="px-5 py-2.5 text-xs font-black text-zinc-500 hover:bg-zinc-100 rounded-xl cursor-pointer">Batal</button>
-                <button onClick={saveNote} className="px-6 py-2.5 bg-gradient-to-r from-[#E87F24] to-[#FFC81E] text-zinc-950 text-xs font-black rounded-xl shadow-md cursor-pointer">Simpan Catatan</button>
+              <textarea 
+                placeholder="Contoh: Kurang manis, tanpa es batu..." 
+                value={customNote} 
+                onChange={(e) => setCustomNote(e.target.value)} 
+                rows={3} 
+                className="w-full bg-zinc-50 border border-zinc-200 rounded-xl p-3.5 text-xs font-medium focus:outline-none focus:border-[#E87F24] focus:ring-2 focus:ring-[#E87F24]/15 resize-none transition-all" 
+              />
+              <div className="flex justify-end gap-2.5 pt-1">
+                <button onClick={() => setNoteModalItem(null)} className="px-4 py-2 text-xs font-bold text-zinc-600 hover:bg-zinc-100 rounded-lg cursor-pointer">Batal</button>
+                <button onClick={saveNote} className="px-5 py-2 bg-[#E87F24] hover:bg-[#d6731f] text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer transition-colors">Simpan Catatan</button>
               </div>
             </motion.div>
           </div>
@@ -431,16 +593,16 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
       <AnimatePresence>
         {stockAlertModal.isOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setStockAlertModal({ ...stockAlertModal, isOpen: false })} className="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm cursor-pointer"></motion.div>
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 15 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 15 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }} className="relative w-full max-w-sm bg-white rounded-[2rem] p-7 shadow-2xl border border-zinc-100 text-center space-y-5">
-              <div className="w-16 h-16 bg-red-50 text-red-500 rounded-3xl mx-auto flex items-center justify-center border border-red-100 shadow-inner">
-                <ShieldAlert size={32} />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setStockAlertModal({ ...stockAlertModal, isOpen: false })} className="absolute inset-0 bg-zinc-950/40 cursor-pointer"></motion.div>
+            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }} className="relative w-full max-w-sm bg-white rounded-2xl p-6 shadow-xl border border-zinc-200 text-center space-y-4">
+              <div className="w-14 h-14 bg-red-50 text-red-500 rounded-2xl mx-auto flex items-center justify-center border border-red-100">
+                <ShieldAlert size={28} />
               </div>
-              <div className="space-y-2">
-                <h3 className="font-black text-zinc-900 text-lg">{stockAlertModal.title}</h3>
-                <p className="text-xs text-zinc-500 font-medium leading-relaxed">{stockAlertModal.message}</p>
+              <div className="space-y-1.5">
+                <h3 className="font-bold text-zinc-900 text-base">{stockAlertModal.title}</h3>
+                <p className="text-xs text-zinc-600 font-medium leading-relaxed">{stockAlertModal.message}</p>
               </div>
-              <button onClick={() => setStockAlertModal({ ...stockAlertModal, isOpen: false })} className="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-black py-3.5 rounded-2xl text-xs shadow-lg cursor-pointer transition-colors">
+              <button onClick={() => setStockAlertModal({ ...stockAlertModal, isOpen: false })} className="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold py-3 rounded-xl text-xs cursor-pointer transition-colors">
                 Mengerti
               </button>
             </motion.div>
@@ -448,44 +610,65 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
         )}
       </AnimatePresence>
 
-      {/* MODAL KEMBALIAN TUNAI */}
+      {/* MODAL KEMBALIAN TUNAI DENGAN QUICK SHORTCUT BUTTONS */}
       <AnimatePresence>
         {cashModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm cursor-pointer" onClick={() => setCashModalOpen(false)}></motion.div>
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 15 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 15 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }} className="relative w-full max-w-sm bg-white rounded-[2rem] p-7 shadow-2xl border border-zinc-100 space-y-5">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-zinc-950/40 cursor-pointer" onClick={() => setCashModalOpen(false)}></motion.div>
+            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }} className="relative w-full max-w-sm bg-white rounded-2xl p-6 shadow-xl border border-zinc-200 space-y-4">
               <div className="text-center space-y-1">
-                <h3 className="font-black text-zinc-900 text-lg">Pembayaran Tunai</h3>
-                <p className="text-xs text-zinc-500 font-medium">Total Tagihan: <span className="font-black text-[#E87F24]">Rp {totalPrice.toLocaleString('id-ID')}</span></p>
+                <h3 className="font-bold text-zinc-900 text-base">Pembayaran Tunai</h3>
+                <p className="text-xs text-zinc-600 font-medium">Total Tagihan: <span className="font-bold text-[#E87F24]">Rp {totalPrice.toLocaleString('id-ID')}</span></p>
               </div>
               
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">Uang Diterima (Rp)</label>
+                <label className="text-[11px] font-bold text-zinc-600">Nominal Uang Diterima (Rp)</label>
                 <input 
                   type="number" 
                   autoFocus
-                  placeholder="Contoh: 50000" 
+                  placeholder="Masukkan nominal uang" 
                   value={cashReceived} 
                   onChange={(e) => setCashReceived(e.target.value)} 
-                  className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 text-sm font-black focus:outline-none focus:border-[#E87F24] focus:ring-4 focus:ring-[#E87F24]/10 transition-all text-center font-mono"
+                  className="w-full bg-zinc-50 border border-zinc-200 rounded-xl p-3 text-base font-bold focus:outline-none focus:border-[#E87F24] focus:ring-2 focus:ring-[#E87F24]/15 transition-all text-center font-mono text-zinc-900"
                 />
+
+                {/* Tombol Cepat Nominal Uang (Quick Cash Buttons untuk Kemudahan Kasir) */}
+                <div className="grid grid-cols-3 gap-1.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setCashReceived(String(totalPrice))}
+                    className="py-1.5 px-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
+                  >
+                    Uang Pas
+                  </button>
+                  {[50000, 100000].map(amt => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setCashReceived(String(amt))}
+                      className="py-1.5 px-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
+                    >
+                      {amt >= 1000000 ? `${amt / 1000000}jt` : `${amt / 1000}rb`}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {Number(cashReceived) >= totalPrice && (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-center space-y-1">
-                  <p className="text-[10px] font-black uppercase text-emerald-600 tracking-wider">Kembalian</p>
-                  <p className="font-mono text-xl text-emerald-600 font-black">Rp {(Number(cashReceived) - totalPrice).toLocaleString('id-ID')}</p>
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center space-y-0.5">
+                  <p className="text-[10px] font-bold uppercase text-emerald-700 tracking-wider">Kembalian</p>
+                  <p className="font-mono text-lg text-emerald-700 font-extrabold">Rp {(Number(cashReceived) - totalPrice).toLocaleString('id-ID')}</p>
                 </div>
               )}
 
-              <div className="flex justify-end gap-3 pt-2">
-                <button onClick={() => setCashModalOpen(false)} className="w-full px-5 py-3.5 text-xs font-black text-zinc-500 hover:bg-zinc-100 rounded-2xl cursor-pointer transition-colors">Batal</button>
+              <div className="flex justify-end gap-2.5 pt-2">
+                <button onClick={() => setCashModalOpen(false)} className="w-full px-4 py-2.5 text-xs font-bold text-zinc-600 hover:bg-zinc-100 rounded-xl cursor-pointer transition-colors">Batal</button>
                 <button 
                   onClick={() => finalizeCheckout(Number(cashReceived))} 
                   disabled={!cashReceived || Number(cashReceived) < totalPrice}
-                  className="w-full bg-gradient-to-r from-[#E87F24] to-[#FFC81E] disabled:opacity-40 disabled:cursor-not-allowed text-zinc-950 text-xs font-black rounded-2xl shadow-lg cursor-pointer transition-all"
+                  className="w-full bg-[#E87F24] hover:bg-[#d6731f] disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-sm cursor-pointer transition-all"
                 >
-                  Selesai
+                  Selesaikan Transaksi
                 </button>
               </div>
             </motion.div>

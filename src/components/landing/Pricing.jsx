@@ -1,138 +1,132 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Check, X, Sparkles, Store, Layers, Building2, ArrowRight } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useGSAP } from '@gsap/react';
+import { Check, X, Award } from 'lucide-react';
+import { SUBSCRIPTION_PLANS } from '../../data/subscriptionPlans';
 
-export const SUBSCRIPTION_PLANS = [
-  {
-    id: 'starter',
-    name: 'Paket Starter',
-    subtitle: 'Basic POS & Kasir Mandiri',
-    price: 'Rp79.000',
-    period: '/ bulan',
-    badge: 'UMKM Mikro & Pemula',
-    icon: Store,
-    target: 'UMKM F&B mikro, kedai kopi kecil, atau pedagang pop-up pemula yang baru beralih dari kasir konvensional.',
-    highlight: false,
-    included: [
-      'Modul POS Kasir lengkap (pencarian menu & catatan dapur)',
-      'Pembayaran Tunai (kalkulator kembalian), QRIS, & Kartu',
-      'Cetak struk senyap (Silent Hidden Iframe)',
-      'Manajemen Menu dasar (Katalog Produk)',
-      'Akses terbatas: 1 Superadmin & maks. 1 Kasir'
-    ],
-    excluded: [
-      'Mesin pemotong stok resep otomatis (BOM Engine)',
-      'Validasi stok lintas menu & Peringatan FIFO/FEFO',
-      'Modul Self-Order Kiosk Meja & Role Stocker Gudang'
-    ]
-  },
-  {
-    id: 'pro',
-    name: 'Paket Pro / Business',
-    subtitle: 'Smart Inventory & Automated BOM',
-    price: 'Rp149.000',
-    period: '/ bulan',
-    badge: 'Core Product • Paling Populer',
-    icon: Layers,
-    target: 'Kafe, restoran menengah, atau kedai dengan inventaris bahan baku aktif yang ingin mencegah kerugian & food waste.',
-    highlight: true,
-    included: [
-      'Real-Time Automated BOM Engine (konversi gram/ml ke kg/liter presisi 3 desimal)',
-      'Cross-Menu Validation (cegah pesanan jika stok bahan gudang kurang)',
-      'FIFO/FEFO Early Warning (peringatan bahan ≤ 30 hari & stok kritis)',
-      'Modul Self-Order Kiosk (pesan mandiri dari meja pelanggan)',
-      'Full RBAC: Superadmin, Kasir POS, dan Stocker Gudang',
-      'Advanced Reporting (4 metrik utama, tren, produk terlaris, metode bayar, & CSV)'
-    ],
-    excluded: [
-      'Manajemen Multi-Outlet & Central Kitchen Sync',
-      'Advanced Log Mutasi Stok Antar-Cabang'
-    ]
-  },
-  {
-    id: 'enterprise',
-    name: 'Paket Enterprise / Franchise',
-    subtitle: 'Multi-Outlet & Central Kitchen',
-    price: 'Rp299.000',
-    period: '/ outlet / bln',
-    badge: 'Waralaba & Cloud Kitchen',
-    icon: Building2,
-    target: 'Bisnis F&B berantai, waralaba (franchise), atau cloud kitchen dengan banyak cabang dan gudang pusat.',
-    highlight: false,
-    included: [
-      'Seluruh fitur lengkap dari Paket Pro / Business',
-      'Manajemen Multi-Outlet (inventaris & laporan terpusat semua cabang)',
-      'Central Kitchen Integration (sinkronisasi pasokan gudang pusat ke gerai)',
-      'Advanced Log Mutasi Stok (pelacakan riwayat keluar-masuk antar-cabang)',
-      'Akun karyawan tanpa batas & Dukungan teknis prioritas 24/7'
-    ],
-    excluded: []
-  }
-];
+gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 export default function Pricing({ onSelectPlan, onSimulatePlan }) {
+  const sectionRef = useRef(null);
+  const [billingCycle, setBillingCycle] = useState('monthly');
+
+  const annualPrices = {
+    starter: 'Rp63.000',
+    pro: 'Rp119.000',
+    enterprise: 'Rp239.000'
+  };
+
+  useGSAP(
+    () => {
+      gsap.fromTo(
+        '.pricing-card-reveal',
+        { y: 40, opacity: 0 },
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.8,
+          stagger: 0.12,
+          ease: 'power3.out',
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: 'top 78%'
+          }
+        }
+      );
+    },
+    { scope: sectionRef }
+  );
+
   return (
-    <section id="harga" className="py-28 bg-white relative border-t border-zinc-200/80 overflow-hidden">
-      {/* Dekorasi Latar */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-6xl h-[450px] bg-gradient-to-b from-[#FEFDDF]/70 via-[#E87F24]/5 to-transparent rounded-full blur-[120px] pointer-events-none"></div>
-
-      <div className="max-w-7xl mx-auto px-6 relative z-10">
-        {/* Header Section */}
-        <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="inline-flex items-center gap-2 bg-orange-50 border border-orange-200/80 px-4 py-1.5 rounded-full text-xs font-black text-[#E87F24] uppercase tracking-wider"
-          >
-            <Sparkles size={14} /> Skema Berlangganan Fleksibel
-          </motion.div>
-
-          <motion.h2
-            initial={{ opacity: 0, y: 15 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.4, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
-            className="text-3xl md:text-5xl font-black text-zinc-900 tracking-tight leading-tight"
-          >
-            Pilih Paket Sesuai Skala <br className="hidden sm:block" />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#E87F24] to-[#FFC81E]">
-              Operasional Bisnis Anda.
+    <section
+      ref={sectionRef}
+      id="harga"
+      className="py-24 md:py-32 bg-white text-[#141414] relative border-b border-zinc-200 overflow-hidden"
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
+        {/* Editorial Section Header */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end pb-12 border-b border-zinc-200 mb-14">
+          <div className="lg:col-span-7 space-y-3">
+            <span className="font-mono text-xs uppercase tracking-[0.2em] text-[#D97706] font-bold block">
+              [ 04 // INVESTASI TRANSPARAN ]
             </span>
-          </motion.h2>
+            <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-[1.06] text-[#141414]">
+              Skema Paket{' '}
+              <span className="font-serif italic font-normal text-[#F59E0B]">
+                Skalabel
+              </span>{' '}
+              Sesuai Gerai Anda.
+            </h2>
+          </div>
 
-          <motion.p
-            initial={{ opacity: 0, y: 15 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.4, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-            className="text-zinc-500 font-medium text-sm md:text-base"
-          >
-            Mulai dari kasir mandiri untuk kedai rintisan, otomatisasi penuh resep gudang (BOM), hingga manajemen multi-cabang terpusat.
-          </motion.p>
+          <div className="lg:col-span-5 flex flex-col lg:items-end gap-4">
+            <p className="text-[#52525B] font-medium text-sm lg:text-right">
+              Mulai dari kasir mandiri hingga otomatisasi BOM dan manajemen multi-outlet terpusat.
+            </p>
+
+            {/* Billing Cycle Switcher */}
+            <div className="inline-flex items-center bg-[#FAFAFA] p-1 rounded-full border border-zinc-200 self-start lg:self-end">
+              <button
+                type="button"
+                onClick={() => setBillingCycle('monthly')}
+                className={`relative px-5 py-2 rounded-full text-xs font-bold transition-colors cursor-pointer ${
+                  billingCycle === 'monthly' ? 'text-white' : 'text-[#52525B] hover:text-[#141414]'
+                }`}
+              >
+                {billingCycle === 'monthly' && (
+                  <motion.div
+                    layoutId="billingTogglePill"
+                    transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute inset-0 bg-[#141414] rounded-full"
+                  />
+                )}
+                <span className="relative z-10">Bulanan</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setBillingCycle('annual')}
+                className={`relative px-5 py-2 rounded-full text-xs font-bold transition-colors cursor-pointer flex items-center gap-2 ${
+                  billingCycle === 'annual' ? 'text-white' : 'text-[#52525B] hover:text-[#141414]'
+                }`}
+              >
+                {billingCycle === 'annual' && (
+                  <motion.div
+                    layoutId="billingTogglePill"
+                    transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute inset-0 bg-[#141414] rounded-full"
+                  />
+                )}
+                <span className="relative z-10">Tahunan</span>
+                <span className="relative z-10 font-mono bg-[#F59E0B] text-[#141414] text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  -20%
+                </span>
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* Grid 3 Paket */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
-          {SUBSCRIPTION_PLANS.map((plan, idx) => {
+        {/* 3-Column Editorial Pricing Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+          {SUBSCRIPTION_PLANS.map((plan) => {
             const Icon = plan.icon;
+            const displayPrice = billingCycle === 'annual' ? annualPrices[plan.id] : plan.price;
+
             return (
-              <motion.div
+              <div
                 key={plan.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: idx * 0.08, ease: [0.22, 1, 0.36, 1] }}
-                className={`rounded-[2.5rem] p-8 flex flex-col justify-between relative transition-all duration-300 ${
+                data-cursor="Select"
+                className={`pricing-card-reveal relative rounded-3xl p-7 sm:p-8 flex flex-col justify-between transition-colors duration-200 gpu-accelerated ${
                   plan.highlight
-                    ? 'bg-zinc-950 text-white border-2 border-[#E87F24] shadow-2xl shadow-[#E87F24]/15 lg:-translate-y-3'
-                    : 'bg-white text-zinc-900 border border-zinc-200/90 shadow-xl shadow-zinc-200/40 hover:border-zinc-300'
+                    ? 'bg-white border-2 border-[#F59E0B] shadow-[0_24px_60px_-15px_rgba(245,158,11,0.18)]'
+                    : 'bg-[#FAFAFA] border border-zinc-200 hover:border-zinc-300'
                 }`}
               >
                 {plan.highlight && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-[#E87F24] to-[#FFC81E] text-zinc-950 text-[11px] font-black uppercase tracking-wider px-4 py-1.5 rounded-full shadow-md whitespace-nowrap">
-                    ⭐ Core Product • Paling Direkomendasikan
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[#F59E0B] text-[#141414] font-mono text-[10px] font-extrabold uppercase tracking-wider px-4 py-1 rounded-full whitespace-nowrap inline-flex items-center gap-1.5 shadow-sm">
+                    <Award size={12} /> Core Product • Paling Populer
                   </div>
                 )}
 
@@ -140,99 +134,114 @@ export default function Pricing({ onSelectPlan, onSimulatePlan }) {
                   {/* Top Header */}
                   <div className="flex items-start justify-between gap-4 pt-1">
                     <div>
-                      <span className={`inline-block text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 ${
-                        plan.highlight
-                          ? 'bg-[#E87F24]/20 text-[#FFC81E] border border-[#E87F24]/30'
-                          : 'bg-zinc-100 text-zinc-600'
-                      }`}>
+                      <span
+                        className={`inline-block font-mono text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full mb-2.5 border ${
+                          plan.highlight
+                            ? 'bg-[#FEF3C7] text-[#B45309] border-[#FDE68A]'
+                            : 'bg-white text-[#52525B] border-zinc-200'
+                        }`}
+                      >
                         {plan.badge}
                       </span>
-                      <h3 className="text-2xl font-black tracking-tight">{plan.name}</h3>
-                      <p className={`text-xs font-bold mt-0.5 ${plan.highlight ? 'text-[#FFC81E]' : 'text-[#E87F24]'}`}>
-                        {plan.subtitle}
-                      </p>
+                      <h3 className="text-2xl font-extrabold tracking-tight text-[#141414]">{plan.name}</h3>
+                      <p className="text-xs font-bold mt-0.5 text-[#D97706]">{plan.subtitle}</p>
                     </div>
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
-                      plan.highlight
-                        ? 'bg-gradient-to-br from-[#E87F24] to-[#FFC81E] text-zinc-950'
-                        : 'bg-orange-50 text-[#E87F24] border border-orange-100'
-                    }`}>
-                      <Icon size={22} />
+                    <div
+                      className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border ${
+                        plan.highlight
+                          ? 'bg-[#F59E0B] text-[#141414] border-[#F59E0B]'
+                          : 'bg-white text-[#D97706] border-zinc-200'
+                      }`}
+                    >
+                      <Icon size={20} />
                     </div>
                   </div>
 
                   {/* Price */}
-                  <div className={`pb-5 border-b ${plan.highlight ? 'border-zinc-800' : 'border-zinc-100'}`}>
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-3xl md:text-4xl font-black tracking-tight">{plan.price}</span>
-                      <span className={`text-xs font-bold ${plan.highlight ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                        {plan.period}
-                      </span>
+                  <div className="pb-6 border-b border-zinc-200">
+                    <div className="flex items-baseline gap-2 overflow-hidden">
+                      <AnimatePresence mode="popLayout">
+                        <motion.span
+                          key={displayPrice}
+                          initial={{ opacity: 0, y: 12 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -12 }}
+                          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                          className="text-3xl md:text-4xl font-black tracking-tight font-mono text-[#141414] inline-block"
+                        >
+                          {displayPrice}
+                        </motion.span>
+                      </AnimatePresence>
+                      <span className="text-xs font-mono text-[#52525B]">{plan.period}</span>
                     </div>
-                    <p className={`text-xs font-medium mt-3 leading-relaxed ${plan.highlight ? 'text-zinc-400' : 'text-zinc-500'}`}>
+
+                    {billingCycle === 'annual' && (
+                      <p className="font-mono text-[11px] font-bold text-emerald-700 mt-1.5">
+                        Hemat 20% dari {plan.price}
+                      </p>
+                    )}
+
+                    <p className="text-xs font-medium mt-3 leading-relaxed text-[#52525B]">
                       {plan.target}
                     </p>
                   </div>
 
-                  {/* Included Features */}
+                  {/* Included */}
                   <div className="space-y-3">
-                    <p className={`text-[11px] font-black uppercase tracking-wider ${plan.highlight ? 'text-zinc-400' : 'text-zinc-400'}`}>
-                      Fitur Utama yang Didapat:
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#52525B]">
+                      Fitur Utama:
                     </p>
                     {plan.included.map((feat, i) => (
                       <div key={i} className="flex items-start gap-3 text-xs font-medium leading-relaxed">
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                          plan.highlight ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-50 text-emerald-600'
-                        }`}>
+                        <div className="w-5 h-5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
                           <Check size={12} />
                         </div>
-                        <span className={plan.highlight ? 'text-zinc-200' : 'text-zinc-700'}>{feat}</span>
+                        <span className="text-[#141414]">{feat}</span>
                       </div>
                     ))}
                   </div>
 
-                  {/* Excluded Features */}
+                  {/* Excluded */}
                   {plan.excluded.length > 0 && (
-                    <div className={`space-y-2.5 pt-4 border-t ${plan.highlight ? 'border-zinc-800/80' : 'border-zinc-100'}`}>
-                      <p className="text-[10px] font-black uppercase tracking-wider text-zinc-400">
+                    <div className="space-y-2.5 pt-4 border-t border-zinc-200">
+                      <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#52525B]">
                         Tidak Termasuk:
                       </p>
                       {plan.excluded.map((ex, i) => (
-                        <div key={i} className="flex items-start gap-3 text-xs font-medium leading-relaxed opacity-60">
-                          <div className="w-5 h-5 rounded-full bg-zinc-200/40 text-zinc-400 flex items-center justify-center shrink-0 mt-0.5">
+                        <div key={i} className="flex items-start gap-3 text-xs font-medium leading-relaxed opacity-75">
+                          <div className="w-5 h-5 rounded-full bg-zinc-200 text-[#52525B] flex items-center justify-center shrink-0 mt-0.5">
                             <X size={11} />
                           </div>
-                          <span className={plan.highlight ? 'text-zinc-400' : 'text-zinc-500'}>{ex}</span>
+                          <span className="text-[#52525B]">{ex}</span>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
 
-                {/* Action Buttons */}
+                {/* CTAs */}
                 <div className="pt-8 mt-6 space-y-2.5">
-                  <button
+                  <motion.button
+                    type="button"
+                    whileTap={{ scale: 0.98 }}
                     onClick={() => onSelectPlan?.(plan.id)}
-                    className={`w-full py-3.5 px-6 rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 ${
+                    className={`w-full py-3.5 px-6 rounded-full text-xs font-extrabold transition-colors cursor-pointer ${
                       plan.highlight
-                        ? 'bg-gradient-to-r from-[#E87F24] to-[#FFC81E] hover:from-[#d6731f] hover:to-[#e6b419] text-zinc-950 shadow-lg shadow-[#E87F24]/25'
-                        : 'bg-zinc-900 hover:bg-zinc-800 text-white shadow-md'
+                        ? 'bg-[#F59E0B] hover:bg-[#D97706] text-[#141414]'
+                        : 'bg-[#141414] hover:bg-zinc-800 text-white'
                     }`}
                   >
-                    Pilih {plan.name} <ArrowRight size={15} />
-                  </button>
+                    Pilih {plan.name}
+                  </motion.button>
                   <button
+                    type="button"
                     onClick={() => onSimulatePlan?.(plan.id)}
-                    className={`w-full py-2.5 px-4 rounded-xl text-[11px] font-bold transition-colors cursor-pointer ${
-                      plan.highlight
-                        ? 'text-zinc-300 hover:text-white hover:bg-white/5'
-                        : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'
-                    }`}
+                    className="w-full py-2.5 px-4 rounded-full text-[11px] font-semibold text-[#52525B] hover:text-[#141414] hover:bg-zinc-200/70 transition-colors cursor-pointer"
                   >
-                    Coba Simulasi Mode {plan.name.replace('Paket ', '')} →
+                    Simulasikan Mode {plan.name.replace('Paket ', '')}
                   </button>
                 </div>
-              </motion.div>
+              </div>
             );
           })}
         </div>

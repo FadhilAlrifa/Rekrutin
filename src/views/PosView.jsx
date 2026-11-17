@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, CheckCircle2, MessageSquare, Sparkles, Store, AlertCircle, X } from 'lucide-react';
+import { ShoppingCart, CheckCircle2, MessageSquare, Store, AlertCircle, X } from 'lucide-react';
 
 export default function PosView({ products, onCheckout }) {
   const [cart, setCart] = useState([]);
@@ -76,11 +76,9 @@ export default function PosView({ products, onCheckout }) {
       
       {/* Header POS */}
       <div className="relative bg-white border border-zinc-200 rounded-[2.5rem] p-8 md:p-10 shadow-sm overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-[#E87F24]/10 to-transparent blur-[50px] pointer-events-none"></div>
-        
         <div className="relative z-10 space-y-2">
           <span className="bg-orange-50 text-[#E87F24] border border-orange-200 px-3.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5">
-            <Sparkles size={13} /> Sesi Kasir Aktif
+            <Store size={13} /> Sesi Kasir Aktif
           </span>
           <h1 className="text-2xl md:text-3xl font-black text-zinc-900 tracking-tight">Point of Sale (POS)</h1>
           <p className="text-zinc-500 text-xs md:text-sm font-medium max-w-md leading-relaxed">

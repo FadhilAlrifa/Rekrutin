@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import { X, Edit3, Calendar, Package, Check } from 'lucide-react';
 

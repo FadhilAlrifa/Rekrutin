@@ -1,4 +1,3 @@
-import React from 'react';
 import { ShoppingBag, MapPin } from 'lucide-react';
 
 export default function CartSummary({ cart, tableNumber, onCheckout }) {
@@ -15,7 +14,7 @@ export default function CartSummary({ cart, tableNumber, onCheckout }) {
             Pesanan Anda
           </h3>
           <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-500 mt-1">
-            <MapPin size={12} className="text-[#E87F24]" /> Makan di Tempat — Meja <span className="text-[#E87F24]">{tableNumber}</span>
+            <MapPin size={12} className="text-[#E87F24]" /> Makan di Tempat - Meja <span className="text-[#E87F24]">{tableNumber}</span>
           </div>
         </div>
         <div className="w-10 h-10 bg-orange-50 text-[#E87F24] rounded-full flex items-center justify-center">

@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import { Edit3, Trash2, Layers, Tag, Lock } from 'lucide-react';
 

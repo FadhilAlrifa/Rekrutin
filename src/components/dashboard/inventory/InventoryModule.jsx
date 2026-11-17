@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, LayoutGrid, AlertTriangle, Clock, ShieldCheck, ArrowDownToLine, Building2, ArrowRightLeft, History, ArrowUpRight, ArrowDownLeft, Check, X } from 'lucide-react';
+import { Search, LayoutGrid, AlertTriangle, Clock, ShieldCheck, ArrowDownToLine, Building2, ArrowRightLeft, History, ArrowUpRight, ArrowDownLeft, Check, X } from 'lucide-react';
 import { supabase } from '../../../services/supabaseClient';
 
 // Impor komponen terpisah
@@ -12,7 +12,7 @@ export default function InventoryModule({
   ingredients = [],
   setIngredients,
   subscriptionPlan = 'pro',
-  activeOutlet = 'Cabang Utama — Makassar',
+  activeOutlet = 'Cabang Utama - Makassar',
   stockLogs = [],
   onAddStockLog,
   onUpgradePlan
@@ -38,7 +38,7 @@ export default function InventoryModule({
   const [ckTransfer, setCkTransfer] = useState({
     ingredientId: '',
     qty: '',
-    targetOutlet: activeOutlet === 'Semua Cabang (Terpusat)' ? 'Cabang Utama — Makassar' : activeOutlet,
+    targetOutlet: activeOutlet === 'Semua Cabang (Terpusat)' ? 'Cabang Utama - Makassar' : activeOutlet,
     notes: 'Distribusi rutin Central Kitchen'
   });
 
@@ -106,7 +106,7 @@ export default function InventoryModule({
         itemName: stockInData.name.trim(),
         type: 'MASUK (Restock Supplier)',
         qty: `+${qtyToAdd} ${targetItem.unit}`,
-        outlet: activeOutlet === 'Semua Cabang (Terpusat)' ? 'Cabang Utama — Makassar' : activeOutlet,
+        outlet: activeOutlet === 'Semua Cabang (Terpusat)' ? 'Cabang Utama - Makassar' : activeOutlet,
         note: 'Pencatatan barang masuk gudang'
       });
 
@@ -148,7 +148,7 @@ export default function InventoryModule({
           itemName: stockInData.name.trim(),
           type: 'MASUK (Bahan Baru)',
           qty: `+${qtyToAdd} ${stockInData.unit}`,
-          outlet: activeOutlet === 'Semua Cabang (Terpusat)' ? 'Cabang Utama — Makassar' : activeOutlet,
+          outlet: activeOutlet === 'Semua Cabang (Terpusat)' ? 'Cabang Utama - Makassar' : activeOutlet,
           note: 'Registrasi bahan baku baru'
         });
       }
@@ -193,7 +193,7 @@ export default function InventoryModule({
     setCkTransfer({
       ingredientId: '',
       qty: '',
-      targetOutlet: activeOutlet === 'Semua Cabang (Terpusat)' ? 'Cabang Utama — Makassar' : activeOutlet,
+      targetOutlet: activeOutlet === 'Semua Cabang (Terpusat)' ? 'Cabang Utama - Makassar' : activeOutlet,
       notes: 'Distribusi rutin Central Kitchen'
     });
   };
@@ -392,9 +392,9 @@ export default function InventoryModule({
           {!isEnterprise && onUpgradePlan && (
             <button
               onClick={() => onUpgradePlan('enterprise')}
-              className="text-xs font-black text-[#E87F24] bg-orange-50 hover:bg-orange-100 border border-orange-200 px-3.5 py-2 rounded-xl transition-colors cursor-pointer shrink-0"
+              className="text-xs font-bold text-[#E87F24] bg-orange-50 hover:bg-orange-100 border border-orange-200 px-3.5 py-2 rounded-xl transition-colors cursor-pointer shrink-0"
             >
-              Buka Multi-Outlet & Central Kitchen (Enterprise) →
+              Buka Multi-Outlet & Central Kitchen (Enterprise)
             </button>
           )}
         </div>
@@ -402,7 +402,7 @@ export default function InventoryModule({
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[650px]">
             <thead>
-              <tr className="border-b border-zinc-100 text-[11px] font-bold uppercase text-zinc-400">
+              <tr className="border-b border-zinc-100 text-[11px] font-bold uppercase text-zinc-500">
                 <th className="pb-3 px-3">Waktu</th>
                 <th className="pb-3 px-3">Nama Bahan Baku</th>
                 <th className="pb-3 px-3">Tipe Mutasi</th>
@@ -439,7 +439,7 @@ export default function InventoryModule({
                     {isEnterprise && (
                       <td className="py-3 px-3">
                         <span className="inline-flex items-center gap-1 text-[11px] font-bold text-zinc-700 bg-zinc-100 px-2.5 py-1 rounded-lg">
-                          <Building2 size={11} className="text-[#E87F24]" /> {log.outlet || 'Cabang Utama — Makassar'}
+                          <Building2 size={11} className="text-[#E87F24]" /> {log.outlet || 'Cabang Utama - Makassar'}
                         </span>
                       </td>
                     )}
@@ -551,9 +551,9 @@ export default function InventoryModule({
                       onChange={(e) => setCkTransfer({ ...ckTransfer, targetOutlet: e.target.value })}
                       className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-xs font-bold text-zinc-900 focus:outline-none focus:bg-white focus:border-[#E87F24] cursor-pointer"
                     >
-                      <option value="Cabang Utama — Makassar">Cabang Utama — Makassar</option>
-                      <option value="Cabang 2 — Bandung">Cabang 2 — Bandung</option>
-                      <option value="Cabang 3 — Jakarta">Cabang 3 — Jakarta</option>
+                      <option value="Cabang Utama - Makassar">Cabang Utama - Makassar</option>
+                      <option value="Cabang 2 - Bandung">Cabang 2 - Bandung</option>
+                      <option value="Cabang 3 - Jakarta">Cabang 3 - Jakarta</option>
                     </select>
                   </div>
                 </div>

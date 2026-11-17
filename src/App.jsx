@@ -1,6 +1,6 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, Sparkles, Check, Building2, Layers } from 'lucide-react';
+import { Lock, Check, Building2, ShieldCheck } from 'lucide-react';
 import LandingPage from './components/landing/LandingPage';
 import Register from './Page/auth/Register';
 import Login from './Page/auth/Login';
@@ -23,20 +23,20 @@ export default function App() {
   const [ingredients, setIngredients] = useState([]);
   const [userRole, setUserRole] = useState('superadmin');
 
-  // State Paket Langganan ('starter' | 'pro' | 'enterprise') — Default 'pro' (Core Product)
+  // State Paket Langganan ('starter' | 'pro' | 'enterprise') - Default 'pro' (Core Product)
   const [subscriptionPlan, setSubscriptionPlan] = useState('pro');
   // State Cabang Aktif (Khusus Paket Enterprise / Multi-Outlet)
   const [activeOutlet, setActiveOutlet] = useState('Semua Cabang (Terpusat)');
 
   // State Riwayat Mutasi Stok (Keluar-Masuk Gudang & Antar-Cabang)
-  const [stockLogs, setStockLogs] = useState([
+  const [stockLogs, setStockLogs] = useState(() => [
     {
       id: 'LOG-INIT-1',
       timestamp: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
       itemName: 'Biji Kopi Arabika',
       type: 'TRANSFER CENTRAL KITCHEN',
       qty: '+5 kg',
-      outlet: 'Cabang Utama — Makassar',
+      outlet: 'Cabang Utama - Makassar',
       note: 'Pasokan rutin mingguan dari Gudang Pusat'
     },
     {
@@ -45,7 +45,7 @@ export default function App() {
       itemName: 'Susu Segar UHT',
       type: 'MASUK (Restock Supplier)',
       qty: '+12 liter',
-      outlet: 'Cabang 2 — Bandung',
+      outlet: 'Cabang 2 - Bandung',
       note: 'Penerimaan faktur supplier pagi'
     },
     {
@@ -54,7 +54,7 @@ export default function App() {
       itemName: 'Biji Kopi Arabika',
       type: 'KELUAR (Otomatis BOM POS)',
       qty: '-0.036 kg',
-      outlet: 'Cabang Utama — Makassar',
+      outlet: 'Cabang Utama - Makassar',
       note: 'Pemotongan otomatis penjualan 2x Kopi Susu'
     }
   ]);
@@ -178,7 +178,7 @@ export default function App() {
                 itemName: (updatedIngredients[index].name || '').split(' | ')[0],
                 type: 'KELUAR (Otomatis BOM POS)',
                 qty: `-${totalDeduction} ${storageUnit}`,
-                outlet: activeOutlet === 'Semua Cabang (Terpusat)' ? 'Cabang Utama — Makassar' : activeOutlet,
+                outlet: activeOutlet === 'Semua Cabang (Terpusat)' ? 'Cabang Utama - Makassar' : activeOutlet,
                 note: `Penjualan ${cartItem.qty}x ${cartItem.name}`
               });
             }
@@ -202,29 +202,29 @@ export default function App() {
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-      className="bg-white border border-zinc-200/80 rounded-[2.5rem] p-8 md:p-14 shadow-xl max-w-3xl mx-auto my-8 text-center space-y-6"
+      className="bg-white border border-zinc-200/80 rounded-3xl p-8 md:p-12 shadow-sm max-w-3xl mx-auto my-8 text-center space-y-6"
     >
-      <div className="w-16 h-16 rounded-3xl bg-orange-50 border border-orange-200 text-[#E87F24] flex items-center justify-center mx-auto shadow-xs">
-        <Lock size={30} />
+      <div className="w-14 h-14 rounded-2xl bg-orange-50 border border-orange-200 text-[#E87F24] flex items-center justify-center mx-auto shadow-xs">
+        <Lock size={26} />
       </div>
       <div className="space-y-2">
-        <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full bg-zinc-900 text-[#FFC81E]">
-          <Sparkles size={12} /> Eksklusif Paket Pro / Business & Enterprise
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider px-3.5 py-1 rounded-full bg-zinc-900 text-[#FFC81E]">
+          <ShieldCheck size={13} /> Fitur Paket Pro & Enterprise
         </span>
         <h2 className="text-2xl md:text-3xl font-black text-zinc-900 tracking-tight pt-1">
           {featureTitle}
         </h2>
-        <p className="text-xs md:text-sm text-zinc-500 font-medium max-w-xl mx-auto leading-relaxed">
+        <p className="text-xs md:text-sm text-zinc-600 font-medium max-w-xl mx-auto leading-relaxed">
           {featureDesc}
         </p>
       </div>
 
-      <div className="bg-zinc-50 border border-zinc-200/80 rounded-3xl p-6 text-left max-w-lg mx-auto space-y-3">
-        <p className="text-[11px] font-black uppercase tracking-wider text-zinc-400">
+      <div className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-6 text-left max-w-lg mx-auto space-y-3">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
           Keunggulan yang Akan Terbuka:
         </p>
         {highlights.map((h, i) => (
-          <div key={i} className="flex items-start gap-2.5 text-xs font-bold text-zinc-700">
+          <div key={i} className="flex items-start gap-2.5 text-xs font-semibold text-zinc-700">
             <div className="w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
               <Check size={12} />
             </div>
@@ -236,13 +236,13 @@ export default function App() {
       <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
         <button
           onClick={() => setSubscriptionPlan('pro')}
-          className="w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-gradient-to-r from-[#E87F24] to-[#FFC81E] text-zinc-950 font-black text-xs shadow-lg shadow-[#E87F24]/20 cursor-pointer active:scale-95 transition-all"
+          className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-gradient-to-r from-[#E87F24] to-[#FFC81E] text-zinc-950 font-bold text-xs shadow-md cursor-pointer active:scale-95 transition-all"
         >
           Aktifkan Paket Pro (Rp149.000/bln)
         </button>
         <button
           onClick={() => setSubscriptionPlan('enterprise')}
-          className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white font-black text-xs cursor-pointer active:scale-95 transition-all"
+          className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs cursor-pointer active:scale-95 transition-all"
         >
           Coba Paket Enterprise (Multi-Outlet)
         </button>
@@ -256,10 +256,10 @@ export default function App() {
         return (
           <motion.div 
             key="landing"
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             className="w-full min-h-screen"
           >
             <LandingPage 
@@ -282,13 +282,14 @@ export default function App() {
         return (
           <motion.div 
             key="register"
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             className="w-full min-h-screen"
           >
             <Register 
+              key={subscriptionPlan}
               onBack={() => setCurrentView('landing')} 
               onOpenLogin={() => setCurrentView('login')}
               initialPlan={subscriptionPlan}
@@ -383,9 +384,9 @@ export default function App() {
                           className="bg-zinc-800 border border-zinc-700 text-white text-xs font-bold rounded-xl px-3.5 py-2 focus:outline-none focus:border-[#E87F24] cursor-pointer"
                         >
                           <option value="Semua Cabang (Terpusat)">Semua Cabang (Terpusat)</option>
-                          <option value="Cabang Utama — Makassar">Cabang Utama — Makassar</option>
-                          <option value="Cabang 2 — Bandung">Cabang 2 — Bandung</option>
-                          <option value="Cabang 3 — Jakarta">Cabang 3 — Jakarta</option>
+                          <option value="Cabang Utama - Makassar">Cabang Utama - Makassar</option>
+                          <option value="Cabang 2 - Bandung">Cabang 2 - Bandung</option>
+                          <option value="Cabang 3 - Jakarta">Cabang 3 - Jakarta</option>
                           <option value="Central Kitchen (Gudang Pusat)">Central Kitchen (Gudang Pusat)</option>
                         </select>
                       </div>

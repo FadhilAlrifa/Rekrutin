@@ -1,47 +1,124 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { ArrowRight, Sparkles, Store } from 'lucide-react';
+import { useRef } from 'react';
+import { motion, useMotionValue, useSpring } from 'framer-motion';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useGSAP } from '@gsap/react';
+import { Store, CheckCircle2 } from 'lucide-react';
+
+gsap.registerPlugin(ScrollTrigger, useGSAP);
+
+function MagneticCtaButton({ children, onClick, className, cursorLabel }) {
+  const ref = useRef(null);
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const springX = useSpring(x, { stiffness: 180, damping: 22, mass: 0.4 });
+  const springY = useSpring(y, { stiffness: 180, damping: 22, mass: 0.4 });
+
+  const handleMouseMove = (e) => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    x.set((e.clientX - (rect.left + rect.width / 2)) * 0.24);
+    y.set((e.clientY - (rect.top + rect.height / 2)) * 0.24);
+  };
+
+  const handleMouseLeave = () => {
+    x.set(0);
+    y.set(0);
+  };
+
+  return (
+    <motion.button
+      ref={ref}
+      type="button"
+      onClick={onClick}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      data-cursor={cursorLabel}
+      style={{ x: springX, y: springY }}
+      whileTap={{ scale: 0.97 }}
+      className={`${className} gpu-accelerated`}
+    >
+      {children}
+    </motion.button>
+  );
+}
 
 export default function CTA({ onOpenApp, onOpenRegister }) {
+  const sectionRef = useRef(null);
+
+  useGSAP(
+    () => {
+      gsap.fromTo(
+        '.cta-reveal',
+        { y: 36, opacity: 0 },
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.85,
+          ease: 'power3.out',
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: 'top 80%'
+          }
+        }
+      );
+    },
+    { scope: sectionRef }
+  );
+
   return (
-    <section className="relative py-24 md:py-32 overflow-hidden bg-zinc-950">
-      {/* Background Glow Premium */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl h-full bg-gradient-to-r from-[#E87F24]/20 to-[#FFC81E]/20 blur-[120px] rounded-full pointer-events-none"></div>
-      
-      <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95, y: 20 }} 
-          whileInView={{ opacity: 1, scale: 1, y: 0 }} 
-          viewport={{ once: true }} 
-          transition={{ duration: 1.5 }}
-          className="bg-white/5 backdrop-blur-2xl border border-white/10 p-10 md:p-20 rounded-[3rem] shadow-2xl"
-        >
-          <Sparkles className="text-[#FFC81E] w-12 h-12 mx-auto mb-6 animate-pulse" />
-          
-          <h2 className="text-4xl md:text-6xl font-black text-white mb-6 tracking-tight">
-            Siap Merevolusi <br className="hidden md:block" />Operasional Gerai Anda?
+    <section
+      ref={sectionRef}
+      className="relative py-24 md:py-32 overflow-hidden bg-white"
+    >
+      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 text-center">
+        <div className="cta-reveal bg-[#FAFAFA] border border-zinc-200 rounded-3xl p-8 sm:p-14 md:p-20 relative overflow-hidden space-y-7 gpu-accelerated">
+          <span className="font-mono text-xs uppercase tracking-[0.2em] text-[#D97706] font-bold block">
+            [ READY TO DEPLOY ]
+          </span>
+
+          <h2 className="text-4xl sm:text-6xl font-extrabold text-[#141414] tracking-tight leading-[1.04] max-w-3xl mx-auto">
+            Digitalisasi Kasir &{' '}
+            <span className="font-serif italic font-normal text-[#F59E0B]">
+              Gudang Gerai
+            </span>{' '}
+            Anda Hari Ini.
           </h2>
-          
-          <p className="text-lg md:text-xl text-zinc-300 font-medium mb-10 max-w-2xl mx-auto leading-relaxed">
-            Tinggalkan pencatatan manual dan kerugian akibat bahan basi. Gunakan Stocko hari ini untuk integrasi kasir POS, resep gudang, dan peringatan FEFO dalam satu platform.
+
+          <p className="text-sm sm:text-base text-[#52525B] font-medium max-w-xl mx-auto leading-relaxed">
+            Integrasikan pencatatan transaksi kasir, pemotongan bahan baku otomatis (BOM), dan peringatan kedaluwarsa FEFO dalam satu sistem terpadu.
           </p>
-          
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <button 
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
+            <MagneticCtaButton
               onClick={onOpenRegister}
-              className="w-full sm:w-auto bg-gradient-to-r from-[#E87F24] to-[#FFC81E] hover:from-[#c96a1a] hover:to-[#e6b419] text-zinc-950 font-black px-10 h-14 md:h-16 rounded-full text-sm md:text-lg shadow-[0_0_40px_rgba(232,127,36,0.3)] hover:shadow-[0_0_60px_rgba(232,127,36,0.6)] transition-all flex items-center justify-center gap-2 hover:-translate-y-1 cursor-pointer"
+              cursorLabel="Start"
+              className="w-full sm:w-auto bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] font-extrabold px-9 py-4 rounded-full text-xs sm:text-sm transition-colors cursor-pointer shadow-sm"
             >
-              Mulai Uji Coba Gratis <ArrowRight size={20} />
-            </button>
-            
-            <button 
+              Mulai Uji Coba Gratis 14 Hari
+            </MagneticCtaButton>
+
+            <MagneticCtaButton
               onClick={onOpenApp}
-              className="w-full sm:w-auto bg-white/5 hover:bg-white/10 text-white border border-white/20 font-bold px-10 h-14 md:h-16 rounded-full text-sm md:text-lg transition-all flex items-center justify-center gap-2 hover:-translate-y-1 cursor-pointer"
+              cursorLabel="Try POS"
+              className="w-full sm:w-auto bg-white hover:bg-zinc-100 text-[#141414] border border-zinc-300 font-bold px-9 py-4 rounded-full text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
             >
-              <Store size={20} /> Buka Simulasi POS
-            </button>
+              <Store size={16} className="text-[#D97706]" /> Buka Simulasi POS
+            </MagneticCtaButton>
           </div>
-        </motion.div>
+
+          <div className="pt-4 flex flex-wrap items-center justify-center gap-6 font-mono text-[11px] text-[#52525B]">
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 size={14} className="text-emerald-600" /> Aktivasi Magic Link
+            </span>
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 size={14} className="text-emerald-600" /> Simulasi Tanpa Login
+            </span>
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 size={14} className="text-emerald-600" /> Bebas Biaya Setup
+            </span>
+          </div>
+        </div>
       </div>
     </section>
   );

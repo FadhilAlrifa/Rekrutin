@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Receipt, Eye, Calendar, MapPin } from 'lucide-react';
 
 export default function TransactionHistory({ transactions, formatDateTime, onSelectTx }) {

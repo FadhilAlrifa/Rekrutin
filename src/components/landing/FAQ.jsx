@@ -1,102 +1,162 @@
-import React, { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Minus, Sparkles } from 'lucide-react';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useGSAP } from '@gsap/react';
+import { ChevronDown, MessageSquare } from 'lucide-react';
+
+gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 export default function FAQ() {
-  const [activeIndex, setActiveIndex] = useState(0); // Buka yang pertama secara default
+  const sectionRef = useRef(null);
+  const [activeIndex, setActiveIndex] = useState(0);
 
   const faqs = [
     {
-      q: "Bagaimana sistem FEFO (First Expired, First Out) bekerja di Stocko?",
-      a: "Saat Anda mencatat stok masuk (restock), sistem akan meminta tanggal kedaluwarsa. Stocko secara otomatis mengurutkan bahan mana yang harus dipakai lebih dulu, dan memberikan notifikasi visual jika ada barang yang mendekati batas simpannya."
+      tag: '01 // FEFO',
+      q: 'Bagaimana sistem FEFO (First Expired, First Out) bekerja di Stocko?',
+      a: 'Saat Anda mencatat stok masuk (restock), sistem mencatat tanggal kedaluwarsa setiap bahan baku. Stocko secara otomatis memprioritaskan bahan yang masa simpannya paling dekat (≤ 30 hari) dan menampilkan peringatan visual di modul Peringatan Gudang.'
     },
     {
-      q: "Apakah modul POS langsung terhubung dengan stok gudang?",
-      a: "Ya. Setiap transaksi penjualan di meja kasir akan langsung mengurangi jumlah bahan baku di database (melalui integrasi Bill of Materials) secara real-time. Tidak ada lagi selisih antara laporan penjualan dan fisik gudang."
+      tag: '02 // BOM',
+      q: 'Apakah modul POS langsung terhubung dengan stok bahan mentah di gudang?',
+      a: 'Ya. Setiap transaksi penjualan di meja kasir maupun QR Self-Order langsung mengonversi satuan (gram/ml ke kg/liter) dan memotong jumlah bahan baku di database melalui mesin Bill of Materials secara real-time.'
     },
     {
-      q: "Bagaimana jika koneksi internet terputus di gerai kami?",
-      a: "Sistem kasir Stocko dilengkapi arsitektur offline-first. Anda tetap bisa memproses pesanan dan mencetak struk. Data penjualan akan otomatis disinkronkan ke cloud begitu koneksi internet Anda kembali stabil."
+      tag: '03 // VALIDASI',
+      q: 'Apa yang terjadi jika bahan baku di gudang tidak cukup saat kasir menginput pesanan?',
+      a: 'Mesin Cross-Menu Validation Stocko menghitung akumulasi kebutuhan bahan dari seluruh item di keranjang secara kolektif. Jika ada bahan yang tidak mencukupi, sistem otomatis mengunci penambahan porsi sebelum transaksi terjadi.'
     },
     {
-      q: "Apakah aplikasi ini dirancang khusus untuk Track 4.2 Duluinnovation?",
-      a: "Benar. Stocko dikembangkan sebagai vertical SaaS yang berfokus pada Smart Inventory & POS untuk F&B/Retail, sebagai bentuk perluasan ekosistem teknologi B2B Duluin."
+      tag: '04 // RBAC',
+      q: 'Bisakah saya memisahkan akses antara Kasir dan Staf Gudang?',
+      a: 'Tentu. Melalui sistem Role-Based Access Control (RBAC), pemilik gerai (Superadmin) dapat membuat akun khusus Kasir yang hanya membuka layar penjualan dan akun Stocker yang khusus mengelola inventaris gudang.'
     }
   ];
 
-  return (
-    <section id="faq" className="py-24 bg-zinc-50 border-t border-zinc-200/60 relative overflow-hidden">
-      {/* Background Accent */}
-      <div className="absolute top-1/2 left-0 w-[500px] h-[500px] bg-[#E87F24]/5 rounded-full blur-[100px] -z-0 -translate-y-1/2 -translate-x-1/2 pointer-events-none"></div>
+  useGSAP(
+    () => {
+      gsap.fromTo(
+        '.faq-reveal',
+        { y: 28, opacity: 0 },
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.75,
+          stagger: 0.1,
+          ease: 'power3.out',
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: 'top 80%'
+          }
+        }
+      );
+    },
+    { scope: sectionRef }
+  );
 
-      <div className="max-w-7xl mx-auto px-6 relative z-10">
-        
-        {/* Layout 2 Kolom untuk Desktop */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8">
-          
-          {/* Kolom Kiri: Judul & Kontak */}
-          <div className="lg:col-span-4 lg:sticky lg:top-32 h-fit">
-            <motion.div 
-              initial={{ opacity: 0, y: -20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-              className="inline-flex items-center gap-2 bg-orange-50 text-[#E87F24] border border-orange-200 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider mb-6"
-            >
-              <Sparkles size={14} /> Bantuan Terpusat
-            </motion.div>
-            
-            <h2 className="text-3xl md:text-5xl font-black text-zinc-900 tracking-tight mb-6">Pertanyaan<br className="hidden lg:block"/> Umum.</h2>
-            <p className="text-zinc-500 font-medium mb-8 leading-relaxed">
-              Temukan jawaban tentang bagaimana sistem kasir dan otomatisasi inventaris kami bekerja.
-            </p>
-            
-            <div className="bg-white border border-zinc-200 p-8 rounded-[2rem] shadow-sm">
-              <p className="text-base font-black text-zinc-900 mb-2">Masih ada keraguan?</p>
-              <p className="text-sm text-zinc-500 mb-6">Tim teknis kami siap memandu Anda melakukan integrasi awal untuk gerai Anda.</p>
-              <button className="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-black text-sm py-4 rounded-2xl transition-colors shadow-md cursor-pointer">
-                Hubungi Support
-              </button>
+  return (
+    <section
+      ref={sectionRef}
+      id="faq"
+      className="py-24 md:py-32 bg-[#FAFAFA] text-[#141414] border-b border-zinc-200 relative overflow-hidden"
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
+          {/* Left Column */}
+          <div className="faq-reveal lg:col-span-4 lg:sticky lg:top-28 space-y-6 gpu-accelerated">
+            <div className="space-y-3">
+              <span className="font-mono text-xs uppercase tracking-[0.2em] text-[#D97706] font-bold block">
+                [ 05 // PUSAT INFORMASI ]
+              </span>
+              <h2 className="text-3xl sm:text-5xl font-extrabold text-[#141414] tracking-tight leading-[1.06]">
+                Pertanyaan{' '}
+                <span className="font-serif italic font-normal text-[#F59E0B]">
+                  Umum.
+                </span>
+              </h2>
+              <p className="text-[#52525B] text-sm font-medium leading-relaxed">
+                Pelajari cara kerja otomatisasi resep BOM, peringatan dini FEFO, dan manajemen operasional di Stocko.
+              </p>
+            </div>
+
+            <div className="bg-white border border-zinc-200 rounded-3xl p-6 space-y-4 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.06)]">
+              <div className="w-10 h-10 rounded-xl bg-[#FEF3C7] border border-[#FDE68A] text-[#D97706] flex items-center justify-center">
+                <MessageSquare size={18} />
+              </div>
+              <div className="space-y-1">
+                <p className="text-base font-bold text-[#141414]">Butuh konsultasi implementasi?</p>
+                <p className="text-xs text-[#52525B] font-medium leading-relaxed">
+                  Tim teknis kami siap memandu migrasi katalog menu dan takaran resep gerai Anda.
+                </p>
+              </div>
+              <a
+                href="mailto:hello@duluin.com"
+                data-cursor="Email"
+                className="w-full bg-[#141414] hover:bg-zinc-800 text-white font-bold text-xs py-3 rounded-full transition-colors flex items-center justify-center cursor-pointer"
+              >
+                Hubungi Tim Teknis
+              </a>
             </div>
           </div>
 
-          {/* Kolom Kanan: Daftar Pertanyaan */}
-          <div className="lg:col-span-8 space-y-4">
-            {faqs.map((faq, index) => (
-              <motion.div 
-                key={index} 
-                initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: index * 0.1 }}
-                className={`border rounded-3xl transition-all duration-300 overflow-hidden ${
-                  activeIndex === index ? 'bg-white border-[#E87F24]/40 shadow-lg shadow-[#E87F24]/5' : 'bg-transparent border-zinc-200 hover:border-zinc-300 hover:bg-white/50'
-                }`}
-              >
-                <button 
-                  onClick={() => setActiveIndex(activeIndex === index ? null : index)}
-                  className="w-full text-left p-6 md:p-8 flex justify-between items-center focus:outline-none cursor-pointer"
+          {/* Right Column: Editorial Accordion */}
+          <div className="lg:col-span-8 space-y-3.5">
+            {faqs.map((faq, index) => {
+              const isOpen = activeIndex === index;
+              return (
+                <div
+                  key={index}
+                  className={`faq-reveal rounded-2xl border transition-colors duration-200 overflow-hidden gpu-accelerated ${
+                    isOpen
+                      ? 'bg-white border-[#F59E0B] shadow-[0_12px_30px_-10px_rgba(245,158,11,0.12)]'
+                      : 'bg-white border-zinc-200 hover:border-zinc-300'
+                  }`}
                 >
-                  <span className={`font-black text-base md:text-lg pr-8 transition-colors ${activeIndex === index ? 'text-[#E87F24]' : 'text-zinc-700 hover:text-zinc-900'}`}>
-                    {faq.q}
-                  </span>
-                  <div className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                    activeIndex === index ? 'bg-orange-50 text-[#E87F24]' : 'bg-zinc-100 text-zinc-400'
-                  }`}>
-                    {activeIndex === index ? <Minus size={18} /> : <Plus size={18} />}
-                  </div>
-                </button>
-                
-                <AnimatePresence>
-                  {activeIndex === index && (
-                    <motion.div 
-                      initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden"
+                  <button
+                    type="button"
+                    aria-expanded={isOpen}
+                    onClick={() => setActiveIndex(isOpen ? null : index)}
+                    className="w-full text-left p-5 sm:p-6 flex justify-between items-center gap-4 focus:outline-none cursor-pointer"
+                  >
+                    <div className="space-y-1.5 pr-2">
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#D97706] block">
+                        {faq.tag}
+                      </span>
+                      <p className="font-bold text-sm sm:text-base text-[#141414]">{faq.q}</p>
+                    </div>
+                    <motion.div
+                      animate={{ rotate: isOpen ? 180 : 0 }}
+                      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                      className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center border transition-colors ${
+                        isOpen
+                          ? 'bg-[#F59E0B] text-[#141414] border-[#F59E0B]'
+                          : 'bg-[#FAFAFA] text-[#52525B] border-zinc-200'
+                      }`}
                     >
-                      <div className="px-6 md:px-8 pb-6 md:pb-8 text-zinc-600 text-sm font-medium leading-relaxed border-t border-zinc-100 pt-4 mt-2">
-                        {faq.a}
-                      </div>
+                      <ChevronDown size={17} />
                     </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            ))}
-          </div>
+                  </button>
 
+                  <AnimatePresence initial={false}>
+                    {isOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                        className="overflow-hidden"
+                      >
+                        <div className="px-5 sm:px-6 pb-6 pt-3 text-[#52525B] text-xs sm:text-sm font-medium leading-relaxed border-t border-zinc-200">
+                          {faq.a}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>

@@ -3,59 +3,75 @@
 @tailwind utilities;
 
 @layer base {
-  html {
-    /* Membuat efek scroll halus saat tombol navigasi diklik */
-    scroll-behavior: smooth; 
+  html.lenis,
+  html.lenis body {
+    height: auto;
   }
-  
+
+  .lenis.lenis-smooth {
+    scroll-behavior: auto !important;
+  }
+
+  .lenis.lenis-smooth [data-lenis-prevent] {
+    overscroll-behavior: contain;
+  }
+
+  .lenis.lenis-stopped {
+    overflow: hidden;
+  }
+
   body {
-    /* Memastikan font terlihat tajam, modern, dan tidak bergerigi */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    
-    /* Menerapkan warna latar belakang tema terang bawaan agar tidak ada flash putih sebelum React dimuat */
-    @apply bg-zinc-50 text-zinc-900;
+    @apply bg-[#FAFAFA] text-[#141414];
   }
-  
-  /* ========================================== */
-  /* KUSTOMISASI SCROLLBAR (Tampilan Modern)    */
-  /* ========================================== */
-  
-  /* Lebar untuk scrollbar vertikal & Tinggi untuk scrollbar horizontal (tabel) */
+
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px; 
+    width: 6px;
+    height: 6px;
   }
-  
+
   ::-webkit-scrollbar-track {
-    background: transparent; 
+    background: #FAFAFA;
   }
-  
+
   ::-webkit-scrollbar-thumb {
     @apply bg-zinc-300 rounded-full;
   }
-  
+
   ::-webkit-scrollbar-thumb:hover {
-    background: #E87F24; /* Warna oranye identitas Stocko / Duluin */
+    background: #F59E0B;
   }
 }
 
 @layer utilities {
-  .no-scrollbar::-webkit-scrollbar {
+  .no-scrollbar::-webkit-scrollbar,
+  .hide-scrollbar::-webkit-scrollbar {
     display: none;
   }
-  .no-scrollbar {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+  .no-scrollbar,
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 
-  /* Animasi shimmer (kilap) yang digunakan pada tombol CTA "Daftar Sekarang" */
-  @keyframes shimmer {
-    0% {
-      transform: translateX(-100%);
-    }
-    100% {
-      transform: translateX(100%);
-    }
+  /* Light Editorial Solid Surfaces (No Gradients) */
+  .agency-card-light {
+    @apply bg-white border border-zinc-200 rounded-3xl shadow-[0_20px_50px_-15px_rgba(0,0,0,0.06)];
+  }
+
+  .agency-panel-light {
+    @apply bg-[#FAFAFA] border border-zinc-200 rounded-2xl;
+  }
+
+  /* Dark Obsidian Contrast Surface (Solid) */
+  .agency-card-dark {
+    @apply bg-[#18181B] border border-zinc-800 rounded-3xl shadow-[0_20px_50px_-15px_rgba(0,0,0,0.45)];
+  }
+
+  .gpu-accelerated {
+    will-change: transform, opacity;
+    transform: translateZ(0);
+    backface-visibility: hidden;
   }
 }

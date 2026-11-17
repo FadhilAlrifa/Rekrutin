@@ -1,6 +1,5 @@
-import React from 'react';
 import { motion } from 'framer-motion';
-import { X, ArrowDownToLine, Tag, Calendar, Package, Check } from 'lucide-react';
+import { X, ArrowDownToLine, Calendar, Package, Check } from 'lucide-react';
 
 export default function StockInModal({ isOpen, onClose, onSubmit, stockInData, setStockInData }) {
   if (!isOpen) return null;

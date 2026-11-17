@@ -1,130 +1,151 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import logoKominfo from '../../assets/logo_kominfo.svg';
-import { MapPin, Phone, Mail, Globe, Zap, ArrowRight, ShieldCheck } from 'lucide-react';
+import { MapPin, Phone, Mail, Globe, ShieldCheck, X } from 'lucide-react';
 
-export default function Footer({ onOpenApp, onOpenRegister, onOpenLogin }) {
+export default function Footer({ onOpenRegister }) {
+  const [showFloatingBar, setShowFloatingBar] = useState(true);
+
   return (
-    <footer className="bg-[#f8f9fb] text-zinc-600 pt-20 pb-36 font-sans relative overflow-hidden border-t border-zinc-200/80">
-
-      {/* 1. Background Glow & Ornaments (Disesuaikan untuk mode terang) */}
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-5xl h-[400px] bg-gradient-to-t from-[#E87F24]/15 via-[#FFC81E]/10 to-transparent blur-[120px] pointer-events-none -z-10"></div>
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#00000008_1px,transparent_1px),linear-gradient(to_bottom,#00000008_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none -z-10"></div>
-
-      <div className="max-w-7xl mx-auto px-6 relative z-10">
-
-        {/* Grid Footer Utama */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-12 pb-16 border-b border-zinc-200/80">
-
-          {/* Kolom 1: Logo & Kontak Perusahaan */}
+    <footer className="bg-[#111111] text-zinc-400 pt-20 pb-32 font-sans relative overflow-hidden border-t border-zinc-800">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
+        {/* Main Editorial Footer Grid (Dark Obsidian Contrast Section #2) */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-12 pb-16 border-b border-zinc-800">
+          {/* Column 1: Brand & Contact */}
           <div className="md:col-span-5 space-y-6">
             <div className="flex items-center gap-2.5">
-              <img src="/logo-stocko.png" alt="Stocko Logo" className="w-10 h-10 object-contain" />
-              <span className="text-2xl font-black tracking-tight text-zinc-900">
-                Stocko<span className="text-[#E87F24]">.</span>
+              <div className="w-10 h-10 rounded-full bg-[#18181B] border border-zinc-800 flex items-center justify-center">
+                <img src="/logo-stocko.png" alt="Stocko Logo" className="w-6 h-6 object-contain" />
+              </div>
+              <span className="text-2xl font-extrabold tracking-tight text-[#FAFAFA]">
+                Stocko<span className="text-[#F59E0B]">.</span>
               </span>
             </div>
 
-            <p className="text-sm text-zinc-500 font-medium leading-relaxed max-w-md">
+            <p className="text-sm text-zinc-400 font-medium leading-relaxed max-w-md">
               Sistem Smart Inventory & POS berbasis integrasi BOM dan FEFO di bawah ekosistem teknologi PT. Duluin Solusi Indonesia untuk efisiensi bisnis F&B modern.
             </p>
 
-            <div className="space-y-3 text-sm font-medium pt-2">
-              <div className="flex items-start gap-3 hover:text-zinc-900 transition-colors">
-                <MapPin size={18} className="text-[#E87F24] shrink-0 mt-0.5" />
+            <div className="space-y-3 text-sm font-medium pt-1">
+              <div className="flex items-start gap-3 text-zinc-400 hover:text-[#FAFAFA] transition-colors">
+                <MapPin size={17} className="text-[#F59E0B] shrink-0 mt-0.5" />
                 <span>Jl. Batununggal Indah Raya No.365, Batununggal, Kec. Bandung Kidul, Kota Bandung, Jawa Barat 40266</span>
               </div>
-              <div className="flex items-center gap-3 hover:text-zinc-900 transition-colors">
-                <Phone size={18} className="text-[#E87F24] shrink-0" />
+              <div className="flex items-center gap-3 text-zinc-400 hover:text-[#FAFAFA] transition-colors">
+                <Phone size={17} className="text-[#F59E0B] shrink-0" />
                 <span>081910031000</span>
               </div>
-              <div className="flex items-center gap-3 hover:text-zinc-900 transition-colors">
-                <Mail size={18} className="text-[#E87F24] shrink-0" />
+              <div className="flex items-center gap-3 text-zinc-400 hover:text-[#FAFAFA] transition-colors">
+                <Mail size={17} className="text-[#F59E0B] shrink-0" />
                 <span>hello@duluin.com</span>
               </div>
-              <div className="flex items-center gap-3 hover:text-zinc-900 transition-colors">
-                <Globe size={18} className="text-[#E87F24] shrink-0" />
+              <div className="flex items-center gap-3 text-zinc-400 hover:text-[#FAFAFA] transition-colors">
+                <Globe size={17} className="text-[#F59E0B] shrink-0" />
                 <span>duluinstocko.com</span>
               </div>
             </div>
           </div>
 
-          {/* Kolom 2: Legalitas / Kominfo & ISO */}
-          <div className="md:col-span-4 space-y-6">
-            <div className="space-y-3 bg-white border border-zinc-200 p-5 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center gap-3">
-                {/* Menggunakan file SVG Logo Kominfo */}
-                <img
-                  src={logoKominfo}
-                  alt="Logo Kominfo"
-                  className="h-8 w-auto object-contain"
-                />
+          {/* Column 2: Compliance & Security */}
+          <div className="md:col-span-4 space-y-4">
+            <div className="bg-[#18181B] border border-zinc-800 rounded-2xl p-5 space-y-3">
+              <div className="inline-flex items-center bg-white px-3 py-1.5 rounded-lg">
+                <img src={logoKominfo} alt="Logo Kominfo" className="h-6 w-auto object-contain" />
               </div>
-              <p className="text-xs font-medium text-zinc-500 leading-relaxed mt-1">
-                <strong className="text-zinc-900">PT. Duluin Solusi Indonesia</strong><br />
-                Terdaftar di Penyelenggara Sistem Elektronik<br />
-                {/* Warna kode diubah dari kuning ke oranye agar lebih mudah dibaca di background terang */}
-                <span className="font-mono text-[11px] text-[#E87F24] font-bold">018780.01/DJAI.PSE/06/2025</span>
+              <p className="text-xs font-medium text-zinc-400 leading-relaxed">
+                <strong className="text-[#FAFAFA]">PT. Duluin Solusi Indonesia</strong>
+                <br />
+                Terdaftar di Penyelenggara Sistem Elektronik
+                <br />
+                <span className="font-mono text-[11px] text-[#F59E0B] font-bold">018780.01/DJAI.PSE/06/2025</span>
               </p>
             </div>
 
-            <div className="flex items-center gap-3 bg-white border border-zinc-200 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-              <ShieldCheck className="text-emerald-500 shrink-0" size={24} />
-              <div className="text-[11px] font-bold text-zinc-900">
+            <div className="bg-[#18181B] border border-zinc-800 rounded-2xl p-4 flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                <ShieldCheck className="text-emerald-400" size={20} />
+              </div>
+              <div className="text-xs font-bold text-[#FAFAFA]">
                 ISO/IEC 27001:2022
-                <span className="block font-medium text-zinc-500 text-[10px]">Certified Security Management</span>
+                <span className="block font-medium text-zinc-400 text-[11px]">Certified Security Management</span>
               </div>
             </div>
           </div>
 
-          {/* Kolom 3: Navigasi Halaman */}
+          {/* Column 3: Quick Links */}
           <div className="md:col-span-3 space-y-4">
-            <h4 className="font-bold text-zinc-900 text-sm uppercase tracking-wider">Navigasi</h4>
-            <ul className="space-y-3 text-sm font-medium text-zinc-500">
-              <li><a href="#" className="hover:text-[#E87F24] transition-colors flex items-center gap-2">Beranda</a></li>
-              <li><a href="#features" className="hover:text-[#E87F24] transition-colors flex items-center gap-2">Fitur POS & BOM</a></li>
-              <li><a href="#why-us" className="hover:text-[#E87F24] transition-colors flex items-center gap-2">Keunggulan FEFO</a></li>
-              <li><a href="#benefits" className="hover:text-[#E87F24] transition-colors flex items-center gap-2">Manfaat Bisnis</a></li>
-              <li><a href="#faq" className="hover:text-[#E87F24] transition-colors flex items-center gap-2">FAQ</a></li>
-              <li><a href="#" className="hover:text-[#E87F24] transition-colors flex items-center gap-2">Kebijakan Privasi</a></li>
+            <h4 className="font-mono font-bold text-[#FAFAFA] text-xs uppercase tracking-widest">
+              Navigasi
+            </h4>
+            <ul className="space-y-2.5 text-sm font-medium text-zinc-400">
+              <li>
+                <a href="#" className="hover:text-[#F59E0B] transition-colors">Beranda</a>
+              </li>
+              <li>
+                <a href="#features" className="hover:text-[#F59E0B] transition-colors">Fitur POS & BOM</a>
+              </li>
+              <li>
+                <a href="#why-us" className="hover:text-[#F59E0B] transition-colors">Alur Otomatisasi</a>
+              </li>
+              <li>
+                <a href="#benefits" className="hover:text-[#F59E0B] transition-colors">Manfaat Bisnis</a>
+              </li>
+              <li>
+                <a href="#harga" className="hover:text-[#F59E0B] transition-colors">Paket Langganan</a>
+              </li>
+              <li>
+                <a href="#faq" className="hover:text-[#F59E0B] transition-colors">FAQ</a>
+              </li>
             </ul>
           </div>
-
         </div>
 
-        {/* Hak Cipta */}
-        <div className="pt-8 text-center text-xs font-medium text-zinc-400">
-          &copy; {new Date().getFullYear()} PT. Duluin Solusi Indonesia. Hak cipta dilindungi undang-undang.
+        {/* Copyright */}
+        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-2 font-mono text-xs text-zinc-500">
+          <span>&copy; {new Date().getFullYear()} PT. Duluin Solusi Indonesia.</span>
+          <span>SMART POS & INVENTORY ENGINE</span>
         </div>
-
       </div>
 
-      {/* ========================================== */}
-      {/* STICKY FLOATING CARD (Glassmorphism + Gradasi Tombol) */}
-      {/* ========================================== */}
-      <div className="fixed bottom-6 inset-x-0 z-50 flex justify-center px-4 pointer-events-none">
-        <motion.div
-          initial={{ y: 50, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.6, type: "spring" }}
-          className="pointer-events-auto bg-white/90 backdrop-blur-xl border border-zinc-200/80 text-zinc-900 py-3 sm:py-3.5 px-5 sm:px-6 rounded-[2rem] sm:rounded-full shadow-[0_10px_30px_rgb(0,0,0,0.15)] flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-6 group transition-all duration-300 w-full max-w-xl text-center sm:text-left"
-        >
-          <div className="text-xs sm:text-sm font-bold flex items-center justify-center sm:justify-start gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#E87F24] animate-ping shrink-0"></span>
-            <span className="leading-snug">
-              Optimalkan Bisnis Anda Mulai <span className="text-[#E87F24] font-black underline decoration-wavy decoration-[#E87F24]">Rp79.000/bln</span>
-            </span>
-          </div>
-
-          <button
-            onClick={onOpenRegister}
-            className="w-full sm:w-auto bg-gradient-to-r from-[#E87F24] to-[#FFC81E] hover:from-[#c96a1a] hover:to-[#e6b419] text-white/90 font-black text-xs sm:text-sm px-5 py-2.5 rounded-full shadow-lg transition-transform hover:scale-105 shrink-0 flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+      {/* Dismissible Solid Floating Dock */}
+      <AnimatePresence>
+        {showFloatingBar && (
+          <motion.div
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 40, opacity: 0 }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed bottom-5 inset-x-0 z-40 flex justify-center px-4 pointer-events-none"
           >
-            Daftar Sekarang <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-          </button>
-        </motion.div>
-      </div>
+            <div className="pointer-events-auto bg-white border border-zinc-200 text-[#141414] py-2.5 px-4 sm:px-5 rounded-full shadow-[0_18px_40px_rgba(0,0,0,0.16)] flex items-center justify-between gap-4 w-full max-w-lg">
+              <div className="flex items-center gap-2.5 text-xs font-semibold truncate">
+                <span className="w-2 h-2 rounded-full bg-[#F59E0B] shrink-0" />
+                <span className="truncate">
+                  Mulai <strong className="text-[#D97706] font-mono">Rp79.000/bln</strong> • Gratis uji coba 14 hari
+                </span>
+              </div>
 
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={onOpenRegister}
+                  className="bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] font-extrabold text-xs px-4 py-1.5 rounded-full cursor-pointer active:scale-95 transition-all"
+                >
+                  Daftar
+                </button>
+                <button
+                  type="button"
+                  aria-label="Tutup banner"
+                  onClick={() => setShowFloatingBar(false)}
+                  className="w-7 h-7 rounded-full bg-[#FAFAFA] hover:bg-zinc-200 text-[#52525B] hover:text-[#141414] border border-zinc-200 flex items-center justify-center cursor-pointer transition-colors"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </footer>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Plus, Search, LayoutGrid, Coffee, Utensils, Croissant, Cake } from 'lucide-react';
 import { supabase } from '../../../services/supabaseClient';

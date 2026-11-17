@@ -1,27 +1,44 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Menu, X, Store } from 'lucide-react';
+import { Menu, X, Store } from 'lucide-react';
+
+const NAV_LINKS = [
+  { key: 'beranda', label: 'Beranda', id: '#' },
+  { key: 'fitur', label: 'Fitur', id: 'features' },
+  { key: 'keunggulan', label: 'Alur Kerja', id: 'why-us' },
+  { key: 'harga', label: 'Harga', id: 'harga' },
+  { key: 'faq', label: 'FAQ', id: 'faq' }
+];
 
 export default function Navbar({ onOpenRegister, onOpenLogin, onOpenApp }) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('beranda');
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
-      const scrollPosition = window.scrollY;
+      const y = window.scrollY;
+      setScrolled(y > 24);
+
+      const faqEl = document.getElementById('faq');
       const hargaEl = document.getElementById('harga');
+      const whyEl = document.getElementById('why-us');
       const featuresEl = document.getElementById('features');
 
-      if (hargaEl && scrollPosition >= hargaEl.offsetTop - 250) {
+      if (faqEl && faqEl.getBoundingClientRect().top <= 280) {
+        setActiveSection('faq');
+      } else if (hargaEl && hargaEl.getBoundingClientRect().top <= 280) {
         setActiveSection('harga');
-      } else if (featuresEl && scrollPosition >= featuresEl.offsetTop - 250) {
+      } else if (whyEl && whyEl.getBoundingClientRect().top <= 280) {
+        setActiveSection('keunggulan');
+      } else if (featuresEl && featuresEl.getBoundingClientRect().top <= 280) {
         setActiveSection('fitur');
       } else {
         setActiveSection('beranda');
       }
     };
 
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
@@ -30,93 +47,118 @@ export default function Navbar({ onOpenRegister, onOpenLogin, onOpenApp }) {
     setActiveSection(sectionKey);
     setIsOpen(false);
     if (id === '#') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (window.__lenis) {
+        window.__lenis.scrollTo(0, { duration: 1.2 });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
       return;
     }
     const target = document.getElementById(id);
     if (target) {
-      target.scrollIntoView({ behavior: 'smooth' });
+      if (window.__lenis) {
+        window.__lenis.scrollTo(target, { offset: -20, duration: 1.2 });
+      } else {
+        target.scrollIntoView({ behavior: 'smooth' });
+      }
     }
   };
 
   return (
     <motion.nav
-      initial={{ y: -100 }} animate={{ y: 0 }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-      className="fixed w-full top-0 z-50 px-4 md:px-6 py-4"
+      initial={{ y: -30, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.36, 1] }}
+      className="fixed w-full top-0 z-50 px-4 md:px-6 pt-4 pointer-events-none"
     >
-      <div className="max-w-7xl mx-auto bg-white/85 backdrop-blur-xl border border-zinc-200/80 rounded-full px-6 py-3 flex items-center justify-between shadow-[0_10px_30px_rgb(0,0,0,0.05)]">
-
-        {/* Logo */}
-        <div className="flex items-center gap-2.5 cursor-pointer" onClick={(e) => scrollToSection(e, '#', 'beranda')}>
-          <img src="/logo-stocko.png" alt="Stocko Logo" className="w-9 h-9 object-contain" />
-          <span className="text-xl font-black tracking-tight text-zinc-900">
-            Stocko<span className="text-[#E87F24]">.</span>
+      <div
+        className={`max-w-7xl mx-auto pointer-events-auto rounded-full px-4 sm:px-6 py-2.5 flex items-center justify-between transition-all duration-300 ${
+          scrolled
+            ? 'bg-white/95 backdrop-blur-xl border border-zinc-200 shadow-[0_14px_36px_-10px_rgba(0,0,0,0.08)]'
+            : 'bg-white border border-zinc-200 shadow-[0_4px_16px_-6px_rgba(0,0,0,0.04)]'
+        }`}
+      >
+        {/* Brand Logo */}
+        <div
+          className="flex items-center gap-2.5 cursor-pointer group"
+          onClick={(e) => scrollToSection(e, '#', 'beranda')}
+        >
+          <div className="w-9 h-9 rounded-full bg-[#FAFAFA] border border-zinc-200 flex items-center justify-center group-hover:border-[#F59E0B] transition-colors">
+            <img src="/logo-stocko.png" alt="Stocko Logo" className="w-5 h-5 object-contain" />
+          </div>
+          <span className="text-lg font-extrabold tracking-tight text-[#141414]">
+            Stocko<span className="text-[#F59E0B]">.</span>
+          </span>
+          <span className="hidden xl:inline-block font-mono text-[10px] text-[#52525B] border-l border-zinc-200 pl-2.5 uppercase tracking-widest">
+            POS // BOM
           </span>
         </div>
 
-        {/* Desktop Menu */}
-        <div className="hidden md:flex items-center gap-8 font-bold text-sm text-zinc-600">
-          <a
-            href="#"
-            onClick={(e) => scrollToSection(e, '#', 'beranda')}
-            className={`transition-colors relative py-1 ${activeSection === 'beranda' ? 'text-[#E87F24]' : 'hover:text-[#E87F24]'}`}
-          >
-            Beranda
-            {activeSection === 'beranda' && (
-              <motion.div layoutId="activeIndicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#E87F24] rounded-full" />
-            )}
-          </a>
-
-          <a
-            href="#features"
-            onClick={(e) => scrollToSection(e, 'features', 'fitur')}
-            className={`transition-colors relative py-1 ${activeSection === 'fitur' ? 'text-[#E87F24]' : 'hover:text-[#E87F24]'}`}
-          >
-            Fitur
-            {activeSection === 'fitur' && (
-              <motion.div layoutId="activeIndicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#E87F24] rounded-full" />
-            )}
-          </a>
-
-          <a
-            href="#harga"
-            onClick={(e) => scrollToSection(e, 'harga', 'harga')}
-            className={`transition-colors relative py-1 cursor-pointer ${activeSection === 'harga' ? 'text-[#E87F24]' : 'hover:text-[#E87F24]'}`}
-          >
-            Paket Langganan
-            {activeSection === 'harga' && (
-              <motion.div layoutId="activeIndicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#E87F24] rounded-full" />
-            )}
-          </a>
-
-          <a
-            href="#faq"
-            onClick={(e) => scrollToSection(e, 'faq', 'faq')}
-            className="hover:text-[#E87F24] transition-colors py-1"
-          >
-            FAQ
-          </a>
+        {/* Desktop Sliding Pill Navigation */}
+        <div className="hidden lg:flex items-center gap-1 bg-[#FAFAFA] p-1 rounded-full border border-zinc-200">
+          {NAV_LINKS.map((link) => {
+            const isActive = activeSection === link.key;
+            return (
+              <a
+                key={link.key}
+                href={link.id === '#' ? '#' : `#${link.id}`}
+                onClick={(e) => scrollToSection(e, link.id, link.key)}
+                className={`relative px-4 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                  isActive ? 'text-white' : 'text-[#52525B] hover:text-[#141414]'
+                }`}
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="navPill"
+                    transition={{ duration: 0.35, ease: [0.16, 1, 0.36, 1] }}
+                    className="absolute inset-0 bg-[#141414] rounded-full"
+                  />
+                )}
+                <span className="relative z-10">{link.label}</span>
+              </a>
+            );
+          })}
         </div>
 
-        {/* Desktop Buttons */}
-        <div className="hidden md:flex items-center gap-4">
+        {/* Desktop Actions */}
+        <div className="hidden md:flex items-center gap-2">
           <button
+            type="button"
+            onClick={onOpenApp}
+            data-cursor="Try POS"
+            className="font-semibold text-xs text-[#141414] hover:text-[#D97706] px-3.5 py-2 rounded-full hover:bg-[#FAFAFA] transition-colors cursor-pointer flex items-center gap-1.5"
+          >
+            <Store size={14} className="text-[#F59E0B]" />
+            <span>Simulasi POS</span>
+          </button>
+          <button
+            type="button"
             onClick={onOpenLogin}
-            className="font-bold text-sm text-zinc-700 hover:text-[#E87F24] transition-colors cursor-pointer"
+            className="font-semibold text-xs text-[#52525B] hover:text-[#141414] px-3.5 py-2 rounded-full hover:bg-[#FAFAFA] transition-colors cursor-pointer"
           >
-            Login
+            Masuk
           </button>
-          <button
+          <motion.button
+            type="button"
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.97 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.36, 1] }}
             onClick={onOpenRegister}
-            className="bg-gradient-to-r from-[#E87F24] to-[#FFC81E] hover:from-[#c96a1a] hover:to-[#e6b419] text-zinc-950 font-black text-xs sm:text-sm px-6 py-2.5 rounded-full shadow-lg transition-transform hover:scale-105 shrink-0 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+            data-cursor="Start"
+            className="bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] font-extrabold text-xs px-5 py-2.5 rounded-full transition-colors shrink-0 cursor-pointer whitespace-nowrap"
           >
-            Coba Gratis <ArrowRight size={16} />
-          </button>
+            Coba Gratis
+          </motion.button>
         </div>
 
-        {/* Mobile Toggle */}
-        <button className="md:hidden text-zinc-900 p-1 cursor-pointer" onClick={() => setIsOpen(!isOpen)}>
-          {isOpen ? <X size={24} /> : <Menu size={24} />}
+        {/* Mobile Menu Button */}
+        <button
+          type="button"
+          aria-label="Toggle Menu"
+          className="md:hidden text-[#141414] w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-100 cursor-pointer transition-colors"
+          onClick={() => setIsOpen(!isOpen)}
+        >
+          {isOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
       </div>
 
@@ -124,34 +166,60 @@ export default function Navbar({ onOpenRegister, onOpenLogin, onOpenApp }) {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }}
-            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute top-20 left-4 right-4 bg-white border border-zinc-200 p-6 rounded-3xl shadow-2xl flex flex-col gap-4 md:hidden text-zinc-900"
+            initial={{ opacity: 0, y: -10, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.98 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.36, 1] }}
+            className="max-w-7xl mx-auto mt-2 pointer-events-auto bg-white border border-zinc-200 p-4 rounded-3xl shadow-xl flex flex-col gap-1 md:hidden text-[#141414]"
           >
-            <a href="#" onClick={(e) => scrollToSection(e, '#', 'beranda')} className="font-bold hover:text-[#E87F24]">Beranda</a>
-            <a href="#features" onClick={(e) => scrollToSection(e, 'features', 'fitur')} className="font-bold hover:text-[#E87F24]">Fitur</a>
-            <a href="#harga" onClick={(e) => scrollToSection(e, 'harga', 'harga')} className="font-bold hover:text-[#E87F24]">Paket Langganan</a>
-            <a href="#faq" onClick={(e) => scrollToSection(e, 'faq', 'faq')} className="font-bold hover:text-[#E87F24]">FAQ</a>
+            {NAV_LINKS.map((link) => (
+              <a
+                key={link.key}
+                href={link.id === '#' ? '#' : `#${link.id}`}
+                onClick={(e) => scrollToSection(e, link.id, link.key)}
+                className={`font-semibold text-sm py-2.5 px-4 rounded-xl transition-colors ${
+                  activeSection === link.key
+                    ? 'bg-[#FEF3C7] text-[#B45309]'
+                    : 'text-[#52525B] hover:bg-[#FAFAFA]'
+                }`}
+              >
+                {link.label}
+              </a>
+            ))}
+
+            <hr className="border-zinc-200 my-1.5" />
 
             <button
-              onClick={() => { setIsOpen(false); onOpenApp?.(); }}
-              className="font-bold text-left hover:text-[#E87F24] flex items-center gap-2 text-[#E87F24]"
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                onOpenApp?.();
+              }}
+              className="font-semibold text-sm text-left py-2.5 px-4 rounded-xl hover:bg-[#FAFAFA] text-[#D97706] flex items-center gap-2 cursor-pointer transition-colors"
             >
               <Store size={16} /> Buka Simulasi POS
             </button>
 
             <button
-              onClick={() => { setIsOpen(false); onOpenLogin?.(); }}
-              className="text-left font-bold hover:text-[#E87F24]"
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                onOpenLogin?.();
+              }}
+              className="text-left font-semibold text-sm py-2.5 px-4 rounded-xl text-[#52525B] hover:bg-[#FAFAFA] cursor-pointer transition-colors"
             >
-              Login
+              Masuk ke Akun
             </button>
-            <hr className="border-zinc-100 my-1" />
+
             <button
-              onClick={() => { setIsOpen(false); onOpenRegister?.(); }}
-              className="bg-gradient-to-r from-[#E87F24] to-[#FFC81E] text-zinc-950 font-black py-3 rounded-xl flex justify-center items-center gap-2 shadow-md cursor-pointer"
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                onOpenRegister?.();
+              }}
+              className="mt-1 bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] font-extrabold text-sm py-3 rounded-xl flex justify-center items-center cursor-pointer transition-colors"
             >
-              Coba Gratis <ArrowRight size={18} />
+              Coba Gratis 14 Hari
             </button>
           </motion.div>
         )}
