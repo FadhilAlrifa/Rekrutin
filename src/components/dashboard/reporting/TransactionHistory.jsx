@@ -64,7 +64,7 @@ export default function TransactionHistory({ transactions, formatDateTime, onSel
                   {/* Kolom Informasi Nomor Meja / Kasir */}
                   <td className="py-3 px-2">
                     <span className="inline-flex items-center gap-1 bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] px-2.5 py-1 rounded-lg font-mono text-[10px] font-bold">
-                      <MapPin size={10} /> {tx.table_number || 'Takeaway / Kasir'}
+                      <MapPin size={10} /> {tx.table_number || 'Takeaway / Kasir'} • {tx.cashier_name || 'Kasir'}
                     </span>
                   </td>
                   <td className="py-3 px-2">

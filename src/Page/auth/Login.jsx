@@ -9,7 +9,7 @@ const fadeUp = {
   show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.16, 1, 0.36, 1] } }
 };
 
-export default function Login({ onBack, onOpenRegister, onLoginSuccess }) {
+export default function Login({ onBack, onOpenRegister, onLoginSuccess, externalError = '' }) {
   const [loginMethod, setLoginMethod] = useState('magic'); // 'magic' atau 'password'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -121,7 +121,7 @@ export default function Login({ onBack, onOpenRegister, onLoginSuccess }) {
                   {loginMethod === 'magic' ? <ShieldCheck size={24} /> : <Store size={24} />}
                 </div>
                 <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#D97706] font-bold block">
-                  {loginMethod === 'magic' ? 'ADMIN // MAGIC LINK' : 'STAF // RBAC LOGIN'}
+                  {loginMethod === 'magic' ? 'ADMIN // MAGIC LINK' : 'STAF PRIBADI // 1 AKUN = 1 KARYAWAN'}
                 </span>
                 <h2 className="text-2xl font-extrabold text-[#141414]">
                   {loginMethod === 'magic' ? 'Portal Admin' : 'Portal Karyawan'}
@@ -129,13 +129,13 @@ export default function Login({ onBack, onOpenRegister, onLoginSuccess }) {
                 <p className="text-xs text-[#52525B] font-medium">
                   {loginMethod === 'magic'
                     ? 'Masuk menggunakan Magic Link aman tanpa kata sandi.'
-                    : 'Masuk menggunakan email dan kata sandi karyawan Anda.'}
+                    : 'Masuk dengan akun pribadi Anda (Kasir atau Stocker). Sesi login tercatat untuk audit.'}
                 </p>
               </div>
 
-              {errorMessage && (
+              {(errorMessage || externalError) && (
                 <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold p-3 rounded-xl text-center">
-                  {errorMessage}
+                  {errorMessage || externalError}
                 </div>
               )}
 
@@ -175,14 +175,14 @@ export default function Login({ onBack, onOpenRegister, onLoginSuccess }) {
                 <form onSubmit={handlePasswordSubmit} className="space-y-4">
                   <div>
                     <label className="block font-mono text-[10px] uppercase tracking-wider text-[#52525B] font-semibold mb-2">
-                      Email Karyawan
+                      Email Pribadi Karyawan
                     </label>
                     <div className="relative">
                       <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
                       <input
                         type="email"
                         required
-                        placeholder="kasir@toko.com"
+                        placeholder="nama.karyawan@toko.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl px-4 py-3.5 pl-11 text-sm font-semibold text-[#141414] placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#F59E0B] transition-colors"

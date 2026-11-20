@@ -7,6 +7,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export const supabaseAdminAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
+    storageKey: 'sb-stocko-admin-temp',
     autoRefreshToken: false,
     persistSession: false,
     detectSessionInUrl: false

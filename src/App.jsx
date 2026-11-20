@@ -1,27 +1,79 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, Check, Building2, ShieldCheck } from 'lucide-react';
+import { Lock, Check, Building2, ShieldCheck, AlertTriangle, ArrowRight } from 'lucide-react';
 import LandingPage from './components/landing/LandingPage';
 import Register from './Page/auth/Register';
 import Login from './Page/auth/Login';
 import DashboardNavbar from './components/dashboard/DashboardNavbar';
 import PosModule from './components/dashboard/PosModule';
-import MenuManagementModule from './components/dashboard/menu/MenuManagementModal'; 
+import MenuManagementModule from './components/dashboard/menu/MenuManagementModal';
 import InventoryModule from './components/dashboard/inventory/InventoryModule';
 import AlertsModule from './components/dashboard/AlertsModule';
 import ReportingModule from './components/dashboard/reporting/ReportingModule';
+import ProfitabilityAiModule from './components/dashboard/reporting/ProfitabilityAiModule';
+import SeasonalAnalyticsModule from './components/dashboard/reporting/SeasonalAnalyticsModule';
+import AuditTrailModule from './components/dashboard/audit/AuditTrailModule';
 import SelfOrderModule from './components/dashboard/self-order/SelfOrderModule';
 import EmployeeModule from './components/dashboard/employee/EmployeeModule';
 import { supabase } from './services/supabaseClient';
-import { fetchProducts, fetchIngredients, saveTransaction, updateIngredientStock } from './services/stockoService';
+import {
+  fetchProducts,
+  fetchIngredients,
+  saveTransaction,
+  updateIngredientStock,
+  fetchPriceHistory,
+  updateIngredientPrice,
+  seedMarketPricesForMissing,
+  recordStockMutationLog,
+  DEFAULT_MERCHANT_SETTINGS,
+  fetchMerchantSettings,
+  saveMerchantSettings,
+  fetchOrders,
+  createOrderRecord,
+  updateOrderRecord,
+  fetchAuditLogs,
+  recordAuditLog,
+  fetchStockMovements,
+  recordStockMovement,
+  fetchSeasonalEvents
+} from './services/stockoService';
+import {
+  fetchStaffProfiles,
+  resolveAuthenticatedEmployeeProfile,
+  recordEmployeeSessionEvent
+} from './services/employeeAuditService';
+import {
+  createOrderPayload,
+  computeBomRequirementsForItems,
+  resolveOrderCancellation,
+  resolveOrderModification
+} from './utils/orderStateMachine';
+import { DEFAULT_SEASONAL_EVENTS } from './utils/seasonalForecasting';
 
 export default function App() {
-  const [currentView, setCurrentView] = useState('landing'); 
-  const [activeTab, setActiveTab] = useState('pos'); 
+  const [currentView, setCurrentView] = useState('landing');
+  const [activeTab, setActiveTab] = useState('pos');
 
   const [products, setProducts] = useState([]);
   const [ingredients, setIngredients] = useState([]);
+  const [priceHistory, setPriceHistory] = useState([]);
   const [userRole, setUserRole] = useState('superadmin');
+
+  // Iterasi 2 States: Operator Shift, Workflow Settings, Orders/KDS, Audit Trail & Seasonal Events
+  const [currentOperator, setCurrentOperator] = useState({
+    id: 'OP-SHIFT-DEFAULT',
+    name: 'Kasir Shift Utama',
+    role: 'superadmin',
+    shiftActive: true
+  });
+  const [merchantSettings, setMerchantSettings] = useState(DEFAULT_MERCHANT_SETTINGS);
+  const [orders, setOrders] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [stockMovements, setStockMovements] = useState([]);
+  const [seasonalEvents, setSeasonalEvents] = useState(DEFAULT_SEASONAL_EVENTS);
+  const [staffProfiles, setStaffProfiles] = useState([]);
+  const [authNotice, setAuthNotice] = useState('');
+  const activeSessionIdRef = useRef(null);
 
   // State Paket Langganan ('starter' | 'pro' | 'enterprise') - Default 'pro' (Core Product)
   const [subscriptionPlan, setSubscriptionPlan] = useState('pro');
@@ -59,50 +111,249 @@ export default function App() {
     }
   ]);
 
+  const resolvedOutletLabel =
+    activeOutlet === 'Semua Cabang (Terpusat)' ? 'Cabang Utama - Makassar' : activeOutlet;
+
   const handleAddStockLog = (newLog) => {
-    setStockLogs(prev => [newLog, ...prev]);
+    setStockLogs((prev) => [newLog, ...prev]);
   };
 
-  const checkUserRole = async (userId) => {
-    try {
-      const { data } = await supabase.from('user_roles').select('role').eq('id', userId).single();
-      if (data && data.role) {
-        setUserRole(data.role);
-        if (data.role === 'stocker') {
-          setActiveTab('inventory');
-        } else {
-          setActiveTab('pos');
-        }
-      } else {
-        setUserRole('superadmin'); 
-        setActiveTab('pos');
-      }
-    } catch {
+  const handleRecordAudit = async (payload) => {
+    const auditRecord = await recordAuditLog({
+      userId: currentOperator?.id || 'operator-active',
+      userName: currentOperator?.name || 'Admin Operasional',
+      role: currentOperator?.role || userRole,
+      outlet: resolvedOutletLabel,
+      ...payload
+    });
+    setAuditLogs((prev) => [auditRecord, ...prev]);
+
+    if (payload.movementType) {
+      const mov = await recordStockMovement({
+        ingredientId: payload.entityId || null,
+        ingredientName: payload.entityName || 'Bahan Baku',
+        movementType: payload.movementType,
+        qtyChange: payload.qtyChange || 0,
+        beforeStock: payload.beforeStock ?? 0,
+        afterStock: payload.afterStock ?? 0,
+        unit: payload.unit || 'pcs',
+        costImpact: payload.costImpact || 0,
+        orderId: payload.orderId || null,
+        userId: currentOperator?.id || 'operator-active',
+        userName: currentOperator?.name || 'Admin Operasional',
+        role: currentOperator?.role || userRole,
+        reason: payload.reason || ''
+      });
+      setStockMovements((prev) => [mov, ...prev]);
+    }
+  };
+
+  const handleUpdateIngredientPrice = async (arg1, arg2, arg3) => {
+    const ingredient = arg1?.ingredient ? arg1.ingredient : arg1;
+    const newPrice = arg1?.ingredient ? arg1.newPrice : arg2;
+    const notes = arg1?.ingredient ? arg1.notes : arg3;
+
+    const oldPrice = Number(ingredient?.unitPrice ?? ingredient?.unit_price ?? 0);
+    const res = await updateIngredientPrice({ ingredient, newPrice, notes });
+    setIngredients((prev) =>
+      prev.map((ing) =>
+        ing.id === ingredient.id ? { ...ing, unitPrice: Number(newPrice) } : ing
+      )
+    );
+    if (res?.entry) {
+      setPriceHistory((prev) => [res.entry, ...prev]);
+    }
+
+    await handleRecordAudit({
+      actionType: 'Price Update',
+      entityType: 'ingredient',
+      entityId: ingredient?.id,
+      entityName: String(ingredient?.name || '').split(' | ')[0],
+      beforeValue: `Rp ${oldPrice.toLocaleString('id-ID')}`,
+      afterValue: `Rp ${Number(newPrice || 0).toLocaleString('id-ID')}`,
+      deltaLabel: res?.entry?.changePct
+        ? `${res.entry.changePct > 0 ? `+${res.entry.changePct}%` : `${res.entry.changePct}%`}`
+        : '',
+      reason: notes || 'Pembaruan harga pasar bahan baku'
+    });
+
+    return res;
+  };
+
+  const handleBatchFillMarketPrices = async () => {
+    const res = await seedMarketPricesForMissing(ingredients);
+    if (res?.updated && res.updated.length > 0) {
+      setIngredients(res.updated);
+    }
+    if (res?.entries && res.entries.length > 0) {
+      setPriceHistory((prev) => [...res.entries, ...prev]);
+    }
+    return res;
+  };
+
+  const applyStockDeltas = async (
+    deltas = [],
+    { movementType, actionType, reason, orderId, logType, isAddition = false }
+  ) => {
+    if (subscriptionPlan === 'starter' || !Array.isArray(deltas) || deltas.length === 0) {
+      return;
+    }
+
+    let updatedIngredients = [...ingredients];
+    const newLogs = [];
+
+    for (const d of deltas) {
+      const idx = updatedIngredients.findIndex((ing) => String(ing.id) === String(d.ingredientId));
+      if (idx < 0) continue;
+
+      const cur = updatedIngredients[idx];
+      const deltaSigned = isAddition ? Math.abs(Number(d.amount || 0)) : -Math.abs(Number(d.amount || 0));
+      const beforeStock = Number(cur.stock) || 0;
+      const afterStock = Math.max(0, Number((beforeStock + deltaSigned).toFixed(3)));
+
+      updatedIngredients[idx] = { ...cur, stock: afterStock };
+      await updateIngredientStock(cur.id, afterStock);
+
+      const cleanName = String(cur.name || '').split(' | ')[0];
+      const logEntry = {
+        id: `MOV-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        timestamp: new Date().toISOString(),
+        itemName: cleanName,
+        type: logType,
+        qty: `${deltaSigned >= 0 ? `+${deltaSigned}` : deltaSigned} ${cur.unit}`,
+        outlet: resolvedOutletLabel,
+        note: reason
+      };
+      newLogs.push(logEntry);
+      recordStockMutationLog({ ...logEntry, ingredientId: cur.id });
+
+      await handleRecordAudit({
+        actionType,
+        entityType: 'ingredient',
+        entityId: cur.id,
+        entityName: cleanName,
+        beforeValue: `${beforeStock} ${cur.unit}`,
+        afterValue: `${afterStock} ${cur.unit}`,
+        deltaLabel: `${deltaSigned >= 0 ? `+${deltaSigned}` : deltaSigned} ${cur.unit}`,
+        reason,
+        movementType,
+        qtyChange: deltaSigned,
+        beforeStock,
+        afterStock,
+        unit: cur.unit,
+        costImpact: movementType === 'WASTE_LOSS' ? Math.round(Math.abs(deltaSigned) * Number(cur.unitPrice || 0)) : 0,
+        orderId
+      });
+    }
+
+    setIngredients(updatedIngredients);
+    if (newLogs.length > 0) {
+      setStockLogs((prev) => [...newLogs, ...prev]);
+    }
+  };
+
+  const checkUserRole = async (user) => {
+    if (!user?.id) return;
+    const profile = await resolveAuthenticatedEmployeeProfile(user);
+    if (!profile) return;
+
+    if (!profile.hasRoleAccess || profile.isActive === false) {
+      await recordEmployeeSessionEvent({
+        userId: profile.id,
+        fullName: profile.fullName,
+        email: profile.email,
+        role: profile.role,
+        outletName: profile.outletName,
+        eventType: 'blocked_inactive'
+      });
+      setAuthNotice(
+        profile.isActive === false
+          ? `Akun karyawan atas nama "${profile.fullName}" berstatus nonaktif / resign. Hubungi Owner untuk aktivasi.`
+          : 'Akses karyawan telah dicabut. Hubungi Owner/Admin.'
+      );
+      await supabase.auth.signOut();
       setUserRole('superadmin');
+      setCurrentView('login');
+      return;
+    }
+
+    setAuthNotice('');
+    setUserRole(profile.role);
+    setCurrentOperator({
+      id: profile.id,
+      name: profile.fullName,
+      email: profile.email,
+      role: profile.role,
+      outlet: profile.outletName,
+      shiftActive: true,
+      isAuthenticatedEmployee: profile.role === 'kasir' || profile.role === 'stocker'
+    });
+
+    if (!activeSessionIdRef.current) {
+      const ses = await recordEmployeeSessionEvent({
+        userId: profile.id,
+        fullName: profile.fullName,
+        email: profile.email,
+        role: profile.role,
+        outletName: profile.outletName,
+        eventType: 'login'
+      });
+      activeSessionIdRef.current = ses?.id || null;
+    }
+
+    if (profile.role === 'stocker') {
+      setActiveTab('inventory');
+    } else {
       setActiveTab('pos');
     }
   };
 
   useEffect(() => {
     async function loadBackendData() {
-      const dbProducts = await fetchProducts();
-      const dbIngredients = await fetchIngredients();
+      const [
+        dbProducts,
+        dbIngredients,
+        historyRes,
+        savedSettings,
+        dbOrders,
+        dbAudit,
+        dbMovements,
+        dbEvents,
+        staffRes
+      ] = await Promise.all([
+        fetchProducts(),
+        fetchIngredients(),
+        fetchPriceHistory(),
+        fetchMerchantSettings(),
+        fetchOrders(),
+        fetchAuditLogs(),
+        fetchStockMovements(),
+        fetchSeasonalEvents(),
+        fetchStaffProfiles()
+      ]);
 
       if (dbProducts && dbProducts.length > 0) setProducts(dbProducts);
       if (dbIngredients && dbIngredients.length > 0) setIngredients(dbIngredients);
+      if (historyRes?.data) setPriceHistory(historyRes.data);
+      if (savedSettings) setMerchantSettings(savedSettings);
+      if (Array.isArray(dbOrders)) setOrders(dbOrders);
+      if (Array.isArray(dbAudit)) setAuditLogs(dbAudit);
+      if (Array.isArray(dbMovements)) setStockMovements(dbMovements);
+      if (Array.isArray(dbEvents) && dbEvents.length > 0) setSeasonalEvents(dbEvents);
+      if (staffRes?.success && Array.isArray(staffRes.data)) setStaffProfiles(staffRes.data);
     }
     loadBackendData();
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        checkUserRole(session.user.id);
-        setCurrentView('app'); 
+        checkUserRole(session.user);
+        setCurrentView('app');
       }
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        checkUserRole(session.user.id);
+        checkUserRole(session.user);
         setCurrentView('app');
       } else if (event === 'SIGNED_OUT') {
         setCurrentView('landing');
@@ -119,81 +370,317 @@ export default function App() {
   const checkExpiryAlert = (dateString) => {
     if (!dateString) return false;
     const diffDays = Math.ceil((new Date(dateString) - new Date()) / (1000 * 60 * 60 * 24));
-    return diffDays <= 30; 
+    return diffDays <= 30;
   };
 
-  const alertCount = ingredients.filter(ing => ing.stock <= ing.minLimit || checkExpiryAlert(ing.expiryDate)).length;
-
-  const convertToStandardBase = (qty, unit) => {
-    const u = (unit || '').toLowerCase().trim();
-    const q = Number(qty) || 0;
-    if (u === 'kg' || u === 'kilogram') return q * 1000;
-    if (u === 'gram' || u === 'g') return q;
-    if (u === 'liter' || u === 'l') return q * 1000;
-    if (u === 'ml' || u === 'milliliter') return q;
-    return q;
-  };
-
-  const calculateDeductionInStorageUnit = (neededQty, neededUnit, storageUnit) => {
-    const neededBase = convertToStandardBase(neededQty, neededUnit);
-    const storageUnitLower = (storageUnit || '').toLowerCase().trim();
-    if (storageUnitLower === 'kg' || storageUnitLower === 'kilogram' || storageUnitLower === 'liter' || storageUnitLower === 'l') {
-      return neededBase / 1000;
-    }
-    return neededBase;
-  };
+  const lowStockIngredients = ingredients.filter(
+    (ing) => Number(ing.stock) <= Number(ing.minLimit ?? 5)
+  );
+  const lowStockCount = lowStockIngredients.length;
+  const alertCount = ingredients.filter(
+    (ing) => Number(ing.stock) <= Number(ing.minLimit ?? 5) || checkExpiryAlert(ing.expiryDate)
+  ).length;
 
   const handleCheckout = async (cartItems, tableNumber = 'Kasir Utama', paymentMethod = 'cash') => {
-    // Jika Paket Pro atau Enterprise aktif, jalankan mesin pemotong stok otomatis (BOM Engine)
-    if (subscriptionPlan !== 'starter') {
-      let updatedIngredients = [...ingredients];
-      const newLogs = [];
+    const reqs = computeBomRequirementsForItems(cartItems, ingredients);
+    await applyStockDeltas(reqs, {
+      movementType: 'BOM_SALE',
+      actionType: 'Stock Out',
+      reason: `Penjualan POS (${tableNumber})`,
+      orderId: null,
+      logType: 'KELUAR (Otomatis BOM POS)',
+      isAddition: false
+    });
 
-      for (let cartItem of cartItems) {
-        if (cartItem.recipe && Array.isArray(cartItem.recipe)) {
-          for (let ingredientNeeded of cartItem.recipe) {
-            const cleanTarget = (ingredientNeeded.name || '').split(' | ')[0].toLowerCase().trim();
-            const index = updatedIngredients.findIndex(
-              ing => (ing.name || '').toLowerCase().includes(cleanTarget)
-            );
+    const currentSubtotal = cartItems.reduce((sum, item) => sum + item.price * item.qty, 0);
+    await saveTransaction(currentSubtotal, cartItems, tableNumber, paymentMethod, {
+      orderChannel: 'dine_in',
+      paymentFlow: 'pay_first',
+      paymentStatus: 'paid',
+      kitchenStatus: 'served',
+      cashierId: currentOperator?.id,
+      cashierName: currentOperator?.name || 'Kasir Aktif'
+    });
+  };
 
-            if (index >= 0) {
-              const storageUnit = updatedIngredients[index].unit;
-              const deductionPerUnit = calculateDeductionInStorageUnit(ingredientNeeded.qty, ingredientNeeded.unit, storageUnit);
-              const totalDeduction = Number((deductionPerUnit * cartItem.qty).toFixed(3));
-              
-              const currentStock = updatedIngredients[index].stock;
-              const newStock = Math.max(0, Number((currentStock - totalDeduction).toFixed(3)));
-              
-              updatedIngredients[index] = {
-                ...updatedIngredients[index],
-                stock: newStock
-              };
+  const handleSaveMerchantSettings = async (nextSettings) => {
+    const saved = await saveMerchantSettings(nextSettings, currentOperator?.name || 'Owner');
+    setMerchantSettings(saved);
+  };
 
-              await updateIngredientStock(updatedIngredients[index].id, newStock);
+  const handlePlaceWorkflowOrder = ({
+    items,
+    orderChannel,
+    paymentFlow,
+    paymentMethod,
+    tableNumber,
+    isClosedKitchenOrder = false
+  }) => {
+    const order = createOrderPayload({
+      items,
+      orderChannel,
+      paymentFlow,
+      paymentMethod,
+      tableNumber,
+      operator: currentOperator,
+      outlet: resolvedOutletLabel,
+      isClosedKitchenOrder
+    });
 
-              newLogs.push({
-                id: 'BOM-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
-                timestamp: new Date().toISOString(),
-                itemName: (updatedIngredients[index].name || '').split(' | ')[0],
-                type: 'KELUAR (Otomatis BOM POS)',
-                qty: `-${totalDeduction} ${storageUnit}`,
-                outlet: activeOutlet === 'Semua Cabang (Terpusat)' ? 'Cabang Utama - Makassar' : activeOutlet,
-                note: `Penjualan ${cartItem.qty}x ${cartItem.name}`
-              });
+    // Untuk order langsung dari POS (Pay First atau Pay Later preparing), potong stok BOM saat masuk proses
+    const shouldDeductNow =
+      subscriptionPlan !== 'starter' &&
+      (order.kitchenStatus === 'preparing' || order.paymentFlow === 'pay_first') &&
+      !isClosedKitchenOrder;
+
+    const finalOrder = { ...order, stockDeducted: shouldDeductNow };
+    setOrders((prev) => [finalOrder, ...prev]);
+    createOrderRecord(finalOrder);
+
+    if (shouldDeductNow) {
+      const reqs = computeBomRequirementsForItems(items, ingredients);
+      applyStockDeltas(reqs, {
+        movementType: 'BOM_SALE',
+        actionType: 'Stock Out',
+        reason: `Order ${finalOrder.orderNumber} (${finalOrder.paymentFlow === 'pay_later' ? 'Open Bill / Preparing' : 'Pay First'})`,
+        orderId: finalOrder.id,
+        logType: 'KELUAR (Otomatis BOM POS)',
+        isAddition: false
+      });
+    }
+
+    if (finalOrder.paymentStatus === 'paid' && !isClosedKitchenOrder) {
+      saveTransaction(finalOrder.totalAmount, finalOrder.items, finalOrder.tableNumber, finalOrder.paymentMethod, {
+        orderChannel: finalOrder.orderChannel,
+        paymentFlow: finalOrder.paymentFlow,
+        paymentStatus: 'paid',
+        kitchenStatus: finalOrder.kitchenStatus,
+        cashierId: finalOrder.cashierId,
+        cashierName: finalOrder.cashierName
+      });
+    }
+
+    return finalOrder;
+  };
+
+  const handleTransitionOrderKitchenStatus = async (order, nextStatus) => {
+    if (!order) return;
+    let nextStockDeducted = order.stockDeducted;
+
+    // Jika masuk ke 'preparing' (misal order Closed Kitchen baru mulai dimasak), potong stok bahan sekarang
+    if (nextStatus === 'preparing' && !order.stockDeducted && subscriptionPlan !== 'starter') {
+      const reqs = computeBomRequirementsForItems(order.items, ingredients);
+      await applyStockDeltas(reqs, {
+        movementType: 'BOM_SALE',
+        actionType: 'Stock Out',
+        reason: `Mulai masak order ${order.orderNumber} (${order.orderChannel})`,
+        orderId: order.id,
+        logType: 'KELUAR (Dapur Preparing BOM)',
+        isAddition: false
+      });
+      nextStockDeducted = true;
+    }
+
+    const updated = {
+      ...order,
+      kitchenStatus: nextStatus,
+      orderStatus: nextStatus === 'served' && order.paymentStatus === 'paid' ? 'closed' : order.orderStatus,
+      stockDeducted: nextStockDeducted,
+      updatedAt: new Date().toISOString()
+    };
+
+    setOrders((prev) => prev.map((o) => (o.id === order.id ? updated : o)));
+    await updateOrderRecord(updated);
+  };
+
+  const handleModifyOrder = async ({ order, nextItems, reason, treatRemovedAsWaste }) => {
+    const { updatedOrder, revisionEntry, bomDeltas, addedWasteCost } = resolveOrderModification({
+      order,
+      nextItems,
+      reason,
+      operator: currentOperator,
+      ingredients,
+      treatRemovedAsWaste
+    });
+
+    setOrders((prev) => prev.map((o) => (o.id === order.id ? updatedOrder : o)));
+    await updateOrderRecord(updatedOrder);
+
+    await handleRecordAudit({
+      actionType: 'Order Modified',
+      entityType: 'order',
+      entityId: order.id,
+      entityName: `Nota Coret ${order.orderNumber}`,
+      beforeValue: `Rp ${revisionEntry.beforeTotal.toLocaleString('id-ID')}`,
+      afterValue: `Rp ${revisionEntry.afterTotal.toLocaleString('id-ID')}`,
+      deltaLabel: revisionEntry.summary,
+      reason
+    });
+
+    if (order.stockDeducted && subscriptionPlan !== 'starter' && bomDeltas.length > 0) {
+      for (const delta of bomDeltas) {
+        if (delta.deltaAmount > 0) {
+          // Penambahan item susulan -> potong tambahan stok
+          await applyStockDeltas(
+            [{ ...delta, amount: delta.deltaAmount }],
+            {
+              movementType: 'BOM_SALE',
+              actionType: 'Stock Out',
+              reason: `Item susulan Nota Coret ${order.orderNumber}: ${reason}`,
+              orderId: order.id,
+              logType: 'KELUAR (Item Susulan Order)',
+              isAddition: false
             }
-          }
+          );
+        } else if (delta.deltaAmount < 0 && !treatRemovedAsWaste) {
+          // Item dicoret sebelum dimasak -> kembalikan stok ke gudang
+          await applyStockDeltas(
+            [{ ...delta, amount: Math.abs(delta.deltaAmount) }],
+            {
+              movementType: 'RESTOCK_REVERSAL',
+              actionType: 'Stock In',
+              reason: `Pengembalian bahan Nota Coret ${order.orderNumber}: ${reason}`,
+              orderId: order.id,
+              logType: 'MASUK (Reversal Nota Coret)',
+              isAddition: true
+            }
+          );
         }
-      }
-
-      setIngredients(updatedIngredients);
-      if (newLogs.length > 0) {
-        setStockLogs(prev => [...newLogs, ...prev]);
       }
     }
 
-    const currentSubtotal = cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    await saveTransaction(currentSubtotal, cartItems, tableNumber, paymentMethod);
+    if (addedWasteCost > 0) {
+      const mv = await recordStockMovement({
+        ingredientId: null,
+        ingredientName: `Waste Nota Coret (${order.orderNumber})`,
+        movementType: 'WASTE_LOSS',
+        qtyChange: 0,
+        beforeStock: 0,
+        afterStock: 0,
+        unit: 'porsi',
+        costImpact: addedWasteCost,
+        orderId: order.id,
+        userId: currentOperator?.id,
+        userName: currentOperator?.name,
+        role: currentOperator?.role,
+        reason
+      });
+      setStockMovements((prev) => [mv, ...prev]);
+    }
+  };
+
+  const handleCancelOrder = async ({ order, condition, reason }) => {
+    const { updatedOrder, stockAction, wasteCost, bomRequirements } = resolveOrderCancellation({
+      order,
+      condition,
+      reason,
+      operator: currentOperator,
+      ingredients
+    });
+
+    setOrders((prev) => prev.map((o) => (o.id === order.id ? updatedOrder : o)));
+    await updateOrderRecord(updatedOrder);
+
+    await handleRecordAudit({
+      actionType: 'Order Void/Cancelled',
+      entityType: 'order',
+      entityId: order.id,
+      entityName: `${order.orderNumber} (${condition === 'after_cooking' ? 'Pasca-Proses/Waste' : 'Pra-Masak'})`,
+      beforeValue: `Rp ${Number(order.totalAmount || 0).toLocaleString('id-ID')}`,
+      afterValue:
+        condition === 'after_cooking'
+          ? `Rp 0 (Waste: Rp ${wasteCost.toLocaleString('id-ID')})`
+          : 'Rp 0 (Stok Utuh)',
+      deltaLabel: updatedOrder.paymentStatus === 'refunded' ? 'Refund' : 'Void',
+      reason
+    });
+
+    if (stockAction === 'restore') {
+      await applyStockDeltas(bomRequirements, {
+        movementType: 'RESTOCK_REVERSAL',
+        actionType: 'Stock In',
+        reason: `Pembatalan pra-masak ${order.orderNumber}: ${reason}`,
+        orderId: order.id,
+        logType: 'MASUK (Reversal Order Batal)',
+        isAddition: true
+      });
+    } else if (stockAction === 'deduct_as_waste') {
+      await applyStockDeltas(bomRequirements, {
+        movementType: 'WASTE_LOSS',
+        actionType: 'Stock Out',
+        reason: `Waste pembatalan pasca-produksi ${order.orderNumber}: ${reason}`,
+        orderId: order.id,
+        logType: 'WASTE (Order Batal Pasca-Masak)',
+        isAddition: false
+      });
+    } else if (stockAction === 'keep_as_waste') {
+      const mv = await recordStockMovement({
+        ingredientId: null,
+        ingredientName: `Waste Order ${order.orderNumber}`,
+        movementType: 'WASTE_LOSS',
+        qtyChange: 0,
+        beforeStock: 0,
+        afterStock: 0,
+        unit: 'order',
+        costImpact: wasteCost,
+        orderId: order.id,
+        userId: currentOperator?.id,
+        userName: currentOperator?.name,
+        role: currentOperator?.role,
+        reason
+      });
+      setStockMovements((prev) => [mv, ...prev]);
+
+      await saveTransaction(0, updatedOrder.items, updatedOrder.tableNumber, 'refund_waste', {
+        orderChannel: updatedOrder.orderChannel,
+        paymentFlow: updatedOrder.paymentFlow,
+        paymentStatus: updatedOrder.paymentStatus,
+        kitchenStatus: 'cancelled_waste',
+        cashierId: currentOperator?.id,
+        cashierName: currentOperator?.name || 'Kasir Aktif',
+        wasteCost,
+        cancelReason: reason,
+        revisionHistory: updatedOrder.revisionHistory
+      });
+    }
+  };
+
+  const handleSettleOpenBill = async (order, method = 'cash') => {
+    const updated = {
+      ...order,
+      paymentStatus: 'paid',
+      orderStatus: order.kitchenStatus === 'served' ? 'closed' : 'active',
+      paymentMethod: method,
+      cashierId: currentOperator?.id,
+      cashierName: currentOperator?.name || order.cashierName || 'Kasir Aktif',
+      updatedAt: new Date().toISOString()
+    };
+
+    setOrders((prev) => prev.map((o) => (o.id === order.id ? updated : o)));
+    await updateOrderRecord(updated);
+
+    await saveTransaction(updated.totalAmount, updated.items, updated.tableNumber, method, {
+      orderChannel: updated.orderChannel,
+      paymentFlow: 'pay_later',
+      paymentStatus: 'paid',
+      kitchenStatus: updated.kitchenStatus,
+      cashierId: updated.cashierId,
+      cashierName: updated.cashierName,
+      revisionHistory: updated.revisionHistory
+    });
+  };
+
+  const handleReceiveClosedKitchenDemo = () => {
+    if (!products || products.length === 0) return;
+    const sampleItem = products[0];
+    handlePlaceWorkflowOrder({
+      items: [{ ...sampleItem, qty: 1, note: 'Order Online Closed Kitchen' }],
+      orderChannel: 'online_closed_kitchen',
+      paymentFlow: 'pay_first',
+      paymentMethod: 'qris',
+      tableNumber: 'Online / Grab-GoFood',
+      isClosedKitchenOrder: true
+    });
   };
 
   // Komponen Tampilan Pengunci Fitur saat berada di Paket Starter
@@ -254,7 +741,7 @@ export default function App() {
     switch (currentView) {
       case 'landing':
         return (
-          <motion.div 
+          <motion.div
             key="landing"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -262,8 +749,8 @@ export default function App() {
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             className="w-full min-h-screen"
           >
-            <LandingPage 
-              onOpenApp={() => setCurrentView('app')} 
+            <LandingPage
+              onOpenApp={() => setCurrentView('app')}
               onOpenRegister={() => setCurrentView('register')}
               onOpenLogin={() => setCurrentView('login')}
               onSelectPlan={(planId) => {
@@ -277,10 +764,10 @@ export default function App() {
             />
           </motion.div>
         );
-      
+
       case 'register':
         return (
-          <motion.div 
+          <motion.div
             key="register"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -288,9 +775,9 @@ export default function App() {
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             className="w-full min-h-screen"
           >
-            <Register 
+            <Register
               key={subscriptionPlan}
-              onBack={() => setCurrentView('landing')} 
+              onBack={() => setCurrentView('landing')}
               onOpenLogin={() => setCurrentView('login')}
               initialPlan={subscriptionPlan}
               onPlanChange={setSubscriptionPlan}
@@ -300,7 +787,7 @@ export default function App() {
 
       case 'login':
         return (
-          <motion.div 
+          <motion.div
             key="login"
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
@@ -308,10 +795,14 @@ export default function App() {
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             className="w-full min-h-screen"
           >
-            <Login 
-              onBack={() => setCurrentView('landing')} 
+            <Login
+              onBack={() => setCurrentView('landing')}
               onOpenRegister={() => setCurrentView('register')}
-              onLoginSuccess={() => setCurrentView('app')}
+              onLoginSuccess={() => {
+                setAuthNotice('');
+                setCurrentView('app');
+              }}
+              externalError={authNotice}
             />
           </motion.div>
         );
@@ -319,7 +810,7 @@ export default function App() {
       case 'app':
       default:
         return (
-          <motion.div 
+          <motion.div
             key="app"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -328,30 +819,38 @@ export default function App() {
             className="w-full"
           >
             <div className="min-h-screen bg-[#FAFAFA] text-[#141414] font-sans flex flex-col lg:flex-row relative selection:bg-[#F59E0B] selection:text-[#141414]">
-              
               {/* Navbar Samping */}
-              <DashboardNavbar 
-                activeTab={activeTab} 
-                setActiveTab={setActiveTab} 
-                alertCount={alertCount} 
+              <DashboardNavbar
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                alertCount={alertCount}
+                lowStockCount={lowStockCount}
                 userRole={userRole}
                 subscriptionPlan={subscriptionPlan}
                 setSubscriptionPlan={setSubscriptionPlan}
                 onBackToLanding={async () => {
+                  if (activeSessionIdRef.current) {
+                    await recordEmployeeSessionEvent({
+                      sessionId: activeSessionIdRef.current,
+                      eventType: 'logout'
+                    });
+                    activeSessionIdRef.current = null;
+                  }
                   await supabase.auth.signOut();
                   setCurrentView('landing');
                   setActiveTab('pos');
                 }}
               />
-              
-              {/* Konten Utama */}
-              <main className={`flex-1 w-full min-h-screen transition-all duration-300 ${
-                activeTab === 'self-order' && subscriptionPlan !== 'starter'
-                  ? 'p-0 ml-0'
-                  : 'p-5 sm:p-6 md:p-10 pt-20 lg:pt-8 lg:ml-72'
-              }`}>
-                <div className="max-w-7xl mx-auto space-y-6">
 
+              {/* Konten Utama */}
+              <main
+                className={`flex-1 w-full min-h-screen transition-all duration-300 ${
+                  activeTab === 'self-order' && subscriptionPlan !== 'starter'
+                    ? 'p-0 ml-0'
+                    : 'p-5 sm:p-6 md:p-10 pt-20 lg:pt-8 lg:ml-72'
+                }`}
+              >
+                <div className="max-w-7xl mx-auto space-y-6">
                   {/* BAR KHUSUS PAKET ENTERPRISE: MANAJEMEN MULTI-OUTLET & CENTRAL KITCHEN */}
                   {subscriptionPlan === 'enterprise' && !(activeTab === 'self-order') && (
                     <motion.div
@@ -365,7 +864,9 @@ export default function App() {
                         </div>
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-xs font-extrabold tracking-tight">Enterprise Multi-Outlet & Central Kitchen</span>
+                            <span className="text-xs font-extrabold tracking-tight">
+                              Enterprise Multi-Outlet & Central Kitchen
+                            </span>
                             <span className="font-mono text-[9px] font-bold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">
                               Sinkronisasi Aktif
                             </span>
@@ -377,7 +878,9 @@ export default function App() {
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="font-mono text-[10px] font-bold text-zinc-400 uppercase">Cabang:</span>
+                        <span className="font-mono text-[10px] font-bold text-zinc-400 uppercase">
+                          Cabang:
+                        </span>
                         <select
                           value={activeOutlet}
                           onChange={(e) => setActiveOutlet(e.target.value)}
@@ -387,11 +890,55 @@ export default function App() {
                           <option value="Cabang Utama - Makassar">Cabang Utama - Makassar</option>
                           <option value="Cabang 2 - Bandung">Cabang 2 - Bandung</option>
                           <option value="Cabang 3 - Jakarta">Cabang 3 - Jakarta</option>
-                          <option value="Central Kitchen (Gudang Pusat)">Central Kitchen (Gudang Pusat)</option>
+                          <option value="Central Kitchen (Gudang Pusat)">
+                            Central Kitchen (Gudang Pusat)
+                          </option>
                         </select>
                       </div>
                     </motion.div>
                   )}
+
+                  {/* REAL-TIME BUFFER INVENTORY / LOW-STOCK ALERT BANNER */}
+                  {lowStockIngredients.length > 0 &&
+                    (userRole === 'superadmin' || userRole === 'stocker') &&
+                    activeTab !== 'self-order' &&
+                    subscriptionPlan !== 'starter' && (
+                      <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-2xl px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-start sm:items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-[#F59E0B] text-[#141414] flex items-center justify-center shrink-0">
+                            <AlertTriangle size={18} />
+                          </div>
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-xs font-extrabold text-[#141414]">
+                                {lowStockIngredients.length} Bahan Baku Menyentuh Batas Minimum (Buffer Stock)
+                              </span>
+                              <span className="font-mono text-[9px] font-bold uppercase bg-white text-[#B45309] border border-[#FDE68A] px-2 py-0.5 rounded-full">
+                                Low Stock Alert
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-[#78350F] font-medium mt-0.5">
+                              {lowStockIngredients
+                                .slice(0, 3)
+                                .map((ing) => `${(ing.name || '').split(' | ')[0]} (${ing.stock} ${ing.unit})`)
+                                .join(', ')}
+                              {lowStockIngredients.length > 3
+                                ? ` dan ${lowStockIngredients.length - 3} bahan lainnya`
+                                : ''}
+                            </p>
+                          </div>
+                        </div>
+
+                        {activeTab !== 'inventory' && (
+                          <button
+                            onClick={() => setActiveTab('inventory')}
+                            className="px-4 py-2 rounded-xl bg-[#141414] hover:bg-zinc-800 text-[#F59E0B] text-[11px] font-bold flex items-center gap-1.5 shrink-0 cursor-pointer transition-all active:scale-95"
+                          >
+                            Cek Gudang & Restock <ArrowRight size={13} />
+                          </button>
+                        )}
+                      </div>
+                    )}
 
                   <AnimatePresence mode="wait" onExitComplete={() => window.scrollTo(0, 0)}>
                     <motion.div
@@ -408,11 +955,22 @@ export default function App() {
                           onCheckout={handleCheckout}
                           subscriptionPlan={subscriptionPlan}
                           activeOutlet={activeOutlet}
+                          orders={orders}
+                          merchantSettings={merchantSettings}
+                          onSaveMerchantSettings={handleSaveMerchantSettings}
+                          currentOperator={currentOperator}
+                          onUpdateOperatorShift={setCurrentOperator}
+                          onPlaceWorkflowOrder={handlePlaceWorkflowOrder}
+                          onTransitionOrderKitchenStatus={handleTransitionOrderKitchenStatus}
+                          onModifyOrder={handleModifyOrder}
+                          onCancelOrder={handleCancelOrder}
+                          onSettleOpenBill={handleSettleOpenBill}
+                          onReceiveClosedKitchenDemo={handleReceiveClosedKitchenDemo}
                         />
                       )}
 
-                      {activeTab === 'self-order' && (
-                        subscriptionPlan === 'starter' ? (
+                      {activeTab === 'self-order' &&
+                        (subscriptionPlan === 'starter' ? (
                           renderStarterLockedFeature(
                             'Modul Self-Order Kiosk (Pemesanan Meja)',
                             'Pada Paket Starter, pemesanan hanya dilakukan melalui kasir utama. Tingkatkan ke Paket Pro untuk mengaktifkan QR Self-Order agar pelanggan dapat memesan langsung dari meja.',
@@ -423,16 +981,15 @@ export default function App() {
                             ]
                           )
                         ) : (
-                          <SelfOrderModule 
-                            products={products} 
-                            ingredients={ingredients} 
-                            onCheckout={handleCheckout} 
-                            setActiveTab={setActiveTab} 
+                          <SelfOrderModule
+                            products={products}
+                            ingredients={ingredients}
+                            onCheckout={handleCheckout}
+                            setActiveTab={setActiveTab}
                           />
-                        )
-                      )}
+                        ))}
 
-                      {activeTab === 'menu-management' && (
+                      {activeTab === 'menu-management' && userRole !== 'stocker' && (
                         <MenuManagementModule
                           products={products}
                           setProducts={setProducts}
@@ -442,8 +999,8 @@ export default function App() {
                         />
                       )}
 
-                      {activeTab === 'inventory' && (
-                        subscriptionPlan === 'starter' ? (
+                      {activeTab === 'inventory' &&
+                        (subscriptionPlan === 'starter' ? (
                           renderStarterLockedFeature(
                             'Smart Inventory & Automated BOM Engine',
                             'Paket Starter tidak mencakup manajemen stok bahan mentah dan pemotongan resep otomatis. Upgrade ke Paket Pro (Core Product) untuk mengendalikan gudang dan mencegah food waste.',
@@ -458,17 +1015,21 @@ export default function App() {
                             products={products}
                             ingredients={ingredients}
                             setIngredients={setIngredients}
+                            priceHistory={priceHistory}
+                            onUpdateIngredientPrice={handleUpdateIngredientPrice}
+                            onBatchFillMarketPrices={handleBatchFillMarketPrices}
                             subscriptionPlan={subscriptionPlan}
                             activeOutlet={activeOutlet}
                             stockLogs={stockLogs}
                             onAddStockLog={handleAddStockLog}
+                            onRecordAudit={handleRecordAudit}
+                            currentOperator={currentOperator}
                             onUpgradePlan={setSubscriptionPlan}
                           />
-                        )
-                      )}
+                        ))}
 
-                      {activeTab === 'alerts' && (
-                        subscriptionPlan === 'starter' ? (
+                      {activeTab === 'alerts' &&
+                        (subscriptionPlan === 'starter' ? (
                           renderStarterLockedFeature(
                             'FIFO/FEFO Early Warning & Smart Alerts',
                             'Fitur peringatan dini bahan baku kritis dan deteksi masa kedaluwarsa (≤ 30 hari) merupakan bagian dari Paket Pro / Business & Enterprise.',
@@ -480,13 +1041,13 @@ export default function App() {
                           )
                         ) : (
                           <AlertsModule ingredients={ingredients} setActiveTab={setActiveTab} />
-                        )
-                      )}
+                        ))}
 
                       {activeTab === 'employees' && (
                         <EmployeeModule
                           subscriptionPlan={subscriptionPlan}
                           onUpgradePlan={setSubscriptionPlan}
+                          onRecordAudit={handleRecordAudit}
                         />
                       )}
 
@@ -497,6 +1058,70 @@ export default function App() {
                           onUpgradePlan={setSubscriptionPlan}
                         />
                       )}
+
+                      {activeTab === 'profitability' &&
+                        (subscriptionPlan === 'starter' ? (
+                          renderStarterLockedFeature(
+                            'Profitability Matrix & Stocko AI Insights',
+                            'Analitik Menu Engineering (Stars, Plowhorses, Puzzles, Dogs), tren laba kotor vs kuantitas penjualan, serta Stocko AI Business Analyst tersedia di Paket Pro & Enterprise.',
+                            [
+                              'Klasifikasi otomatis menu berdasarkan volume penjualan & margin COGS aktual',
+                              'Deteksi lonjakan harga bahan baku yang menekan margin di bawah batas aman',
+                              'Rekomendasi upselling berbasis margin tinggi & prediksi restock gudang'
+                            ]
+                          )
+                        ) : (
+                          <ProfitabilityAiModule
+                            products={products}
+                            ingredients={ingredients}
+                            priceHistory={priceHistory}
+                            stockMovements={stockMovements}
+                            seasonalEvents={seasonalEvents}
+                            onNavigateTab={setActiveTab}
+                          />
+                        ))}
+
+                      {activeTab === 'seasonal-analytics' &&
+                        (subscriptionPlan === 'starter' ? (
+                          renderStarterLockedFeature(
+                            'Historical Data Analysis & Seasonal Demand Forecasting',
+                            'Analisis historis multi-periode (Harian–Tahunan), penandaan kalender musiman, serta proyeksi kebutuhan stok tersedia di Paket Pro & Enterprise.',
+                            [
+                              'Tren omzet & konsumsi bahan baku dari harian hingga tahunan',
+                              'Komparasi Baseline vs Seasonal Lift % (Ramadan, Idulfitri, Libur Sekolah, Promo)',
+                              'Rekomendasi kenaikan buffer stok & strategi menu musiman'
+                            ]
+                          )
+                        ) : (
+                          <SeasonalAnalyticsModule
+                            products={products}
+                            ingredients={ingredients}
+                            stockMovements={stockMovements}
+                            seasonalEvents={seasonalEvents}
+                            setSeasonalEvents={setSeasonalEvents}
+                            currentOperator={currentOperator}
+                            onNavigateTab={setActiveTab}
+                          />
+                        ))}
+
+                      {activeTab === 'audit-trail' &&
+                        (subscriptionPlan === 'starter' ? (
+                          renderStarterLockedFeature(
+                            'Audit Trail & Akuntabilitas Operasional',
+                            'Rekam jejak penuh setiap perubahan stok, harga bahan baku, Nota Coret, dan pembatalan pesanan tersedia di Paket Pro & Enterprise.',
+                            [
+                              'Identitas petugas & role tercatat di setiap log mutasi dan pembatalan',
+                              'Pelacakan before/after stock opname & alasan revisi transaksi',
+                              'Pemisahan jelas antara pembatalan pra-masak dan waste pasca-produksi'
+                            ]
+                          )
+                        ) : (
+                          <AuditTrailModule
+                            auditLogs={auditLogs}
+                            stockMovements={stockMovements}
+                            staffProfiles={staffProfiles}
+                          />
+                        ))}
                     </motion.div>
                   </AnimatePresence>
                 </div>

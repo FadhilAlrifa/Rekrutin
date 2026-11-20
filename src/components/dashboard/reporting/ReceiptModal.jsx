@@ -21,6 +21,12 @@ export default function ReceiptModal({ selectedTx, onClose, formatDateTime }) {
             <h3 className="font-black text-zinc-900 text-lg">Stocko. POS</h3>
             <p className="text-[10px] text-zinc-400 font-mono">ID: {selectedTx.id}</p>
             <p className="text-[10px] text-zinc-400 font-medium">{formatDateTime(selectedTx.created_at)}</p>
+            <p className="text-[11px] text-[#141414] font-bold pt-1">Kasir: {selectedTx.cashier_name || 'Kasir Aktif'}</p>
+            {selectedTx.kitchen_status === 'cancelled_waste' && (
+              <span className="inline-block font-mono text-[10px] font-bold bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded mt-1">
+                BATAL PASCA-PROSES (Waste: Rp {Number(selectedTx.waste_cost || 0).toLocaleString('id-ID')})
+              </span>
+            )}
           </div>
 
           <div className="border-t border-dashed border-zinc-300 py-4 space-y-3">

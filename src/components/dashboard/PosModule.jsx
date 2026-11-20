@@ -1,11 +1,33 @@
 import { useState } from 'react';
+import { evaluateMenuStockStatus, getSmartUpsellRecommendations } from '../../utils/cogsCalculator';
+import { ORDER_CHANNEL_LABELS } from '../../utils/orderStateMachine';
+import MerchantWorkflowModal from './pos/MerchantWorkflowModal';
+import KitchenOrdersDrawer from './pos/KitchenOrdersDrawer';
+import { OrderModificationModal, OrderCancelModal, CashierShiftModal } from './pos/OrderActionModals';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingCart, CheckCircle2, MessageSquare, 
-  Search, Trash2, Plus, Minus, CreditCard, Wallet, QrCode, AlertTriangle, ShieldAlert 
+  Search, Trash2, Plus, Minus, CreditCard, Wallet, QrCode, AlertTriangle, ShieldAlert, Sparkles, ChefHat, SlidersHorizontal, UserCheck 
 } from 'lucide-react';
 
-export default function PosModule({ products, ingredients = [], onCheckout, subscriptionPlan = 'pro', activeOutlet = 'Cabang Utama - Makassar' }) {
+export default function PosModule({
+  products,
+  ingredients = [],
+  onCheckout,
+  subscriptionPlan = 'pro',
+  activeOutlet = 'Cabang Utama - Makassar',
+  orders = [],
+  merchantSettings = { defaultOrderChannel: 'dine_in', paymentFlow: 'pay_first', closedKitchenEnabled: true, requireCashierShift: true },
+  onSaveMerchantSettings,
+  currentOperator,
+  onUpdateOperatorShift,
+  onPlaceWorkflowOrder,
+  onTransitionOrderKitchenStatus,
+  onModifyOrder,
+  onCancelOrder,
+  onSettleOpenBill,
+  onReceiveClosedKitchenDemo
+}) {
   const [cart, setCart] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('Semua');
   const [searchQuery, setSearchQuery] = useState('');
@@ -16,6 +38,24 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
   const [cashModalOpen, setCashModalOpen] = useState(false);
   const [cashReceived, setCashReceived] = useState('');
   const [receiptData, setReceiptData] = useState(null);
+  const [posView, setPosView] = useState('catalog');
+  const [orderChannel, setOrderChannel] = useState(merchantSettings?.defaultOrderChannel || 'dine_in');
+  const [tableLabel, setTableLabel] = useState('');
+  const [workflowModalOpen, setWorkflowModalOpen] = useState(false);
+  const [shiftModalOpen, setShiftModalOpen] = useState(false);
+  const [modifyingOrder, setModifyingOrder] = useState(null);
+  const [cancellingOrder, setCancellingOrder] = useState(null);
+  const [settlingBillOrder, setSettlingBillOrder] = useState(null);
+
+  const isStarter = subscriptionPlan === 'starter';
+  const activeKitchenCount = orders.filter(
+    (o) =>
+      (o.kitchenStatus !== 'served' &&
+        o.kitchenStatus !== 'cancelled' &&
+        o.kitchenStatus !== 'cancelled_waste') ||
+      (o.paymentStatus === 'unpaid' && o.kitchenStatus === 'served')
+  ).length;
+  const isPayLaterMode = !isStarter && merchantSettings?.paymentFlow === 'pay_later';
 
   const [stockAlertModal, setStockAlertModal] = useState({
     isOpen: false,
@@ -23,7 +63,6 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
     message: ''
   });
 
-  const isStarter = subscriptionPlan === 'starter';
   const categories = ['Semua', ...new Set(products.map(p => p.category))];
 
   const getSubDescription = (prod) => {
@@ -201,8 +240,40 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
 
   const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
 
+  const activeBillAmount = settlingBillOrder ? Number(settlingBillOrder.totalAmount || 0) : totalPrice;
+
   const handleProcessPayment = () => {
     if (cart.length === 0) return;
+
+    if (merchantSettings?.requireCashierShift && !currentOperator?.shiftActive) {
+      setShiftModalOpen(true);
+      return;
+    }
+
+    if (isPayLaterMode) {
+      const targetTable =
+        tableLabel.trim() ||
+        (orderChannel === 'online_closed_kitchen' ? 'Online / Closed Kitchen' : 'Meja Open Bill');
+
+      if (onPlaceWorkflowOrder) {
+        onPlaceWorkflowOrder({
+          items: cart,
+          orderChannel,
+          paymentFlow: 'pay_later',
+          paymentMethod: 'open_bill',
+          tableNumber: targetTable
+        });
+      } else {
+        onCheckout(cart, targetTable, 'open_bill');
+      }
+      setCart([]);
+      setTableLabel('');
+      setSuccessMsg(true);
+      setTimeout(() => setSuccessMsg(false), 3000);
+      return;
+    }
+
+    setSettlingBillOrder(null);
     if (paymentMethod === 'cash') {
       setCashModalOpen(true);
       setCashReceived('');
@@ -211,30 +282,87 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
     }
   };
 
-  const finalizeCheckout = (received = 0) => {
-    const sourceLabel = subscriptionPlan === 'enterprise'
+  const handleTriggerSettleOpenBill = (order) => {
+    if (merchantSettings?.requireCashierShift && !currentOperator?.shiftActive) {
+      setShiftModalOpen(true);
+      return;
+    }
+    setSettlingBillOrder(order);
+    setCashModalOpen(true);
+    setCashReceived('');
+  };
+
+  const finalizeCheckout = (received = 0, overrideMethod = null) => {
+    const usedMethod = overrideMethod || paymentMethod;
+    const cashierName = currentOperator?.name || 'Kasir Aktif';
+
+    if (settlingBillOrder) {
+      const billTotal = Number(settlingBillOrder.totalAmount || 0);
+      onSettleOpenBill?.(settlingBillOrder, usedMethod);
+      const kembalian = usedMethod === 'cash' ? Math.max(0, received - billTotal) : 0;
+
+      setReceiptData({
+        orderNumber: settlingBillOrder.orderNumber,
+        cart: [...(settlingBillOrder.items || [])],
+        total: billTotal,
+        paymentMethod: usedMethod,
+        cashierName,
+        orderChannelLabel: ORDER_CHANNEL_LABELS[settlingBillOrder.orderChannel] || 'Dine-In',
+        outlet: settlingBillOrder.tableNumber || 'Open Bill',
+        received: usedMethod === 'cash' ? received : billTotal,
+        change: kembalian,
+        date: new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
+      });
+
+      setSettlingBillOrder(null);
+      setCashModalOpen(false);
+      setSuccessMsg(true);
+      setTimeout(() => setSuccessMsg(false), 3000);
+      return;
+    }
+
+    const baseOutlet = subscriptionPlan === 'enterprise'
       ? `Kasir (${activeOutlet.replace('Semua Cabang (Terpusat)', 'Cabang Utama - Makassar')})`
       : 'Kasir Utama';
+    const sourceLabel = tableLabel.trim() ? `${tableLabel.trim()} • ${baseOutlet}` : baseOutlet;
 
-    onCheckout(cart, sourceLabel, paymentMethod);
-    
-    const kembalian = paymentMethod === 'cash' ? received - totalPrice : 0;
-    
+    const placedOrder = onPlaceWorkflowOrder
+      ? onPlaceWorkflowOrder({
+          items: cart,
+          orderChannel,
+          paymentFlow: 'pay_first',
+          paymentMethod: usedMethod,
+          tableNumber: sourceLabel
+        })
+      : null;
+
+    if (!onPlaceWorkflowOrder) {
+      onCheckout(cart, sourceLabel, usedMethod);
+    }
+
+    const kembalian = usedMethod === 'cash' ? received - totalPrice : 0;
+
     setReceiptData({
+      orderNumber: placedOrder?.orderNumber || `POS-${new Date().getTime().toString().slice(-5)}`,
       cart: [...cart],
       total: totalPrice,
-      paymentMethod,
+      paymentMethod: usedMethod,
+      cashierName,
+      orderChannelLabel: ORDER_CHANNEL_LABELS[orderChannel] || 'Dine-In',
       outlet: sourceLabel,
-      received: paymentMethod === 'cash' ? received : totalPrice,
+      received: usedMethod === 'cash' ? received : totalPrice,
       change: kembalian,
       date: new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
     });
 
     setCart([]);
+    setTableLabel('');
     setCashModalOpen(false);
     setSuccessMsg(true);
     setTimeout(() => setSuccessMsg(false), 3000);
   };
+
+  const upsellItems = isStarter ? [] : getSmartUpsellRecommendations(cart, products, ingredients, 2);
 
   const filteredProducts = products.filter(p => {
     const matchesCategory = selectedCategory === 'Semua' || p.category === selectedCategory;
@@ -266,7 +394,59 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
           </p>
         </div>
 
-        <div className="relative w-full md:w-72">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+          {!isStarter && (
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShiftModalOpen(true)}
+                className={`px-3 py-2 rounded-xl text-[11px] font-bold border inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+                  currentOperator?.shiftActive
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-[#FEF3C7] text-[#B45309] border-[#FDE68A]'
+                }`}
+              >
+                <UserCheck size={13} />
+                {currentOperator?.name || 'Verifikasi Shift'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setWorkflowModalOpen(true)}
+                className="px-3 py-2 rounded-xl bg-white hover:bg-[#FAFAFA] border border-zinc-200 text-[#141414] text-[11px] font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <SlidersHorizontal size={13} className="text-[#D97706]" />
+                {isPayLaterMode ? 'Pay Later (Open Bill)' : 'Pay First'}
+              </button>
+
+              <div className="flex items-center bg-zinc-200/70 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setPosView('catalog')}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                    posView === 'catalog'
+                      ? 'bg-[#141414] text-[#F59E0B]'
+                      : 'text-[#52525B] hover:text-[#141414]'
+                  }`}
+                >
+                  Katalog
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPosView('kitchen')}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer transition-all ${
+                    posView === 'kitchen'
+                      ? 'bg-[#141414] text-[#F59E0B]'
+                      : 'text-[#52525B] hover:text-[#141414]'
+                  }`}
+                >
+                  <ChefHat size={12} /> Dapur &amp; Bill ({activeKitchenCount})
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className={posView === 'catalog' ? 'relative w-full md:w-64' : 'hidden'}>
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
           <input 
             type="text" 
@@ -278,7 +458,38 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
         </div>
       </div>
 
-      {/* 2. Sistem Filter Kategori */}
+      </div>
+
+      {posView === 'kitchen' && !isStarter ? (
+        <KitchenOrdersDrawer
+          orders={orders}
+          merchantSettings={merchantSettings}
+          onTransitionStatus={onTransitionOrderKitchenStatus}
+          onOpenModify={(order) => setModifyingOrder(order)}
+          onOpenCancel={(order) => setCancellingOrder(order)}
+          onSettleOpenBill={handleTriggerSettleOpenBill}
+          onReceiveClosedKitchenDemo={onReceiveClosedKitchenDemo}
+          onViewReceipt={(order) =>
+            setReceiptData({
+              orderNumber: order.orderNumber,
+              cart: order.items || [],
+              total: order.totalAmount || 0,
+              paymentMethod: order.paymentMethod || 'cash',
+              cashierName: order.cashierName || currentOperator?.name || 'Kasir Aktif',
+              orderChannelLabel: ORDER_CHANNEL_LABELS[order.orderChannel] || 'Dine-In',
+              outlet: order.tableNumber || 'Kasir',
+              received: order.totalAmount || 0,
+              change: 0,
+              date: new Date(order.createdAt).toLocaleString('id-ID', {
+                dateStyle: 'medium',
+                timeStyle: 'short'
+              })
+            })
+          }
+        />
+      ) : (
+        <>
+          {/* 2. Sistem Filter Kategori */}
       <div className="flex items-center p-1 bg-zinc-200/70 rounded-xl overflow-x-auto hide-scrollbar w-fit max-w-full">
         {categories.map((cat, idx) => {
           const isActive = selectedCategory === cat;
@@ -316,8 +527,10 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
             <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               <AnimatePresence mode="popLayout">
                 {filteredProducts.map((prod) => {
-                  const isAvailable = checkIsIngredientAvailable(prod);
-                  const maxPortions = getMaxPossiblePortions(prod);
+                  const stockEval = isStarter ? { status: 'available', maxPortions: 999, hasLowBufferIngredient: false, label: 'Tersedia' } : evaluateMenuStockStatus(prod, ingredients);
+                  const isAvailable = stockEval.status !== 'out' && checkIsIngredientAvailable(prod);
+                  const isLowStock = isAvailable && stockEval.status === 'low';
+                  const maxPortions = isStarter ? 999 : stockEval.maxPortions;
                   const cartEntry = cart.find(item => item.id === prod.id);
                   const inCartQty = cartEntry ? cartEntry.qty : 0;
 
@@ -355,13 +568,9 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
                           )}
                         </div>
                         <div className="absolute top-2.5 right-2.5">
-                          <span className={`px-2.5 py-1 rounded-md font-mono text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5 shadow-sm ${
-                            !isAvailable 
-                              ? 'bg-red-600 text-white' 
-                              : 'bg-[#141414]/90 text-white'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${!isAvailable ? 'bg-white' : 'bg-emerald-400'}`}></span>
-                            {isStarter ? 'Tersedia' : !isAvailable ? 'Habis' : `Maks: ${maxPortions}`}
+                          <span className={`px-2.5 py-1 rounded-md font-mono text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5 shadow-sm ${!isAvailable ? 'bg-red-600 text-white' : isLowStock ? 'bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]' : 'bg-[#141414]/90 text-white'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${!isAvailable ? 'bg-white' : isLowStock ? 'bg-[#F59E0B]' : 'bg-emerald-400'}`}></span>
+                            {isStarter ? 'Tersedia' : !isAvailable ? 'Habis' : isLowStock ? `Menipis • Sisa ${maxPortions}` : maxPortions >= 999 ? 'Tersedia' : `Maks: ${maxPortions}`}
                           </span>
                         </div>
                       </div>
@@ -382,12 +591,19 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
                           </div>
                         )}
 
+                        {isLowStock && (
+                          <div className="bg-[#FEF3C7] border border-[#FDE68A] text-[#B45309] px-2.5 py-1.5 rounded-xl text-[10px] font-semibold flex items-center gap-1.5">
+                            <AlertTriangle size={13} className="shrink-0" /> Stok menipis (sisa {maxPortions} porsi)
+                          </div>
+                        )}
+
                         <div className="flex items-center justify-between pt-2.5 border-t border-zinc-100">
                           <span className="font-mono font-extrabold text-[#141414] text-sm">
                             Rp {prod.price.toLocaleString('id-ID')}
                           </span>
                           <button 
                             type="button"
+                            disabled={!isAvailable}
                             aria-label={`Tambah ${prod.name}`}
                             className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
                               !isAvailable 
@@ -500,7 +716,101 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
               </AnimatePresence>
             </div>
 
+            {/* Smart Upselling Engine: Margin Tinggi + Stok Aman */}
+            {cart.length > 0 && upsellItems.length > 0 && (
+              <div className="bg-[#FAFAFA] border border-zinc-200 rounded-2xl p-3.5 space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-[#FEF3C7] border border-[#FDE68A] text-[#B45309] flex items-center justify-center shrink-0">
+                    <Sparkles size={13} />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-extrabold text-[#141414] leading-tight">
+                      Rekomendasi Penawaran (Upsell)
+                    </p>
+                    <p className="text-[10px] text-[#52525B] font-medium">
+                      Prioritas profit tinggi &amp; bahan tersedia
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {upsellItems.map((u) => (
+                    <div
+                      key={u.product.id}
+                      className="bg-white border border-zinc-200 rounded-xl p-2.5 flex items-center justify-between gap-2.5 hover:border-[#F59E0B] transition-colors"
+                    >
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-bold text-[#141414] truncate">
+                            {u.product.name}
+                          </span>
+                          <span className="font-mono text-[9px] font-bold bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] px-1.5 py-0.5 rounded-md shrink-0">
+                            Margin Tinggi • Stok Aman
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[10px] font-mono text-[#52525B]">
+                          <span className="font-bold text-[#141414]">
+                            Rp {Number(u.sellingPrice || 0).toLocaleString('id-ID')}
+                          </span>
+                          <span>•</span>
+                          <span className="text-emerald-700 font-bold">
+                            Margin {u.grossMarginPct}% (+Rp {Number(u.grossProfit || 0).toLocaleString('id-ID')})
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => addToCart(u.product)}
+                        className="px-2.5 py-1.5 rounded-lg bg-[#141414] hover:bg-[#F59E0B] text-white hover:text-[#141414] text-[10px] font-extrabold shrink-0 transition-all cursor-pointer active:scale-95"
+                      >
+                        + Tambah
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Kanal Order & Nomor Meja */}
+            {!isStarter && (
+              <div className="space-y-2 pt-1">
+                <p className="font-mono text-[10px] uppercase tracking-wider font-bold text-[#52525B]">
+                  Kanal &amp; Tujuan Order
+                </p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: 'dine_in', label: 'Dine-In' },
+                    { id: 'take_away', label: 'Take-Away' },
+                    ...(merchantSettings?.closedKitchenEnabled
+                      ? [{ id: 'online_closed_kitchen', label: 'Closed Kitchen' }]
+                      : [])
+                  ].map((ch) => (
+                    <button
+                      key={ch.id}
+                      type="button"
+                      onClick={() => setOrderChannel(ch.id)}
+                      className={`py-1.5 px-2 rounded-lg text-[10px] font-bold border cursor-pointer transition-all ${
+                        orderChannel === ch.id
+                          ? 'bg-[#141414] text-[#F59E0B] border-[#141414]'
+                          : 'bg-[#FAFAFA] text-[#52525B] border-zinc-200 hover:text-[#141414]'
+                      }`}
+                    >
+                      {ch.label}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  placeholder="No. Meja / Nama Pelanggan (Opsional)"
+                  value={tableLabel}
+                  onChange={(e) => setTableLabel(e.target.value)}
+                  className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl px-3 py-2 text-xs font-semibold text-[#141414] focus:outline-none focus:border-[#F59E0B]"
+                />
+              </div>
+            )}
+
             {/* Pilihan Metode Pembayaran */}
+            {!isPayLaterMode && (
             <div className="space-y-1.5 pt-1">
               <p className="font-mono text-[10px] uppercase tracking-wider font-bold text-[#52525B]">Metode Pembayaran</p>
               <div className="grid grid-cols-3 gap-2">
@@ -537,6 +847,8 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
               </div>
             </div>
 
+            )}
+
             {/* Total & Checkout */}
             <div className="border-t border-zinc-100 pt-3.5 space-y-3">
               <div className="flex justify-between items-center text-xs">
@@ -567,12 +879,15 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
                 disabled={cart.length === 0} 
                 className="w-full bg-[#F59E0B] hover:bg-[#D97706] disabled:opacity-40 disabled:cursor-not-allowed text-[#141414] font-extrabold py-3.5 rounded-xl text-xs shadow-sm cursor-pointer transition-all active:scale-[0.98]"
               >
-                Proses Pembayaran
+                {isPayLaterMode ? 'Simpan Open Bill & Kirim ke Dapur' : 'Proses Pembayaran'}
               </button>
             </div>
           </div>
         </div>
       </div>
+
+        </>
+      )}
 
       {/* Mobile Floating Quick-Jump Cart Bar */}
       {cart.length > 0 && (
@@ -651,8 +966,26 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-zinc-950/40 cursor-pointer" onClick={() => setCashModalOpen(false)}></motion.div>
             <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }} className="relative w-full max-w-sm bg-white rounded-2xl p-6 shadow-xl border border-zinc-200 space-y-4">
               <div className="text-center space-y-1">
-                <h3 className="font-bold text-[#141414] text-base">Pembayaran Tunai</h3>
-                <p className="text-xs text-[#52525B] font-medium">Total Tagihan: <span className="font-mono font-extrabold text-[#D97706]">Rp {totalPrice.toLocaleString('id-ID')}</span></p>
+                <h3 className="font-bold text-[#141414] text-base">{settlingBillOrder ? `Bayar Open Bill (${settlingBillOrder.orderNumber})` : 'Pembayaran Tunai'}</h3>
+                {settlingBillOrder && (
+                  <div className="grid grid-cols-2 gap-2 py-2">
+                    <button
+                      type="button"
+                      onClick={() => finalizeCheckout(activeBillAmount, 'qris')}
+                      className="py-2 rounded-xl bg-[#FEF3C7] hover:bg-[#FDE68A] border border-[#FDE68A] text-[#B45309] text-xs font-extrabold cursor-pointer"
+                    >
+                      Bayar via QRIS
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => finalizeCheckout(activeBillAmount, 'card')}
+                      className="py-2 rounded-xl bg-[#FAFAFA] hover:bg-zinc-100 border border-zinc-200 text-[#141414] text-xs font-extrabold cursor-pointer"
+                    >
+                      Bayar via Kartu
+                    </button>
+                  </div>
+                )}
+                <p className="text-xs text-[#52525B] font-medium">Total Tagihan: <span className="font-mono font-extrabold text-[#D97706]">Rp {activeBillAmount.toLocaleString('id-ID')}</span></p>
               </div>
               
               <div className="space-y-2">
@@ -670,7 +1003,7 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
                 <div className="grid grid-cols-3 gap-1.5 pt-1">
                   <button
                     type="button"
-                    onClick={() => setCashReceived(String(totalPrice))}
+                    onClick={() => setCashReceived(String(activeBillAmount))}
                     className="py-1.5 px-2 bg-[#FAFAFA] hover:bg-zinc-100 border border-zinc-200 text-[#141414] text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
                   >
                     Uang Pas
@@ -688,18 +1021,18 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
                 </div>
               </div>
 
-              {Number(cashReceived) >= totalPrice && (
+              {Number(cashReceived) >= activeBillAmount && (
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center space-y-0.5">
                   <p className="font-mono text-[10px] font-bold uppercase text-emerald-700 tracking-wider">Kembalian</p>
-                  <p className="font-mono text-lg text-emerald-700 font-extrabold">Rp {(Number(cashReceived) - totalPrice).toLocaleString('id-ID')}</p>
+                  <p className="font-mono text-lg text-emerald-700 font-extrabold">Rp {(Number(cashReceived) - activeBillAmount).toLocaleString('id-ID')}</p>
                 </div>
               )}
 
               <div className="flex justify-end gap-2.5 pt-2">
                 <button onClick={() => setCashModalOpen(false)} className="w-full px-4 py-2.5 text-xs font-bold text-[#52525B] hover:bg-zinc-100 rounded-xl cursor-pointer transition-colors">Batal</button>
                 <button 
-                  onClick={() => finalizeCheckout(Number(cashReceived))} 
-                  disabled={!cashReceived || Number(cashReceived) < totalPrice}
+                  onClick={() => finalizeCheckout(Number(cashReceived), 'cash')} 
+                  disabled={!cashReceived || Number(cashReceived) < activeBillAmount}
                   className="w-full bg-[#F59E0B] hover:bg-[#D97706] disabled:opacity-40 disabled:cursor-not-allowed text-[#141414] text-xs font-extrabold rounded-xl shadow-sm cursor-pointer transition-all"
                 >
                   Selesaikan Transaksi
@@ -723,6 +1056,15 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
                   <h2 className="font-black text-xl text-zinc-900 tracking-tight">STOCKO.</h2>
                   <p className="text-[10px] text-zinc-500 font-medium">{receiptData.outlet || 'Sistem Kasir Pintar UMKM'}</p>
                   <p className="text-[10px] text-zinc-400">{receiptData.date}</p>
+                  <p className="text-[10px] text-zinc-900 font-bold pt-1">
+                    Kasir: {receiptData.cashierName || currentOperator?.name || 'Kasir Aktif'}
+                  </p>
+                  {(receiptData.orderNumber || receiptData.orderChannelLabel) && (
+                    <p className="text-[10px] text-zinc-500 font-mono">
+                      {receiptData.orderNumber ? `${receiptData.orderNumber} • ` : ''}
+                      {receiptData.orderChannelLabel || 'Dine-In'}
+                    </p>
+                  )}
                 </div>
                 
                 <div className="space-y-3 mb-4">
@@ -834,6 +1176,54 @@ export default function PosModule({ products, ingredients = [], onCheckout, subs
           </div>
         )}
       </AnimatePresence>
+
+      {/* MODAL PENGATURAN ALUR TOKO & DAPUR */}
+      <MerchantWorkflowModal
+        key={workflowModalOpen ? 'wf-open' : 'wf-closed'}
+        isOpen={workflowModalOpen}
+        onClose={() => setWorkflowModalOpen(false)}
+        settings={merchantSettings}
+        onSave={(next) => {
+          onSaveMerchantSettings?.(next);
+          if (next?.defaultOrderChannel) setOrderChannel(next.defaultOrderChannel);
+        }}
+      />
+
+      {/* MODAL AUTENTIKASI SHIFT KASIR */}
+      <CashierShiftModal
+        key={shiftModalOpen ? 'shift-open' : 'shift-closed'}
+        isOpen={shiftModalOpen}
+        onClose={() => setShiftModalOpen(false)}
+        currentOperator={currentOperator}
+        onVerifyShift={(op) => onUpdateOperatorShift?.(op)}
+      />
+
+      {/* MODAL NOTA CORET / REVISI ITEM */}
+      {modifyingOrder && (
+        <OrderModificationModal
+          order={modifyingOrder}
+          products={products}
+          ingredients={ingredients}
+          onClose={() => setModifyingOrder(null)}
+          onConfirm={(payload) => {
+            onModifyOrder?.(payload);
+            setModifyingOrder(null);
+          }}
+        />
+      )}
+
+      {/* MODAL PEMBATALAN ORDER (KONDISI A VS KONDISI B) */}
+      {cancellingOrder && (
+        <OrderCancelModal
+          order={cancellingOrder}
+          ingredients={ingredients}
+          onClose={() => setCancellingOrder(null)}
+          onConfirm={(payload) => {
+            onCancelOrder?.(payload);
+            setCancellingOrder(null);
+          }}
+        />
+      )}
     </div>
   );
 }

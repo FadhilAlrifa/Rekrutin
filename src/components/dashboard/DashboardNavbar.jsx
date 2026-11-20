@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Store, Package, Bell, BarChart3, UtensilsCrossed, ArrowLeft, QrCode, Menu, X, Users, Lock, SlidersHorizontal } from 'lucide-react';
+import { Store, Package, Bell, BarChart3, UtensilsCrossed, ArrowLeft, QrCode, Menu, X, Users, Lock, SlidersHorizontal, Sparkles, CalendarRange, ClipboardList } from 'lucide-react';
 
 export default function DashboardNavbar({
   activeTab,
   setActiveTab,
   alertCount,
+  lowStockCount = 0,
   onBackToLanding,
   userRole = 'superadmin',
   subscriptionPlan = 'pro',
@@ -17,10 +18,13 @@ export default function DashboardNavbar({
     { id: 'pos', label: 'POS Kasir', icon: Store },
     { id: 'self-order', label: 'Pemesanan Mandiri', icon: QrCode, badge: 'Kiosk', proOnly: true },
     { id: 'menu-management', label: 'Kelola Menu', icon: UtensilsCrossed },
-    { id: 'inventory', label: 'Stok & BOM Gudang', icon: Package, proOnly: true },
+    { id: 'inventory', label: 'Stok & BOM Gudang', icon: Package, count: isStarter ? 0 : lowStockCount, proOnly: true },
     { id: 'alerts', label: 'Peringatan Khusus', icon: Bell, count: isStarter ? 0 : alertCount, proOnly: true },
     { id: 'employees', label: 'Kelola Karyawan', icon: Users, badge: 'Admin' },
     { id: 'reporting', label: 'Analitik Laporan', icon: BarChart3 },
+    { id: 'profitability', label: 'Profit & AI Insights', icon: Sparkles, badge: 'AI', proOnly: true },
+    { id: 'seasonal-analytics', label: 'Seasonal & Forecast', icon: CalendarRange, badge: 'Forecast', proOnly: true },
+    { id: 'audit-trail', label: 'Audit Trail', icon: ClipboardList, badge: 'Log', proOnly: true },
   ];
 
   // Logika Penyaring (Filter) Berdasarkan Jabatan Karyawan
@@ -30,24 +34,20 @@ export default function DashboardNavbar({
       return ['pos', 'menu-management'].includes(item.id);
     }
     if (userRole === 'stocker') {
-      return ['inventory', 'menu-management', 'alerts'].includes(item.id);
+      return ['inventory', 'alerts'].includes(item.id);
     }
     return false;
   });
 
-  if (activeTab === 'self-order' && !isStarter) {
-    return null;
-  }
-
   const planLabels = {
-    starter: { name: 'Starter', desc: 'Basic POS • Rp79rb' },
-    pro: { name: 'Pro / Business', desc: 'Smart BOM • Rp149rb' },
-    enterprise: { name: 'Enterprise', desc: 'Multi-Outlet • Rp299rb' }
+    starter: { name: 'Starter', desc: 'POS & Menu Digital' },
+    pro: { name: 'Pro / Business', desc: 'BOM Engine Aktif' },
+    enterprise: { name: 'Enterprise', desc: 'Multi-Outlet Sync' }
   };
 
   const roleLabels = {
-    superadmin: { label: 'Pemilik / Superadmin', badge: 'Full Access' },
-    kasir: { label: 'Kasir POS', badge: 'Front Office' },
+    superadmin: { label: 'Owner / Super Admin', badge: 'Full Access' },
+    kasir: { label: 'Kasir POS', badge: 'Frontline' },
     stocker: { label: 'Stocker Gudang', badge: 'Inventory' }
   };
 
