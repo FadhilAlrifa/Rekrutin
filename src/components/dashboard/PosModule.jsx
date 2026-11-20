@@ -48,6 +48,8 @@ export default function PosModule({
   const [settlingBillOrder, setSettlingBillOrder] = useState(null);
 
   const isStarter = subscriptionPlan === 'starter';
+  const businessType = merchantSettings?.businessType || 'fnb';
+  const isRetailBusiness = businessType === 'retail';
   const activeKitchenCount = orders.filter(
     (o) =>
       (o.kitchenStatus !== 'served' &&
@@ -66,6 +68,13 @@ export default function PosModule({
   const categories = ['Semua', ...new Set(products.map(p => p.category))];
 
   const getSubDescription = (prod) => {
+    if (isRetailBusiness || prod.productMode === 'retail') {
+      const parts = [];
+      if (prod.sku) parts.push(`SKU: ${prod.sku}`);
+      if (prod.variantLabel) parts.push(prod.variantLabel);
+      if (parts.length > 0) return parts.join(' • ');
+      return `Produk ritel (${prod.unit || 'pcs'})`;
+    }
     const name = prod.name.toLowerCase();
     if (name.includes('kopi') || name.includes('americano')) return 'Espresso shot & fresh milk';
     if (name.includes('croissant') || name.includes('pain')) return 'Freshly baked buttery pastry';
@@ -114,8 +123,25 @@ export default function PosModule({
 
     const accumulatedDemand = {};
 
-    simulatedCart.forEach(cartItem => {
-      if (cartItem.recipe && Array.isArray(cartItem.recipe)) {
+    for (const cartItem of simulatedCart) {
+      const hasBomRecipe = Array.isArray(cartItem.recipe) && cartItem.recipe.length > 0;
+      const isRetailItem = cartItem.productMode === 'retail' || (isRetailBusiness && !hasBomRecipe);
+
+      if (isRetailItem) {
+        const availableSkuStock = Number(cartItem.stock ?? 0);
+        if (cartItem.qty > availableSkuStock) {
+          return {
+            isValid: false,
+            exceededIngredient: cartItem.name,
+            required: cartItem.qty,
+            stock: availableSkuStock,
+            unit: cartItem.unit || 'pcs'
+          };
+        }
+        continue;
+      }
+
+      if (hasBomRecipe) {
         cartItem.recipe.forEach(req => {
           const reqClean = (req.name || '').split(' | ')[0].toLowerCase().trim();
           const foundIng = ingredients.find(
@@ -137,7 +163,7 @@ export default function PosModule({
           }
         });
       }
-    });
+    }
 
     for (let key in accumulatedDemand) {
       const demand = accumulatedDemand[key];
@@ -155,10 +181,14 @@ export default function PosModule({
     return { isValid: true };
   };
 
-  // Hitung maksimal porsi tersisa untuk satu produk mandiri
+  // Hitung maksimal porsi / unit tersisa untuk satu produk mandiri
   const getMaxPossiblePortions = (product) => {
     if (isStarter) return 999;
-    if (!product.recipe || product.recipe.length === 0) return 999;
+    const hasBomRecipe = Array.isArray(product?.recipe) && product.recipe.length > 0;
+    if (product?.productMode === 'retail' || (isRetailBusiness && !hasBomRecipe)) {
+      return Math.max(0, Math.floor(Number(product?.stock ?? 0)));
+    }
+    if (!hasBomRecipe) return 999;
     const safeIngredients = ingredients || [];
     let limits = [];
 
@@ -362,11 +392,17 @@ export default function PosModule({
     setTimeout(() => setSuccessMsg(false), 3000);
   };
 
-  const upsellItems = isStarter ? [] : getSmartUpsellRecommendations(cart, products, ingredients, 2);
+  const upsellItems = isStarter
+    ? []
+    : getSmartUpsellRecommendations(cart, products, ingredients, 2, businessType);
 
   const filteredProducts = products.filter(p => {
     const matchesCategory = selectedCategory === 'Semua' || p.category === selectedCategory;
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const q = searchQuery.toLowerCase();
+    const matchesSearch =
+      p.name.toLowerCase().includes(q) ||
+      (p.sku || '').toLowerCase().includes(q) ||
+      (p.variantLabel || '').toLowerCase().includes(q);
     return matchesCategory && matchesSearch;
   });
 
@@ -378,7 +414,11 @@ export default function PosModule({
         <div>
           <div className="flex flex-wrap items-center gap-2 mb-2">
             <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]">
-              {isStarter ? 'Paket Starter • Kasir Mandiri' : '[ 01 // POS KASIR • AUTO BOM ]'}
+              {isStarter
+                ? 'Paket Starter • Kasir Mandiri'
+                : isRetailBusiness
+                ? '[ 01 // POS RITEL • AUTO SKU STOCK ]'
+                : '[ 01 // POS KASIR • AUTO BOM ]'}
             </span>
             {subscriptionPlan === 'enterprise' && (
               <span className="font-mono text-[10px] font-bold text-[#52525B] bg-white border border-zinc-200 px-2.5 py-0.5 rounded-full">
@@ -416,7 +456,7 @@ export default function PosModule({
                 className="px-3 py-2 rounded-xl bg-white hover:bg-[#FAFAFA] border border-zinc-200 text-[#141414] text-[11px] font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
               >
                 <SlidersHorizontal size={13} className="text-[#D97706]" />
-                {isPayLaterMode ? 'Pay Later (Open Bill)' : 'Pay First'}
+                {isRetailBusiness ? 'Ritel' : 'F&B'} • {isPayLaterMode ? 'Pay Later' : 'Pay First'}
               </button>
 
               <div className="flex items-center bg-zinc-200/70 p-1 rounded-xl">
@@ -527,10 +567,14 @@ export default function PosModule({
             <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               <AnimatePresence mode="popLayout">
                 {filteredProducts.map((prod) => {
-                  const stockEval = isStarter ? { status: 'available', maxPortions: 999, hasLowBufferIngredient: false, label: 'Tersedia' } : evaluateMenuStockStatus(prod, ingredients);
+                  const stockEval = isStarter
+                    ? { status: 'available', maxPortions: 999, hasLowBufferIngredient: false, label: 'Tersedia' }
+                    : evaluateMenuStockStatus(prod, ingredients, businessType);
                   const isAvailable = stockEval.status !== 'out' && checkIsIngredientAvailable(prod);
                   const isLowStock = isAvailable && stockEval.status === 'low';
                   const maxPortions = isStarter ? 999 : stockEval.maxPortions;
+                  const unitSuffix =
+                    isRetailBusiness || prod.productMode === 'retail' ? (prod.unit || 'pcs') : 'porsi';
                   const cartEntry = cart.find(item => item.id === prod.id);
                   const inCartQty = cartEntry ? cartEntry.qty : 0;
 
@@ -570,7 +614,17 @@ export default function PosModule({
                         <div className="absolute top-2.5 right-2.5">
                           <span className={`px-2.5 py-1 rounded-md font-mono text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5 shadow-sm ${!isAvailable ? 'bg-red-600 text-white' : isLowStock ? 'bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]' : 'bg-[#141414]/90 text-white'}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${!isAvailable ? 'bg-white' : isLowStock ? 'bg-[#F59E0B]' : 'bg-emerald-400'}`}></span>
-                            {isStarter ? 'Tersedia' : !isAvailable ? 'Habis' : isLowStock ? `Menipis • Sisa ${maxPortions}` : maxPortions >= 999 ? 'Tersedia' : `Maks: ${maxPortions}`}
+                            {isStarter
+                              ? 'Tersedia'
+                              : !isAvailable
+                              ? 'Habis'
+                              : isLowStock
+                              ? `Menipis • Sisa ${maxPortions}`
+                              : maxPortions >= 999
+                              ? 'Tersedia'
+                              : isRetailBusiness || prod.productMode === 'retail'
+                              ? `Stok: ${maxPortions} ${unitSuffix}`
+                              : `Maks: ${maxPortions}`}
                           </span>
                         </div>
                       </div>
@@ -587,13 +641,16 @@ export default function PosModule({
 
                         {!isAvailable && (
                           <div className="bg-red-50 border border-red-200 text-red-700 px-2.5 py-1.5 rounded-xl text-[10px] font-semibold flex items-center gap-1.5">
-                            <AlertTriangle size={13} className="shrink-0" /> Stok bahan baku gudang habis
+                            <AlertTriangle size={13} className="shrink-0" />{' '}
+                            {isRetailBusiness || prod.productMode === 'retail'
+                              ? 'Stok unit produk habis'
+                              : 'Stok bahan baku gudang habis'}
                           </div>
                         )}
 
                         {isLowStock && (
                           <div className="bg-[#FEF3C7] border border-[#FDE68A] text-[#B45309] px-2.5 py-1.5 rounded-xl text-[10px] font-semibold flex items-center gap-1.5">
-                            <AlertTriangle size={13} className="shrink-0" /> Stok menipis (sisa {maxPortions} porsi)
+                            <AlertTriangle size={13} className="shrink-0" /> Stok menipis (sisa {maxPortions} {unitSuffix})
                           </div>
                         )}
 

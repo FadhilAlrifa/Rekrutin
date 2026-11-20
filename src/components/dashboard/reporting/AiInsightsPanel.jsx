@@ -19,6 +19,7 @@ export default function AiInsightsPanel({
   priceHistory = [],
   stockMovements = [],
   seasonalEvents = DEFAULT_SEASONAL_EVENTS,
+  businessType = 'fnb',
   onNavigateTab
 }) {
   const [refreshTick, setRefreshTick] = useState(0);
@@ -46,9 +47,10 @@ export default function AiInsightsPanel({
       ingredients,
       transactions,
       priceHistory,
-      seasonalForecast
+      seasonalForecast,
+      businessType
     });
-  }, [products, ingredients, transactions, priceHistory, stockMovements, seasonalEvents, refreshTick]);
+  }, [products, ingredients, transactions, priceHistory, stockMovements, seasonalEvents, businessType, refreshTick]);
 
   const getCardStyle = (status) => {
     if (status === 'critical') {

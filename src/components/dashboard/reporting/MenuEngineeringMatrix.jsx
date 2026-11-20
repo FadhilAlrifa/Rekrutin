@@ -36,13 +36,15 @@ const QUADRANT_META = {
 export default function MenuEngineeringMatrix({
   products = [],
   ingredients = [],
-  transactions = []
+  transactions = [],
+  businessType = 'fnb'
 }) {
   const [selectedQuadrant, setSelectedQuadrant] = useState('all');
+  const isRetail = businessType === 'retail';
 
   const analysis = useMemo(
-    () => computeMenuEngineering(products, ingredients, transactions),
-    [products, ingredients, transactions]
+    () => computeMenuEngineering(products, ingredients, transactions, businessType),
+    [products, ingredients, transactions, businessType]
   );
 
   const displayedRows = useMemo(() => {
@@ -178,13 +180,13 @@ export default function MenuEngineeringMatrix({
       <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 pb-4">
           <div>
-            <h3 className="font-extrabold text-[#141414] text-base">
-              Matriks Performa & Profitabilitas Menu
-            </h3>
-            <p className="text-xs text-[#52525B] font-medium">
-              Benchmark rata-rata: Volume <strong className="font-mono text-[#141414]">{analysis.benchmarks.avgVolume} porsi</strong> • Margin{' '}
-              <strong className="font-mono text-[#141414]">{analysis.benchmarks.avgMargin}%</strong>
-            </p>
+              <h3 className="font-extrabold text-[#141414] text-base">
+                {isRetail ? 'Matriks Performa & Profitabilitas Produk Ritel' : 'Matriks Performa & Profitabilitas Menu'}
+              </h3>
+              <p className="text-xs text-[#52525B] font-medium">
+                Benchmark rata-rata: Volume <strong className="font-mono text-[#141414]">{analysis.benchmarks.avgVolume} {isRetail ? 'unit' : 'porsi'}</strong> • Margin{' '}
+                <strong className="font-mono text-[#141414]">{analysis.benchmarks.avgMargin}%</strong>
+              </p>
           </div>
 
           {selectedQuadrant !== 'all' && (
@@ -202,10 +204,10 @@ export default function MenuEngineeringMatrix({
           <table className="w-full text-left border-collapse min-w-[760px]">
             <thead>
               <tr className="border-b border-zinc-200 font-mono text-[10px] font-bold uppercase tracking-wider text-[#52525B]">
-                <th className="pb-3 px-3">Menu</th>
+                <th className="pb-3 px-3">{isRetail ? 'Produk / SKU' : 'Menu'}</th>
                 <th className="pb-3 px-3">Klasifikasi</th>
                 <th className="pb-3 px-3 text-center">Terjual</th>
-                <th className="pb-3 px-3 text-right">HPP / Porsi</th>
+                <th className="pb-3 px-3 text-right">{isRetail ? 'Kulakan / Unit' : 'HPP / Porsi'}</th>
                 <th className="pb-3 px-3 text-right">Harga Jual</th>
                 <th className="pb-3 px-3 text-center">Margin</th>
                 <th className="pb-3 px-3 text-right">Total Laba Bersih</th>

@@ -36,7 +36,9 @@ import {
   fetchStockMovements,
   recordStockMovement,
   fetchSeasonalEvents,
-  clearUnavailableTablesCache
+  clearUnavailableTablesCache,
+  updateRetailProductStock,
+  fetchRetailPurchasePriceHistory
 } from './services/stockoService';
 import {
   fetchStaffProfiles,
@@ -46,6 +48,7 @@ import {
 import {
   createOrderPayload,
   computeBomRequirementsForItems,
+  computeRetailSkuRequirementsForItems,
   resolveOrderCancellation,
   resolveOrderModification
 } from './utils/orderStateMachine';
@@ -58,6 +61,7 @@ export default function App() {
   const [products, setProducts] = useState([]);
   const [ingredients, setIngredients] = useState([]);
   const [priceHistory, setPriceHistory] = useState([]);
+  const [retailPriceHistory, setRetailPriceHistory] = useState([]);
   const [userRole, setUserRole] = useState('superadmin');
 
   // Iterasi 2 States: Operator Shift, Workflow Settings, Orders/KDS, Audit Trail & Seasonal Events
@@ -165,6 +169,7 @@ export default function App() {
         userId: currentOperator?.id || 'operator-active',
         userName: currentOperator?.name || 'Admin Operasional',
         role: currentOperator?.role || userRole,
+        cashierName: payload.cashierName || '',
         reason: payload.reason || ''
       });
       setStockMovements((prev) => [mov, ...prev]);
@@ -275,6 +280,72 @@ export default function App() {
     }
   };
 
+  const applyRetailStockDeltas = async (
+    deltas = [],
+    { movementType, actionType, reason, orderId, logType, isAddition = false }
+  ) => {
+    if (subscriptionPlan === 'starter' || !Array.isArray(deltas) || deltas.length === 0) {
+      return;
+    }
+
+    let updatedProducts = [...products];
+    const newLogs = [];
+    const activeCashierName = currentOperator?.name || 'Kasir Aktif';
+
+    for (const d of deltas) {
+      const idx = updatedProducts.findIndex((p) => String(p.id) === String(d.productId));
+      if (idx < 0) continue;
+
+      const cur = updatedProducts[idx];
+      const deltaSigned = isAddition ? Math.abs(Number(d.amount || 0)) : -Math.abs(Number(d.amount || 0));
+      const beforeStock = Number(cur.stock ?? 0);
+      const afterStock = Math.max(0, Number((beforeStock + deltaSigned).toFixed(3)));
+      const unit = cur.unit || 'pcs';
+
+      updatedProducts[idx] = { ...cur, stock: afterStock };
+      await updateRetailProductStock(cur.id, afterStock);
+
+      const logEntry = {
+        id: `MOV-RET-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        timestamp: new Date().toISOString(),
+        itemName: cur.name,
+        type: logType || (isAddition ? 'MASUK (Reversal Ritel)' : 'KELUAR (Otomatis POS Ritel)'),
+        qty: `${deltaSigned >= 0 ? `+${deltaSigned}` : deltaSigned} ${unit}`,
+        outlet: resolvedOutletLabel,
+        note: reason
+      };
+      newLogs.push(logEntry);
+      recordStockMutationLog({ ...logEntry, ingredientId: cur.id });
+
+      await handleRecordAudit({
+        actionType,
+        entityType: 'product',
+        entityId: cur.id,
+        entityName: cur.sku ? `${cur.name} (${cur.sku})` : cur.name,
+        beforeValue: `${beforeStock} ${unit}`,
+        afterValue: `${afterStock} ${unit}`,
+        deltaLabel: `${deltaSigned >= 0 ? `+${deltaSigned}` : deltaSigned} ${unit}`,
+        reason,
+        movementType,
+        qtyChange: deltaSigned,
+        beforeStock,
+        afterStock,
+        unit,
+        cashierName: activeCashierName,
+        costImpact:
+          movementType === 'WASTE_LOSS'
+            ? Math.round(Math.abs(deltaSigned) * Number(cur.purchasePrice || d.purchasePrice || 0))
+            : 0,
+        orderId
+      });
+    }
+
+    setProducts(updatedProducts);
+    if (newLogs.length > 0) {
+      setStockLogs((prev) => [...newLogs, ...prev]);
+    }
+  };
+
   const checkUserRole = async (user) => {
     if (!user?.id) return;
     const profile = await resolveAuthenticatedEmployeeProfile(user);
@@ -342,7 +413,8 @@ export default function App() {
         dbAudit,
         dbMovements,
         dbEvents,
-        staffRes
+        staffRes,
+        retailHistoryRes
       ] = await Promise.all([
         fetchProducts(),
         fetchIngredients(),
@@ -352,12 +424,14 @@ export default function App() {
         fetchAuditLogs(),
         fetchStockMovements(),
         fetchSeasonalEvents(),
-        fetchStaffProfiles()
+        fetchStaffProfiles(),
+        fetchRetailPurchasePriceHistory()
       ]);
 
       if (dbProducts && dbProducts.length > 0) setProducts(dbProducts);
       if (dbIngredients && dbIngredients.length > 0) setIngredients(dbIngredients);
       if (historyRes?.data) setPriceHistory(historyRes.data);
+      if (Array.isArray(retailHistoryRes?.data)) setRetailPriceHistory(retailHistoryRes.data);
       if (savedSettings) setMerchantSettings(savedSettings);
       if (Array.isArray(dbOrders)) setOrders(dbOrders);
       if (Array.isArray(dbAudit)) setAuditLogs(dbAudit);
@@ -396,10 +470,15 @@ export default function App() {
     return diffDays <= 30;
   };
 
+  const businessType = merchantSettings?.businessType || 'fnb';
   const lowStockIngredients = ingredients.filter(
     (ing) => Number(ing.stock) <= Number(ing.minLimit ?? 5)
   );
   const lowStockCount = lowStockIngredients.length;
+  const retailLowStockProducts = products.filter(
+    (p) => (p.productMode === 'retail' || businessType === 'retail') && Number(p.stock ?? 0) <= Number(p.minLimit ?? 5)
+  );
+  const retailLowStockCount = retailLowStockProducts.length;
   const alertCount = ingredients.filter(
     (ing) => Number(ing.stock) <= Number(ing.minLimit ?? 5) || checkExpiryAlert(ing.expiryDate)
   ).length;
@@ -412,6 +491,16 @@ export default function App() {
       reason: `Penjualan POS (${tableNumber})`,
       orderId: null,
       logType: 'KELUAR (Otomatis BOM POS)',
+      isAddition: false
+    });
+
+    const retailReqs = computeRetailSkuRequirementsForItems(cartItems, products, businessType);
+    await applyRetailStockDeltas(retailReqs, {
+      movementType: 'BOM_SALE',
+      actionType: 'Stock Out',
+      reason: `Penjualan POS Ritel (${tableNumber})`,
+      orderId: null,
+      logType: 'KELUAR (Otomatis POS Ritel)',
       isAddition: false
     });
 
@@ -431,7 +520,7 @@ export default function App() {
     setMerchantSettings(saved);
   };
 
-  const handlePlaceWorkflowOrder = ({
+  const handlePlaceWorkflowOrder = async ({
     items,
     orderChannel,
     paymentFlow,
@@ -462,12 +551,22 @@ export default function App() {
 
     if (shouldDeductNow) {
       const reqs = computeBomRequirementsForItems(items, ingredients);
-      applyStockDeltas(reqs, {
+      await applyStockDeltas(reqs, {
         movementType: 'BOM_SALE',
         actionType: 'Stock Out',
         reason: `Order ${finalOrder.orderNumber} (${finalOrder.paymentFlow === 'pay_later' ? 'Open Bill / Preparing' : 'Pay First'})`,
         orderId: finalOrder.id,
         logType: 'KELUAR (Otomatis BOM POS)',
+        isAddition: false
+      });
+
+      const retailReqs = computeRetailSkuRequirementsForItems(items, products, businessType);
+      await applyRetailStockDeltas(retailReqs, {
+        movementType: 'BOM_SALE',
+        actionType: 'Stock Out',
+        reason: `Order Ritel ${finalOrder.orderNumber} (${finalOrder.paymentFlow === 'pay_later' ? 'Open Bill / Preparing' : 'Pay First'})`,
+        orderId: finalOrder.id,
+        logType: 'KELUAR (Otomatis POS Ritel)',
         isAddition: false
       });
     }
@@ -499,6 +598,16 @@ export default function App() {
         reason: `Mulai masak order ${order.orderNumber} (${order.orderChannel})`,
         orderId: order.id,
         logType: 'KELUAR (Dapur Preparing BOM)',
+        isAddition: false
+      });
+
+      const retailReqs = computeRetailSkuRequirementsForItems(order.items, products, businessType);
+      await applyRetailStockDeltas(retailReqs, {
+        movementType: 'BOM_SALE',
+        actionType: 'Stock Out',
+        reason: `Proses order ritel ${order.orderNumber} (${order.orderChannel})`,
+        orderId: order.id,
+        logType: 'KELUAR (Otomatis POS Ritel)',
         isAddition: false
       });
       nextStockDeducted = true;
@@ -572,6 +681,47 @@ export default function App() {
       }
     }
 
+    if (order.stockDeducted && subscriptionPlan !== 'starter') {
+      const prevRetailReqs = computeRetailSkuRequirementsForItems(order.items, products, businessType);
+      const nextRetailReqs = computeRetailSkuRequirementsForItems(nextItems, products, businessType);
+      const retailDeltaMap = new Map();
+
+      nextRetailReqs.forEach((r) => {
+        retailDeltaMap.set(String(r.productId), { ...r, deltaAmount: r.amount });
+      });
+      prevRetailReqs.forEach((r) => {
+        const key = String(r.productId);
+        const cur = retailDeltaMap.get(key);
+        if (cur) {
+          cur.deltaAmount = Number((cur.deltaAmount - r.amount).toFixed(3));
+        } else {
+          retailDeltaMap.set(key, { ...r, deltaAmount: Number((-r.amount).toFixed(3)) });
+        }
+      });
+
+      for (const rDelta of retailDeltaMap.values()) {
+        if (rDelta.deltaAmount > 0) {
+          await applyRetailStockDeltas([{ ...rDelta, amount: rDelta.deltaAmount }], {
+            movementType: 'BOM_SALE',
+            actionType: 'Stock Out',
+            reason: `Item susulan Nota Coret ${order.orderNumber}: ${reason}`,
+            orderId: order.id,
+            logType: 'KELUAR (Item Susulan Ritel)',
+            isAddition: false
+          });
+        } else if (rDelta.deltaAmount < 0 && !treatRemovedAsWaste) {
+          await applyRetailStockDeltas([{ ...rDelta, amount: Math.abs(rDelta.deltaAmount) }], {
+            movementType: 'RESTOCK_REVERSAL',
+            actionType: 'Stock In',
+            reason: `Pengembalian stok ritel Nota Coret ${order.orderNumber}: ${reason}`,
+            orderId: order.id,
+            logType: 'MASUK (Reversal Nota Coret Ritel)',
+            isAddition: true
+          });
+        }
+      }
+    }
+
     if (addedWasteCost > 0) {
       const mv = await recordStockMovement({
         ingredientId: null,
@@ -618,6 +768,8 @@ export default function App() {
       reason
     });
 
+    const retailReqs = computeRetailSkuRequirementsForItems(order.items, products, businessType);
+
     if (stockAction === 'restore') {
       await applyStockDeltas(bomRequirements, {
         movementType: 'RESTOCK_REVERSAL',
@@ -627,6 +779,14 @@ export default function App() {
         logType: 'MASUK (Reversal Order Batal)',
         isAddition: true
       });
+      await applyRetailStockDeltas(retailReqs, {
+        movementType: 'RESTOCK_REVERSAL',
+        actionType: 'Stock In',
+        reason: `Pembatalan / Retur ritel ${order.orderNumber}: ${reason}`,
+        orderId: order.id,
+        logType: 'MASUK (Reversal / Retur Ritel)',
+        isAddition: true
+      });
     } else if (stockAction === 'deduct_as_waste') {
       await applyStockDeltas(bomRequirements, {
         movementType: 'WASTE_LOSS',
@@ -634,6 +794,14 @@ export default function App() {
         reason: `Waste pembatalan pasca-produksi ${order.orderNumber}: ${reason}`,
         orderId: order.id,
         logType: 'WASTE (Order Batal Pasca-Masak)',
+        isAddition: false
+      });
+      await applyRetailStockDeltas(retailReqs, {
+        movementType: 'WASTE_LOSS',
+        actionType: 'Stock Out',
+        reason: `Barang rusak / retur batal ${order.orderNumber}: ${reason}`,
+        orderId: order.id,
+        logType: 'WASTE (Batal Ritel)',
         isAddition: false
       });
     } else if (stockAction === 'keep_as_waste') {
@@ -848,6 +1016,8 @@ export default function App() {
                 setActiveTab={handleChangeTab}
                 alertCount={alertCount}
                 lowStockCount={lowStockCount}
+                retailLowStockCount={retailLowStockCount}
+                businessType={businessType}
                 userRole={userRole}
                 subscriptionPlan={subscriptionPlan}
                 setSubscriptionPlan={setSubscriptionPlan}
@@ -922,6 +1092,47 @@ export default function App() {
                   )}
 
                   {/* REAL-TIME BUFFER INVENTORY / LOW-STOCK ALERT BANNER */}
+                  {businessType === 'retail' &&
+                    retailLowStockProducts.length > 0 &&
+                    activeTab !== 'self-order' &&
+                    subscriptionPlan !== 'starter' && (
+                      <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-2xl px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-start sm:items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-[#F59E0B] text-[#141414] flex items-center justify-center shrink-0">
+                            <AlertTriangle size={18} />
+                          </div>
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-xs font-extrabold text-[#141414]">
+                                {retailLowStockProducts.length} SKU Produk Ritel Menyentuh Batas Minimum
+                              </span>
+                              <span className="font-mono text-[9px] font-bold uppercase bg-white text-[#B45309] border border-[#FDE68A] px-2 py-0.5 rounded-full">
+                                Retail Stock Alert
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-[#78350F] font-medium mt-0.5">
+                              {retailLowStockProducts
+                                .slice(0, 3)
+                                .map((p) => `${p.name} (${Number(p.stock ?? 0)} ${p.unit || 'pcs'})`)
+                                .join(', ')}
+                              {retailLowStockProducts.length > 3
+                                ? ` dan ${retailLowStockProducts.length - 3} SKU lainnya`
+                                : ''}
+                            </p>
+                          </div>
+                        </div>
+
+                        {activeTab !== 'menu-management' && userRole !== 'stocker' && (
+                          <button
+                            onClick={() => setActiveTab('menu-management')}
+                            className="px-4 py-2 rounded-xl bg-[#141414] hover:bg-zinc-800 text-[#F59E0B] text-[11px] font-bold flex items-center gap-1.5 shrink-0 cursor-pointer transition-all active:scale-95"
+                          >
+                            Restock SKU Ritel <ArrowRight size={13} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+
                   {lowStockIngredients.length > 0 &&
                     (userRole === 'superadmin' || userRole === 'stocker') &&
                     activeTab !== 'self-order' &&
@@ -1019,6 +1230,13 @@ export default function App() {
                           ingredients={ingredients}
                           subscriptionPlan={subscriptionPlan}
                           onUpgradePlan={setSubscriptionPlan}
+                          businessType={businessType}
+                          retailPriceHistory={retailPriceHistory}
+                          onRetailPriceHistoryAdded={(entry) =>
+                            setRetailPriceHistory((prev) => [entry, ...prev])
+                          }
+                          onRecordAudit={handleRecordAudit}
+                          currentOperator={currentOperator}
                         />
                       )}
 
@@ -1101,6 +1319,7 @@ export default function App() {
                             stockMovements={stockMovements}
                             seasonalEvents={seasonalEvents}
                             onNavigateTab={setActiveTab}
+                            businessType={businessType}
                           />
                         ))}
 

@@ -90,9 +90,43 @@ export function getMarginStatus(marginPct) {
 /**
  * Kalkulasi HPP (COGS), Laba Kotor, dan Gross Margin % sebuah menu secara otomatis.
  */
-export function calculateMenuCogs(product, ingredients = []) {
+export function calculateMenuCogs(product, ingredients = [], businessType = 'fnb') {
   const sellingPrice = Number(product?.price) || 0;
   const recipe = Array.isArray(product?.recipe) ? product.recipe : [];
+  const purchasePrice = Number(product?.purchasePrice ?? product?.purchase_price ?? 0);
+  const isRetailSku =
+    product?.productMode === 'retail' ||
+    (businessType === 'retail' && recipe.length === 0) ||
+    (purchasePrice > 0 && recipe.length === 0);
+
+  if (isRetailSku) {
+    const roundedCogs = Math.round(purchasePrice);
+    const grossProfit = sellingPrice - roundedCogs;
+    const grossMarginPct =
+      sellingPrice > 0 ? Number(((grossProfit / sellingPrice) * 100).toFixed(1)) : 0;
+
+    return {
+      cogs: roundedCogs,
+      sellingPrice,
+      grossProfit,
+      grossMarginPct,
+      status: getMarginStatus(grossMarginPct),
+      missingPriceIngredients: roundedCogs <= 0 ? [product?.name || 'Produk Ritel'] : [],
+      hasRecipe: roundedCogs > 0,
+      isRetailSku: true,
+      breakdown: [
+        {
+          ingredientId: null,
+          name: `Kulakan ${product?.name || 'SKU'}`,
+          qty: 1,
+          unit: product?.unit || 'pcs',
+          storageUnit: product?.unit || 'pcs',
+          unitPrice: roundedCogs,
+          cost: roundedCogs
+        }
+      ]
+    };
+  }
 
   let cogs = 0;
   const missingPriceIngredients = [];
@@ -133,6 +167,7 @@ export function calculateMenuCogs(product, ingredients = []) {
     status: getMarginStatus(grossMarginPct),
     missingPriceIngredients,
     hasRecipe: recipe.length > 0,
+    isRetailSku: false,
     breakdown
   };
 }
@@ -179,8 +214,42 @@ export function analyzeIngredientPriceImpact(ingredient, newPrice, products = []
 /**
  * Hitung maksimal porsi tersisa & status stok detail untuk kasir POS.
  */
-export function evaluateMenuStockStatus(product, ingredients = []) {
+export function evaluateMenuStockStatus(product, ingredients = [], businessType = 'fnb') {
   const recipe = Array.isArray(product?.recipe) ? product.recipe : [];
+  const isRetailItem =
+    product?.productMode === 'retail' || (businessType === 'retail' && recipe.length === 0);
+
+  if (isRetailItem) {
+    const currentStock = Number(product?.stock ?? 0);
+    const minLimit = Number(product?.minLimit ?? product?.min_stock_threshold ?? 5);
+    const unit = product?.unit || 'pcs';
+
+    if (currentStock <= 0) {
+      return {
+        status: 'out',
+        maxPortions: 0,
+        hasLowBufferIngredient: true,
+        label: 'Habis'
+      };
+    }
+
+    if (currentStock <= minLimit) {
+      return {
+        status: 'low',
+        maxPortions: currentStock,
+        hasLowBufferIngredient: true,
+        label: `Menipis • Sisa ${currentStock} ${unit}`
+      };
+    }
+
+    return {
+      status: 'available',
+      maxPortions: currentStock,
+      hasLowBufferIngredient: false,
+      label: `Stok: ${currentStock} ${unit}`
+    };
+  }
+
   if (recipe.length === 0) {
     return {
       status: 'available',
@@ -248,22 +317,29 @@ export function evaluateMenuStockStatus(product, ingredients = []) {
  * Mesin Smart Upselling untuk layar POS Kasir:
  * Memprioritaskan menu dengan Margin Tinggi DAN Stok Bahan Baku Aman (tidak menipis/habis).
  */
-export function getSmartUpsellRecommendations(cart = [], products = [], ingredients = [], limit = 3) {
+export function getSmartUpsellRecommendations(
+  cart = [],
+  products = [],
+  ingredients = [],
+  limit = 3,
+  businessType = 'fnb'
+) {
   if (!Array.isArray(cart) || cart.length === 0) return [];
 
   const cartIds = new Set(cart.map((c) => String(c.id)));
   const cartCategories = new Set(cart.map((c) => (c.category || '').toLowerCase()));
+  const highMarginFloor = businessType === 'retail' ? 30 : 45;
 
   const candidates = products
     .filter((prod) => !cartIds.has(String(prod.id)))
     .map((prod) => {
-      const cogsData = calculateMenuCogs(prod, ingredients);
-      const stockInfo = evaluateMenuStockStatus(prod, ingredients);
+      const cogsData = calculateMenuCogs(prod, ingredients, businessType);
+      const stockInfo = evaluateMenuStockStatus(prod, ingredients, businessType);
 
-      // Syarat ketat 2: Bahan baku harus aman (tidak habis dan tidak sedang menipis)
+      // Syarat ketat 2: Bahan baku / stok SKU harus aman (tidak habis dan tidak sedang menipis)
       const isStockSafe = stockInfo.status === 'available' && stockInfo.maxPortions >= 5;
-      // Syarat ketat 1: Margin keuntungan tinggi (>= 40%, atau prioritas tertinggi bila belum semua diinput)
-      const isHighMargin = cogsData.grossMarginPct >= 45 && cogsData.grossProfit > 0;
+      // Syarat ketat 1: Margin keuntungan tinggi
+      const isHighMargin = cogsData.grossMarginPct >= highMarginFloor && cogsData.grossProfit > 0;
 
       // Boost kategori pelengkap (mis. Bakery/Dessert/Makanan ketika keranjang berisi Minuman)
       const isComplementary = !cartCategories.has((prod.category || '').toLowerCase());
@@ -290,14 +366,19 @@ export function getSmartUpsellRecommendations(cart = [], products = [], ingredie
 /**
  * Klasifikasi Menu Engineering Matrix (Stars, Plowhorses, Puzzles, Dogs) + Tren Volume vs Profit.
  */
-export function computeMenuEngineering(products = [], ingredients = [], transactions = []) {
+export function computeMenuEngineering(
+  products = [],
+  ingredients = [],
+  transactions = [],
+  businessType = 'fnb'
+) {
   const salesMap = {};
   const dailyTrendMap = {};
 
   const cogsByProdId = {};
   const cogsByProdName = {};
   products.forEach((prod) => {
-    const info = calculateMenuCogs(prod, ingredients);
+    const info = calculateMenuCogs(prod, ingredients, businessType);
     cogsByProdId[String(prod.id)] = info;
     cogsByProdName[(prod.name || '').toLowerCase().trim()] = info;
   });
@@ -340,7 +421,7 @@ export function computeMenuEngineering(products = [], ingredients = [], transact
   });
 
   const rows = products.map((prod) => {
-    const cogsInfo = cogsByProdId[String(prod.id)] || calculateMenuCogs(prod, ingredients);
+    const cogsInfo = cogsByProdId[String(prod.id)] || calculateMenuCogs(prod, ingredients, businessType);
     const sales = salesMap[(prod.name || '').toLowerCase().trim()] || { qtySold: 0, revenue: 0 };
     const totalProfit = sales.qtySold * cogsInfo.grossProfit;
 
@@ -370,7 +451,7 @@ export function computeMenuEngineering(products = [], ingredients = [], transact
   const avgMargin =
     rows.length > 0
       ? Math.max(
-          45,
+          businessType === 'retail' ? 28 : 45,
           Math.min(
             65,
             rows.reduce((s, r) => s + r.marginPct, 0) / rows.length
@@ -422,9 +503,10 @@ export function generateAiInsights({
   ingredients = [],
   transactions = [],
   priceHistory = [],
-  seasonalForecast = null
+  seasonalForecast = null,
+  businessType = 'fnb'
 }) {
-  const engineering = computeMenuEngineering(products, ingredients, transactions);
+  const engineering = computeMenuEngineering(products, ingredients, transactions, businessType);
   const items = engineering.items;
 
   // 1. Analisis Margin
@@ -438,11 +520,12 @@ export function generateAiInsights({
   const leastPopular = sortedByVolume[sortedByVolume.length - 1];
 
   // 3. Peluang Upselling (Puzzles / High Margin + Safe Stock)
+  const upsellFloor = businessType === 'retail' ? 30 : 45;
   const upsellCandidates = items
     .filter((row) => {
       const prodObj = products.find((p) => String(p.id) === String(row.id));
-      const stockEval = evaluateMenuStockStatus(prodObj, ingredients);
-      return row.marginPct >= 45 && stockEval.status === 'available';
+      const stockEval = evaluateMenuStockStatus(prodObj, ingredients, businessType);
+      return row.marginPct >= upsellFloor && stockEval.status === 'available';
     })
     .sort((a, b) => (a.quadrant === 'puzzles' ? -1 : 1) || b.marginPct - a.marginPct);
 
@@ -481,29 +564,57 @@ export function generateAiInsights({
     });
   });
 
-  const restockPredictions = ingredients
-    .map((ing) => {
-      const totalUsed = usageByIngId[ing.id] || 0;
-      const dailyRate = totalUsed / spanDays;
-      const currentStock = Number(ing.stock) || 0;
-      const minLimit = Number(ing.minLimit) || 1;
-      const daysLeft = dailyRate > 0 ? Math.floor(currentStock / dailyRate) : currentStock <= minLimit ? 1 : 30;
-      const suggestedRestock =
-        dailyRate > 0 ? Math.max(minLimit * 2, Math.ceil(dailyRate * 7 - currentStock)) : Math.max(minLimit * 2, 5);
+  const restockPredictions =
+    businessType === 'retail'
+      ? products
+          .map((prod) => {
+            const matchedSales = items.find((it) => String(it.id) === String(prod.id));
+            const dailyRate = (matchedSales?.qtySold || 0) / spanDays;
+            const currentStock = Number(prod.stock ?? 0);
+            const minLimit = Number(prod.minLimit ?? prod.min_stock_threshold ?? 5);
+            const daysLeft =
+              dailyRate > 0 ? Math.floor(currentStock / dailyRate) : currentStock <= minLimit ? 1 : 30;
+            const suggestedRestock =
+              dailyRate > 0
+                ? Math.max(minLimit * 2, Math.ceil(dailyRate * 7 - currentStock))
+                : Math.max(minLimit * 2, 10);
 
-      return {
-        id: ing.id,
-        name: cleanIngredientName(ing.name),
-        stock: currentStock,
-        unit: ing.unit,
-        minLimit,
-        dailyRate: Number(dailyRate.toFixed(3)),
-        daysLeft,
-        suggestedRestock: Number(suggestedRestock.toFixed(2)),
-        isUrgent: currentStock <= minLimit || daysLeft <= 5
-      };
-    })
-    .sort((a, b) => a.daysLeft - b.daysLeft);
+            return {
+              id: prod.id,
+              name: prod.name,
+              stock: currentStock,
+              unit: prod.unit || 'pcs',
+              minLimit,
+              dailyRate: Number(dailyRate.toFixed(2)),
+              daysLeft,
+              suggestedRestock: Number(suggestedRestock.toFixed(0)),
+              isUrgent: currentStock <= minLimit || daysLeft <= 5
+            };
+          })
+          .sort((a, b) => a.daysLeft - b.daysLeft)
+      : ingredients
+          .map((ing) => {
+            const totalUsed = usageByIngId[ing.id] || 0;
+            const dailyRate = totalUsed / spanDays;
+            const currentStock = Number(ing.stock) || 0;
+            const minLimit = Number(ing.minLimit) || 1;
+            const daysLeft = dailyRate > 0 ? Math.floor(currentStock / dailyRate) : currentStock <= minLimit ? 1 : 30;
+            const suggestedRestock =
+              dailyRate > 0 ? Math.max(minLimit * 2, Math.ceil(dailyRate * 7 - currentStock)) : Math.max(minLimit * 2, 5);
+
+            return {
+              id: ing.id,
+              name: cleanIngredientName(ing.name),
+              stock: currentStock,
+              unit: ing.unit,
+              minLimit,
+              dailyRate: Number(dailyRate.toFixed(3)),
+              daysLeft,
+              suggestedRestock: Number(suggestedRestock.toFixed(2)),
+              isUrgent: currentStock <= minLimit || daysLeft <= 5
+            };
+          })
+          .sort((a, b) => a.daysLeft - b.daysLeft);
 
   const urgentStock = restockPredictions.filter((r) => r.isUrgent);
 

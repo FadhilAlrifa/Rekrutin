@@ -6,6 +6,8 @@ export default function DashboardNavbar({
   setActiveTab,
   alertCount,
   lowStockCount = 0,
+  retailLowStockCount = 0,
+  businessType = 'fnb',
   onBackToLanding,
   userRole = 'superadmin',
   subscriptionPlan = 'pro',
@@ -15,10 +17,15 @@ export default function DashboardNavbar({
   const isStarter = subscriptionPlan === 'starter';
 
   const allNavItems = [
-    { id: 'pos', label: 'POS Kasir', icon: Store },
+    { id: 'pos', label: businessType === 'retail' ? 'POS Kasir Ritel' : 'POS Kasir', icon: Store },
     { id: 'self-order', label: 'Pemesanan Mandiri', icon: QrCode, badge: 'Kiosk', proOnly: true },
-    { id: 'menu-management', label: 'Kelola Menu', icon: UtensilsCrossed },
-    { id: 'inventory', label: 'Stok & BOM Gudang', icon: Package, count: isStarter ? 0 : lowStockCount, proOnly: true },
+    {
+      id: 'menu-management',
+      label: businessType === 'retail' ? 'Produk & Kulakan' : 'Kelola Menu',
+      icon: UtensilsCrossed,
+      count: businessType === 'retail' && !isStarter ? retailLowStockCount : 0
+    },
+    { id: 'inventory', label: businessType === 'retail' ? 'Gudang Bahan / Ekstra' : 'Stok & BOM Gudang', icon: Package, count: isStarter ? 0 : lowStockCount, proOnly: true },
     { id: 'alerts', label: 'Peringatan Khusus', icon: Bell, count: isStarter ? 0 : alertCount, proOnly: true },
     { id: 'employees', label: 'Kelola Karyawan', icon: Users, badge: 'Admin' },
     { id: 'reporting', label: 'Analitik Laporan', icon: BarChart3 },

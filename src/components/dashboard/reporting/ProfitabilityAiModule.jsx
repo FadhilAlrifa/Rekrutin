@@ -10,6 +10,7 @@ export default function ProfitabilityAiModule({
   priceHistory = [],
   stockMovements = [],
   seasonalEvents = [],
+  businessType = 'fnb',
   onNavigateTab
 }) {
   const [isLoading, setIsLoading] = useState(true);
@@ -106,7 +107,7 @@ export default function ProfitabilityAiModule({
                 activeView === 'matrix' ? 'bg-[#F59E0B] text-[#141414] shadow-sm' : 'text-[#52525B] hover:text-[#141414]'
               }`}
             >
-              <Grid2x2 size={13} /> Menu Engineering Matrix
+              <Grid2x2 size={13} /> {businessType === 'retail' ? 'Matriks Produk Ritel' : 'Menu Engineering Matrix'}
             </button>
           </div>
         </div>
@@ -120,6 +121,7 @@ export default function ProfitabilityAiModule({
           priceHistory={priceHistory}
           stockMovements={stockMovements}
           seasonalEvents={seasonalEvents}
+          businessType={businessType}
           onNavigateTab={onNavigateTab}
         />
       ) : (
@@ -127,6 +129,7 @@ export default function ProfitabilityAiModule({
           products={products}
           ingredients={ingredients}
           transactions={filteredTransactions}
+          businessType={businessType}
         />
       )}
     </div>

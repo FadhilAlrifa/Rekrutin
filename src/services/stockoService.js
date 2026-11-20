@@ -9,6 +9,8 @@ const AUDIT_LOGS_STORAGE_KEY = 'stocko_audit_logs_v1';
 const STOCK_MOVEMENTS_STORAGE_KEY = 'stocko_stock_movements_v1';
 const SEASONAL_EVENTS_STORAGE_KEY = 'stocko_seasonal_events_v1';
 const TX_META_STORAGE_KEY = 'stocko_tx_metadata_v1';
+const RETAIL_PRODUCTS_META_KEY = 'stocko_retail_products_meta_v1';
+const RETAIL_PRICE_HISTORY_KEY = 'stocko_retail_price_history_v1';
 const unavailableTablesSet = new Set();
 const inFlightTableQueries = new Map();
 
@@ -171,17 +173,268 @@ export async function fetchProducts() {
     return [];
   }
 
+  const localRetailMeta = readLocalJson(RETAIL_PRODUCTS_META_KEY, {});
+
   // Petakan properti dari database (snake_case) ke format frontend (camelCase)
-  return data.map(item => ({
-    id: item.id,
-    name: item.name,
-    category: item.category,
-    price: item.price,
-    stock: item.stock || 0,
-    image: item.image,
-    recipe: item.recipe || [],
-    expiryDate: item.expiry_date || item.expiryDate || ''
-  }));
+  return data.map(item => {
+    const meta = localRetailMeta[String(item.id)] || {};
+    const recipeArr = Array.isArray(item.recipe) ? item.recipe : [];
+    const resolvedPurchasePrice =
+      item.purchase_price !== undefined && item.purchase_price !== null && Number(item.purchase_price) > 0
+        ? Number(item.purchase_price)
+        : Number(meta.purchasePrice ?? 0);
+    const resolvedStock =
+      item.stock !== undefined && item.stock !== null
+        ? Number(item.stock)
+        : Number(meta.stock ?? 0);
+
+    return {
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      price: item.price,
+      stock: resolvedStock,
+      minLimit: Number(item.min_stock_threshold ?? meta.minLimit ?? 5),
+      sku: item.sku || meta.sku || '',
+      unit: item.unit || meta.unit || 'pcs',
+      variantLabel: item.variant_label || meta.variantLabel || '',
+      purchasePrice: resolvedPurchasePrice,
+      productMode: item.product_mode || meta.productMode || (recipeArr.length > 0 ? 'fnb' : 'fnb'),
+      image: item.image,
+      recipe: recipeArr,
+      expiryDate: item.expiry_date || item.expiryDate || ''
+    };
+  });
+}
+
+export async function updateRetailProductStock(productId, newStock) {
+  const numericStock = Math.max(0, Number(newStock) || 0);
+  const localMeta = readLocalJson(RETAIL_PRODUCTS_META_KEY, {});
+  localMeta[String(productId)] = {
+    ...(localMeta[String(productId)] || {}),
+    stock: numericStock
+  };
+  writeLocalJson(RETAIL_PRODUCTS_META_KEY, localMeta);
+
+  if (!isTableKnownUnavailable('products.retail_columns')) {
+    const { error } = await supabase
+      .from('products')
+      .update({ stock: numericStock })
+      .eq('id', productId);
+
+    if (error && (String(error.code) === 'PGRST204' || String(error.message || '').toLowerCase().includes('column'))) {
+      markTableUnavailable('products.retail_columns');
+    }
+  }
+}
+
+export async function fetchRetailPurchasePriceHistory() {
+  const res = await runOptionalTableRead('product_purchase_price_history', () =>
+    supabase
+      .from('product_purchase_price_history')
+      .select('*')
+      .order('changed_at', { ascending: false })
+      .limit(60)
+  );
+
+  if (res && !res.error && Array.isArray(res.data)) {
+    const mapped = res.data.map((row) => ({
+      id: row.id,
+      productId: row.product_id,
+      productName: row.product_name,
+      sku: row.sku || '',
+      unit: row.unit || 'pcs',
+      oldPrice: Number(row.old_price) || 0,
+      newPrice: Number(row.new_price) || 0,
+      changePct: Number(row.change_pct) || 0,
+      notes: row.notes || 'Pembaruan harga kulakan supplier',
+      changedBy: row.changed_by || 'Admin',
+      changedAt: row.changed_at
+    }));
+    writeLocalJson(RETAIL_PRICE_HISTORY_KEY, mapped);
+    return mapped;
+  }
+
+  return readLocalJson(RETAIL_PRICE_HISTORY_KEY, []);
+}
+
+export async function recordRetailPurchasePriceChange({
+  product,
+  oldPrice,
+  newPrice,
+  notes = 'Pembaruan harga kulakan supplier',
+  operatorName = 'Admin'
+}) {
+  const parsedOld = Number(oldPrice) || 0;
+  const parsedNew = Math.max(0, Number(newPrice) || 0);
+  const changePct =
+    parsedOld > 0
+      ? Number((((parsedNew - parsedOld) / parsedOld) * 100).toFixed(1))
+      : parsedNew > 0
+      ? 100
+      : 0;
+
+  const entry = {
+    id: `RPRC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    productId: product?.id || null,
+    productName: product?.name || 'Produk Ritel',
+    sku: product?.sku || '',
+    unit: product?.unit || 'pcs',
+    oldPrice: parsedOld,
+    newPrice: parsedNew,
+    changePct,
+    notes: (notes || '').trim() || 'Pembaruan harga kulakan supplier',
+    changedBy: operatorName,
+    changedAt: new Date().toISOString()
+  };
+
+  const current = readLocalJson(RETAIL_PRICE_HISTORY_KEY, []);
+  writeLocalJson(RETAIL_PRICE_HISTORY_KEY, [entry, ...current].slice(0, 60));
+
+  await runOptionalTableWrite('product_purchase_price_history', () =>
+    supabase.from('product_purchase_price_history').insert([
+      {
+        product_id: entry.productId,
+        product_name: entry.productName,
+        sku: entry.sku,
+        unit: entry.unit,
+        old_price: entry.oldPrice,
+        new_price: entry.newPrice,
+        change_pct: entry.changePct,
+        notes: entry.notes,
+        changed_by: entry.changedBy,
+        changed_at: entry.changedAt
+      }
+    ])
+  );
+
+  return entry;
+}
+
+export async function saveProductWithRetailFields({
+  formData,
+  editingProduct,
+  cleanRecipe = [],
+  businessType = 'fnb',
+  operatorName = 'Admin'
+}) {
+  const isRetailItem = businessType === 'retail' || formData.productMode === 'retail';
+  const basePayload = {
+    name: formData.name.trim(),
+    category: formData.category,
+    price: Number(formData.price),
+    expiry_date: formData.expiryDate || null,
+    image: formData.image || '/logo-stocko.png',
+    recipe: isRetailItem ? [] : cleanRecipe
+  };
+
+  const retailPayload = {
+    ...basePayload,
+    sku: (formData.sku || '').trim(),
+    unit: formData.unit || 'pcs',
+    variant_label: (formData.variantLabel || '').trim(),
+    purchase_price: Math.max(0, Number(formData.purchasePrice) || 0),
+    stock: Math.max(0, Number(formData.stock) || 0),
+    min_stock_threshold: Math.max(0, Number(formData.minLimit ?? 5)),
+    product_mode: isRetailItem ? 'retail' : 'fnb'
+  };
+
+  let savedRow;
+  let error;
+
+  const tryWithExtended = !isTableKnownUnavailable('products.retail_columns');
+
+  if (editingProduct) {
+    const res = await supabase
+      .from('products')
+      .update(tryWithExtended ? retailPayload : basePayload)
+      .eq('id', editingProduct.id)
+      .select();
+
+    if (res.error && tryWithExtended) {
+      markTableUnavailable('products.retail_columns');
+      const retry = await supabase
+        .from('products')
+        .update(basePayload)
+        .eq('id', editingProduct.id)
+        .select();
+      savedRow = retry.data?.[0] || { ...basePayload, id: editingProduct.id };
+      error = retry.error;
+    } else {
+      savedRow = res.data?.[0] || { ...basePayload, id: editingProduct.id };
+      error = res.error;
+    }
+  } else {
+    const res = await supabase
+      .from('products')
+      .insert([tryWithExtended ? retailPayload : basePayload])
+      .select();
+
+    if (res.error && tryWithExtended) {
+      markTableUnavailable('products.retail_columns');
+      const retry = await supabase
+        .from('products')
+        .insert([basePayload])
+        .select();
+      savedRow = retry.data?.[0] || null;
+      error = retry.error;
+    } else {
+      savedRow = res.data?.[0] || null;
+      error = res.error;
+    }
+  }
+
+  if (error || !savedRow) {
+    return { success: false, message: error?.message || 'Gagal menyimpan produk.' };
+  }
+
+  // Simpan selalu metadata ritel ke localStorage agar persisten meski kolom DB belum dimigrasi
+  const localMeta = readLocalJson(RETAIL_PRODUCTS_META_KEY, {});
+  localMeta[String(savedRow.id)] = {
+    sku: retailPayload.sku,
+    unit: retailPayload.unit,
+    variantLabel: retailPayload.variant_label,
+    purchasePrice: retailPayload.purchase_price,
+    stock: retailPayload.stock,
+    minLimit: retailPayload.min_stock_threshold,
+    productMode: retailPayload.product_mode
+  };
+  writeLocalJson(RETAIL_PRODUCTS_META_KEY, localMeta);
+
+  const productObj = {
+    id: savedRow.id,
+    name: savedRow.name,
+    category: savedRow.category,
+    price: savedRow.price,
+    expiryDate: savedRow.expiry_date || '',
+    image: savedRow.image,
+    recipe: savedRow.recipe || [],
+    sku: retailPayload.sku,
+    unit: retailPayload.unit,
+    variantLabel: retailPayload.variant_label,
+    purchasePrice: retailPayload.purchase_price,
+    stock: retailPayload.stock,
+    minLimit: retailPayload.min_stock_threshold,
+    productMode: retailPayload.product_mode
+  };
+
+  let priceHistoryEntry = null;
+  const oldPurchasePrice = Number(editingProduct?.purchasePrice ?? 0);
+  if (
+    isRetailItem &&
+    retailPayload.purchase_price !== oldPurchasePrice &&
+    (editingProduct || retailPayload.purchase_price > 0)
+  ) {
+    priceHistoryEntry = await recordRetailPurchasePriceChange({
+      product: productObj,
+      oldPrice: oldPurchasePrice,
+      newPrice: retailPayload.purchase_price,
+      notes: formData.priceChangeNote || (editingProduct ? 'Pembaruan harga kulakan' : 'Harga kulakan awal'),
+      operatorName
+    });
+  }
+
+  return { success: true, product: productObj, priceHistoryEntry };
 }
 
 export async function saveTransaction(
@@ -618,6 +871,7 @@ export async function recordStockMutationLog(entry) {
 // =========================================================================
 
 export const DEFAULT_MERCHANT_SETTINGS = {
+  businessType: 'fnb', // 'fnb' | 'retail'
   defaultOrderChannel: 'dine_in',
   paymentFlow: 'pay_first',
   closedKitchenEnabled: true,
@@ -630,7 +884,9 @@ export async function fetchMerchantSettings() {
   );
 
   if (res && !res.error && res.data) {
+    const cachedLocal = readLocalJson(MERCHANT_SETTINGS_STORAGE_KEY, DEFAULT_MERCHANT_SETTINGS);
     const mapped = {
+      businessType: res.data.business_type || cachedLocal.businessType || 'fnb',
       defaultOrderChannel: res.data.default_order_channel || 'dine_in',
       paymentFlow: res.data.payment_flow || 'pay_first',
       closedKitchenEnabled: res.data.closed_kitchen_enabled ?? true,
@@ -649,8 +905,8 @@ export async function saveMerchantSettings(settings, operatorName = 'Owner') {
   };
   writeLocalJson(MERCHANT_SETTINGS_STORAGE_KEY, normalized);
 
-  await runOptionalTableWrite('merchant_settings', () =>
-    supabase.from('merchant_settings').upsert({
+  await runOptionalTableWrite('merchant_settings', async () => {
+    const baseRow = {
       id: 'default',
       default_order_channel: normalized.defaultOrderChannel,
       payment_flow: normalized.paymentFlow,
@@ -658,8 +914,17 @@ export async function saveMerchantSettings(settings, operatorName = 'Owner') {
       require_cashier_shift: normalized.requireCashierShift,
       updated_by: operatorName,
       updated_at: new Date().toISOString()
-    })
-  );
+    };
+
+    const res = await supabase
+      .from('merchant_settings')
+      .upsert({ ...baseRow, business_type: normalized.businessType });
+
+    if (res.error && String(res.error.code) === 'PGRST204') {
+      return supabase.from('merchant_settings').upsert(baseRow);
+    }
+    return res;
+  });
   return normalized;
 }
 

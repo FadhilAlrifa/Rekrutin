@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { SlidersHorizontal, X, Check, Store, Wallet, ChefHat, ShieldCheck } from 'lucide-react';
+import { SlidersHorizontal, X, Check, Store, Wallet, ChefHat, ShieldCheck, ShoppingBag, UtensilsCrossed } from 'lucide-react';
 
 export default function MerchantWorkflowModal({
   isOpen,
@@ -41,10 +41,10 @@ export default function MerchantWorkflowModal({
                 </div>
                 <div>
                   <h3 className="font-extrabold text-[#141414] text-base">
-                    Pengaturan Alur Toko &amp; Dapur
+                    Pengaturan Bisnis &amp; Alur Operasional
                   </h3>
                   <p className="text-[11px] font-medium text-[#52525B]">
-                    Konfigurasi mode kanal order, alur pembayaran, dan antrean dapur (KDS).
+                    Pilih mode bisnis (F&amp;B / Ritel), kanal order, dan alur kasir toko.
                   </p>
                 </div>
               </div>
@@ -57,7 +57,53 @@ export default function MerchantWorkflowModal({
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-5">
+            <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[78vh] overflow-y-auto">
+              {/* 0. Business Type Selector (F&B vs Ritel) */}
+              <div className="space-y-2">
+                <label className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#52525B] flex items-center gap-1.5">
+                  <Store size={13} className="text-[#D97706]" /> Tipe Usaha (Business Mode)
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {[
+                    {
+                      id: 'fnb',
+                      title: 'F&B / Kafe & Resto',
+                      desc: 'Resep bahan baku (BOM), HPP per porsi, antrean dapur (KDS) & Open Bill.',
+                      icon: UtensilsCrossed
+                    },
+                    {
+                      id: 'retail',
+                      title: 'Toko Ritel / Minimarket',
+                      desc: 'Produk unit/SKU & varian, harga kulakan vs jual, potong stok SKU otomatis.',
+                      icon: ShoppingBag
+                    }
+                  ].map((mode) => {
+                    const active = (draft.businessType || 'fnb') === mode.id;
+                    const Icon = mode.icon;
+                    return (
+                      <button
+                        key={mode.id}
+                        type="button"
+                        onClick={() => setDraft({ ...draft, businessType: mode.id })}
+                        className={`text-left p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                          active
+                            ? 'bg-[#141414] text-white border-[#141414] shadow-sm'
+                            : 'bg-[#FAFAFA] border-zinc-200 hover:border-zinc-300 text-[#141414]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Icon size={14} className={active ? 'text-[#F59E0B]' : 'text-[#D97706]'} />
+                          <p className="text-xs font-extrabold">{mode.title}</p>
+                        </div>
+                        <p className={`text-[11px] mt-1 leading-snug ${active ? 'text-zinc-300' : 'text-[#52525B]'}`}>
+                          {mode.desc}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* 1. Payment Flow */}
               <div className="space-y-2">
                 <label className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#52525B] flex items-center gap-1.5">

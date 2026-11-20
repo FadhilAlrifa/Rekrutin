@@ -55,6 +55,7 @@ export default function MenuFormModal({
   setFormData,
   ingredients = [],
   subscriptionPlan = 'pro',
+  businessType = 'fnb',
   onUpgradePlan
 }) {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -64,6 +65,7 @@ export default function MenuFormModal({
   if (!isOpen) return null;
 
   const isStarter = subscriptionPlan === 'starter';
+  const isRetailMode = businessType === 'retail' || formData.productMode === 'retail';
 
   const handleImageFileSelect = async (file) => {
     if (!file) return;
@@ -114,13 +116,17 @@ export default function MenuFormModal({
     setFormData({ ...formData, recipe: updatedRecipe });
   };
 
-  // Live Kalkulasi COGS (HPP) & Margin Profit saat admin mengetik harga atau takaran resep
+  // Live Kalkulasi COGS (HPP) / Harga Kulakan & Margin Profit saat admin mengetik
   const liveCogs = calculateMenuCogs(
     {
       price: Number(formData.price) || 0,
+      purchasePrice: Number(formData.purchasePrice) || 0,
+      unit: formData.unit || 'pcs',
+      productMode: isRetailMode ? 'retail' : 'fnb',
       recipe: formData.recipe || []
     },
-    ingredients
+    ingredients,
+    businessType
   );
 
   return (
@@ -151,11 +157,19 @@ export default function MenuFormModal({
             </div>
             <div>
               <h3 className="font-extrabold text-[#141414] text-lg tracking-tight">
-                {editingProduct ? 'Edit Menu, Resep & HPP' : 'Tambah Menu Baru'}
+                {editingProduct
+                  ? isRetailMode
+                    ? 'Edit Produk Ritel, Stok & Margin'
+                    : 'Edit Menu, Resep & HPP'
+                  : isRetailMode
+                  ? 'Tambah Produk Ritel (SKU)'
+                  : 'Tambah Menu Baru'}
               </h3>
               <p className="text-xs font-medium text-[#52525B] mt-0.5">
                 {isStarter
-                  ? 'Manajemen Menu Dasar (Paket Starter).'
+                  ? 'Manajemen Produk Dasar (Paket Starter).'
+                  : isRetailMode
+                  ? 'Atur SKU, varian, stok unit, harga kulakan supplier, dan margin keuntungan ritel.'
                   : 'Atur komposisi BOM dan pantau kalkulasi HPP (COGS) & margin profit otomatis.'}
               </p>
             </div>
@@ -183,10 +197,12 @@ export default function MenuFormModal({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-bold text-[#52525B] mb-1.5">Nama Menu</label>
+                  <label className="block text-[11px] font-bold text-[#52525B] mb-1.5">
+                    {isRetailMode ? 'Nama Produk Ritel' : 'Nama Menu'}
+                  </label>
                   <input
                     type="text"
-                    placeholder="Contoh: Kopi Susu Aren"
+                    placeholder={isRetailMode ? 'Contoh: Air Mineral 600ml / Kaos Polos L' : 'Contoh: Kopi Susu Aren'}
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-[#141414] placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all"
@@ -195,16 +211,33 @@ export default function MenuFormModal({
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-[#52525B] mb-1.5">Kategori Menu</label>
+                  <label className="block text-[11px] font-bold text-[#52525B] mb-1.5">
+                    {isRetailMode ? 'Kategori Produk' : 'Kategori Menu'}
+                  </label>
                   <select
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                     className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-[#141414] focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all cursor-pointer"
                   >
-                    <option value="Minuman">Minuman</option>
-                    <option value="Makanan">Makanan</option>
-                    <option value="Bakery">Bakery</option>
-                    <option value="Dessert">Dessert</option>
+                    {isRetailMode ? (
+                      <>
+                        <option value="Minuman Kemasan">Minuman Kemasan</option>
+                        <option value="Makanan Ringan">Makanan Ringan</option>
+                        <option value="Sembako & Kebutuhan">Sembako &amp; Kebutuhan</option>
+                        <option value="Aksesoris & Elektronik">Aksesoris &amp; Elektronik</option>
+                        <option value="Fashion & Varian">Fashion &amp; Varian</option>
+                        <option value="Minuman">Minuman</option>
+                        <option value="Makanan">Makanan</option>
+                        <option value="Lainnya">Lainnya</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="Minuman">Minuman</option>
+                        <option value="Makanan">Makanan</option>
+                        <option value="Bakery">Bakery</option>
+                        <option value="Dessert">Dessert</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
@@ -300,7 +333,173 @@ export default function MenuFormModal({
               </div>
             </div>
 
-            {/* Bagian 2: Komposisi Resep (BOM) */}
+            {/* Bagian 2: Stok & Kulakan (Ritel) ATAU Komposisi Resep BOM (F&B) */}
+            {isRetailMode ? (
+              <div className="space-y-4 pt-2 border-t border-zinc-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Layers size={14} className="text-[#D97706]" />
+                    <span className="font-mono text-[10px] font-bold text-[#52525B] uppercase tracking-wider">
+                      Stok SKU, Varian &amp; Harga Kulakan Supplier
+                    </span>
+                  </div>
+                  <span className="font-mono text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]">
+                    Mode Ritel (Tanpa Resep BOM)
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#52525B] mb-1">
+                      Kode SKU / Barcode
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="SKU-001"
+                      value={formData.sku || ''}
+                      onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                      className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-[#141414] focus:outline-none focus:bg-white focus:border-[#F59E0B]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#52525B] mb-1">
+                      Varian (Ukuran / Warna)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: 500ml / Hitam"
+                      value={formData.variantLabel || ''}
+                      onChange={(e) => setFormData({ ...formData, variantLabel: e.target.value })}
+                      className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#141414] focus:outline-none focus:bg-white focus:border-[#F59E0B]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#52525B] mb-1">
+                      Satuan Jual
+                    </label>
+                    <select
+                      value={formData.unit || 'pcs'}
+                      onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                      className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#141414] focus:outline-none focus:bg-white focus:border-[#F59E0B]"
+                    >
+                      <option value="pcs">pcs</option>
+                      <option value="botol">botol</option>
+                      <option value="pack">pack</option>
+                      <option value="box">box</option>
+                      <option value="kg">kg</option>
+                      <option value="liter">liter</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#52525B] mb-1">
+                      Stok Unit Saat Ini <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      required
+                      placeholder="50"
+                      value={formData.stock ?? ''}
+                      onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                      className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-[#141414] focus:outline-none focus:bg-white focus:border-[#F59E0B]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#52525B] mb-1">
+                      Buffer Minimum (Alert)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      placeholder="5"
+                      value={formData.minLimit ?? 5}
+                      onChange={(e) => setFormData({ ...formData, minLimit: e.target.value })}
+                      className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-[#141414] focus:outline-none focus:bg-white focus:border-[#F59E0B]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#52525B] mb-1">
+                      Harga Kulakan / Beli (Rp) <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      required
+                      placeholder="12000"
+                      value={formData.purchasePrice ?? ''}
+                      onChange={(e) => setFormData({ ...formData, purchasePrice: e.target.value })}
+                      className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-[#141414] focus:outline-none focus:bg-white focus:border-[#F59E0B]"
+                    />
+                  </div>
+                </div>
+
+                {editingProduct &&
+                  Number(formData.purchasePrice || 0) !== Number(editingProduct.purchasePrice || 0) && (
+                    <div className="bg-[#FEF3C7]/60 border border-[#FDE68A] rounded-xl p-3 space-y-1.5">
+                      <label className="block text-[11px] font-bold text-[#B45309]">
+                        Catatan Perubahan Harga Kulakan (Riwayat Harga Supplier)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: Kenaikan harga grosir supplier bulan ini"
+                        value={formData.priceChangeNote || ''}
+                        onChange={(e) => setFormData({ ...formData, priceChangeNote: e.target.value })}
+                        className="w-full bg-white border border-[#FDE68A] rounded-xl px-3 py-2 text-xs font-semibold text-[#141414] focus:outline-none focus:border-[#F59E0B]"
+                      />
+                    </div>
+                  )}
+
+                {/* LIVE MARGIN RITEL CALCULATOR */}
+                <div className="bg-[#FAFAFA] border border-zinc-200 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#52525B] flex items-center gap-1.5">
+                      <Calculator size={13} className="text-[#D97706]" />
+                      Kalkulator Margin Keuntungan Ritel
+                    </span>
+                    <span
+                      className={`font-mono text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${liveCogs.status.badgeClass}`}
+                    >
+                      Status: {liveCogs.status.label} ({liveCogs.grossMarginPct}%)
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2.5">
+                    <div className="bg-white border border-zinc-200 rounded-xl p-3">
+                      <span className="font-mono text-[9px] font-bold uppercase text-[#52525B] block">
+                        Harga Kulakan
+                      </span>
+                      <span className="font-mono text-sm font-extrabold text-[#141414]">
+                        Rp {liveCogs.cogs.toLocaleString('id-ID')}
+                      </span>
+                    </div>
+                    <div className="bg-white border border-zinc-200 rounded-xl p-3">
+                      <span className="font-mono text-[9px] font-bold uppercase text-[#52525B] block">
+                        Laba / {formData.unit || 'unit'}
+                      </span>
+                      <span className={`font-mono text-sm font-extrabold ${liveCogs.status.textClass}`}>
+                        Rp {liveCogs.grossProfit.toLocaleString('id-ID')}
+                      </span>
+                    </div>
+                    <div className="bg-white border border-zinc-200 rounded-xl p-3">
+                      <span className="font-mono text-[9px] font-bold uppercase text-[#52525B] block">
+                        Margin Ritel
+                      </span>
+                      <span className={`font-mono text-sm font-extrabold ${liveCogs.status.textClass}`}>
+                        {liveCogs.grossMarginPct}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
             <div className="space-y-3 pt-2 border-t border-zinc-100">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -476,6 +675,7 @@ export default function MenuFormModal({
                 </>
               )}
             </div>
+            )}
           </div>
 
           {/* Footer Modal */}
@@ -491,7 +691,7 @@ export default function MenuFormModal({
               type="submit"
               className="px-6 py-3 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] text-xs font-extrabold shadow-sm inline-flex items-center gap-2 transition-all cursor-pointer active:scale-95"
             >
-              <Check size={16} /> {editingProduct ? 'Simpan Perubahan' : 'Simpan Menu Baru'}
+              <Check size={16} /> {editingProduct ? 'Simpan Perubahan' : isRetailMode ? 'Simpan Produk Ritel' : 'Simpan Menu Baru'}
             </button>
           </div>
         </form>

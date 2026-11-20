@@ -73,6 +73,40 @@ export function computeBomRequirementsForItems(items = [], ingredients = []) {
 }
 
 /**
+ * Hitung kebutuhan pengurangan stok SKU barang jadi langsung (untuk mode Ritel).
+ */
+export function computeRetailSkuRequirementsForItems(items = [], products = [], businessType = 'fnb') {
+  const reqMap = new Map();
+
+  (items || []).forEach((item) => {
+    const qty = Number(item?.qty) || 0;
+    if (qty <= 0) return;
+
+    const matchedProd =
+      products.find((p) => String(p.id) === String(item.id)) || item;
+    const hasBom = Array.isArray(matchedProd?.recipe) && matchedProd.recipe.length > 0;
+    const isRetailItem =
+      matchedProd?.productMode === 'retail' || (businessType === 'retail' && !hasBom);
+
+    if (!isRetailItem) return;
+
+    const key = String(matchedProd.id);
+    const prev = reqMap.get(key) || {
+      productId: matchedProd.id,
+      productName: matchedProd.name,
+      sku: matchedProd.sku || '',
+      unit: matchedProd.unit || 'pcs',
+      purchasePrice: Number(matchedProd.purchasePrice || 0),
+      amount: 0
+    };
+    prev.amount = Number((prev.amount + qty).toFixed(3));
+    reqMap.set(key, prev);
+  });
+
+  return Array.from(reqMap.values());
+}
+
+/**
  * Hitung total kerugian HPP (waste_cost) dari daftar item pesanan.
  */
 export function calculateOrderItemsWasteCost(items = [], ingredients = []) {
