@@ -1,3 +1,4 @@
+import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   Plus,
@@ -5,15 +6,45 @@ import {
   X,
   Tag,
   Image,
+  Upload,
   Layers,
   Trash2,
   UtensilsCrossed,
   Check,
   Lock,
   Calculator,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
 import { calculateMenuCogs } from '../../../utils/cogsCalculator';
+
+function compressImageToDataUrl(file, maxDimension = 640, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Gagal membaca file gambar.'));
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onerror = () => reject(new Error('Format gambar tidak valid atau rusak.'));
+      img.onload = () => {
+        const scale = Math.min(1, maxDimension / Math.max(img.width, img.height));
+        const width = Math.max(1, Math.round(img.width * scale));
+        const height = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(String(reader.result));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function MenuFormModal({
   isOpen,
@@ -26,9 +57,41 @@ export default function MenuFormModal({
   subscriptionPlan = 'pro',
   onUpgradePlan
 }) {
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const fileInputRef = useRef(null);
+
   if (!isOpen) return null;
 
   const isStarter = subscriptionPlan === 'starter';
+
+  const handleImageFileSelect = async (file) => {
+    if (!file) return;
+    setUploadError('');
+
+    if (!file.type.startsWith('image/')) {
+      setUploadError('File harus berupa gambar (JPG, PNG, atau WebP).');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError('Ukuran file maksimal 10 MB.');
+      return;
+    }
+
+    setIsUploadingImage(true);
+    try {
+      const compressedDataUrl = await compressImageToDataUrl(file);
+      setFormData((prev) => ({ ...prev, image: compressedDataUrl }));
+    } catch (err) {
+      setUploadError(err.message || 'Gagal memproses foto produk.');
+    } finally {
+      setIsUploadingImage(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
   const handleAddRecipeRow = () => {
     setFormData({
@@ -163,28 +226,75 @@ export default function MenuFormModal({
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-bold text-[#52525B] mb-1.5">URL Foto Produk</label>
-                  <div className="flex items-center gap-3">
-                    <div className="relative flex-1">
-                      <Image size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
-                      <input
-                        type="text"
-                        placeholder="https://images.unsplash.com/..."
-                        value={formData.image}
-                        onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                        className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl pl-11 pr-4 py-3 text-xs font-semibold text-[#141414] placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all"
-                      />
+                  <label className="block text-[11px] font-bold text-[#52525B] mb-1.5">
+                    Foto Produk (Upload Gambar)
+                  </label>
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/*"
+                    onChange={(e) => handleImageFileSelect(e.target.files?.[0])}
+                    className="hidden"
+                  />
+
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-[#FAFAFA] border border-dashed border-zinc-300 rounded-2xl p-3.5">
+                    <div className="w-16 h-16 rounded-xl bg-white border border-zinc-200 overflow-hidden shrink-0 flex items-center justify-center">
+                      {formData.image ? (
+                        <img
+                          src={formData.image}
+                          alt="Preview Menu"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Image size={22} className="text-zinc-300" />
+                      )}
                     </div>
-                    {formData.image && (
-                      <img
-                        src={formData.image}
-                        alt="Preview"
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                        }}
-                        className="w-11 h-11 rounded-xl object-cover border border-zinc-200 shrink-0 bg-zinc-100"
-                      />
-                    )}
+
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <p className="text-xs font-bold text-[#141414]">
+                        {formData.image ? 'Foto menu siap digunakan' : 'Belum ada foto menu dipilih'}
+                      </p>
+                      <p className="text-[11px] text-[#52525B] font-medium">
+                        Unggah gambar JPG, PNG, atau WebP (otomatis dikompres agar cepat di POS &amp; Kiosk).
+                      </p>
+                      {uploadError && (
+                        <p className="text-[11px] font-bold text-red-600">{uploadError}</p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        disabled={isUploadingImage}
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-3.5 py-2 rounded-xl bg-[#141414] hover:bg-zinc-800 text-[#F59E0B] text-xs font-extrabold inline-flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
+                      >
+                        {isUploadingImage ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin" /> Memproses...
+                          </>
+                        ) : (
+                          <>
+                            <Upload size={14} /> {formData.image ? 'Ganti Foto' : 'Upload Foto'}
+                          </>
+                        )}
+                      </button>
+
+                      {formData.image && (
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, image: '' })}
+                          className="px-2.5 py-2 rounded-xl bg-white hover:bg-red-50 border border-zinc-200 hover:border-red-200 text-[#52525B] hover:text-red-600 text-xs font-bold cursor-pointer transition-colors"
+                          title="Hapus foto"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

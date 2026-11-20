@@ -25,12 +25,14 @@ import {
   Search,
   Monitor,
   Clock,
-  MapPin
+  MapPin,
+  Edit3
 } from 'lucide-react';
 import {
   fetchStaffProfiles,
   createSingleEmployeeAccount,
   setEmployeeActiveStatus,
+  updateEmployeeProfile,
   deleteEmployeeRole,
   fetchEmployeeLoginSessions
 } from '../../../services/employeeAuditService';
@@ -57,6 +59,9 @@ export default function EmployeeModule({
   const [confirmDeleteEmp, setConfirmDeleteEmp] = useState(null);
   const [statusModalEmp, setStatusModalEmp] = useState(null);
   const [statusReason, setStatusReason] = useState('');
+  const [editingEmp, setEditingEmp] = useState(null);
+  const [editError, setEditError] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // Filter daftar karyawan berdasarkan nama, role, dan status
   const [searchName, setSearchName] = useState('');
@@ -248,6 +253,60 @@ export default function EmployeeModule({
         : `Akun ${emp.fullName} dinonaktifkan. Seluruh riwayat audit & transaksi tetap tersimpan aman.`
     );
     setTimeout(() => setSuccessMsg(''), 4000);
+  };
+
+  const handleOpenEditEmployee = (emp) => {
+    setEditError('');
+    setEditingEmp({
+      ...emp,
+      editFullName: emp.fullName || '',
+      editRole: emp.role || 'kasir',
+      editOutlet: emp.outletName || 'Cabang Utama - Makassar'
+    });
+  };
+
+  const handleSaveEditEmployee = async (e) => {
+    e.preventDefault();
+    if (!editingEmp) return;
+    setEditError('');
+
+    const isSuperadminTarget = (editingEmp.role || '').toLowerCase() === 'superadmin';
+    if (isStarter && !isSuperadminTarget && editingEmp.editRole === 'stocker') {
+      setEditError('Jabatan Stocker Gudang memerlukan Paket Pro / Enterprise.');
+      return;
+    }
+
+    setIsSavingEdit(true);
+    const result = await updateEmployeeProfile({
+      employee: editingEmp,
+      fullName: editingEmp.editFullName,
+      role: editingEmp.editRole,
+      outletName: editingEmp.editOutlet,
+      existingEmployees: employees
+    });
+
+    if (!result.success) {
+      setEditError(result.message || 'Gagal memperbarui data karyawan.');
+      setIsSavingEdit(false);
+      return;
+    }
+
+    await onRecordAudit?.({
+      actionType: 'Account Status',
+      entityType: 'employee',
+      entityId: editingEmp.id || editingEmp.email,
+      entityName: result.employee.fullName,
+      beforeValue: `${editingEmp.fullName || editingEmp.email} (${editingEmp.role} • ${editingEmp.outletName})`,
+      afterValue: `${result.employee.fullName} (${result.employee.role} • ${result.employee.outletName})`,
+      deltaLabel: 'Pembaruan Profil Karyawan',
+      reason: 'Edit nama lengkap, jabatan, atau penempatan outlet karyawan'
+    });
+
+    await refreshEmployees();
+    setIsSavingEdit(false);
+    setEditingEmp(null);
+    setSuccessMsg(`Profil karyawan "${result.employee.fullName}" berhasil diperbarui!`);
+    setTimeout(() => setSuccessMsg(''), 3500);
   };
 
   const handleConfirmDelete = async () => {
@@ -648,14 +707,33 @@ export default function EmployeeModule({
                         </td>
                         <td className="p-4 text-right pr-6">
                           {isSuperadmin ? (
-                            <span
-                              title="Akun Superadmin tidak dapat dinonaktifkan atau dihapus"
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#FAFAFA] border border-zinc-200 font-mono text-[10px] font-bold text-[#52525B] ml-auto select-none"
-                            >
-                              <Lock size={11} className="text-[#D97706]" /> Dilindungi
-                            </span>
+                            <div className="inline-flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditEmployee(emp)}
+                                className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-[#141414] text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer transition-colors"
+                                title="Edit Nama / Outlet Superadmin"
+                              >
+                                <Edit3 size={13} className="text-[#D97706]" /> Edit
+                              </button>
+                              <span
+                                title="Akun Superadmin tidak dapat dinonaktifkan atau dihapus"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#FAFAFA] border border-zinc-200 font-mono text-[10px] font-bold text-[#52525B] select-none"
+                              >
+                                <Lock size={11} className="text-[#D97706]" /> Dilindungi
+                              </span>
+                            </div>
                           ) : (
                             <div className="inline-flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditEmployee(emp)}
+                                className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-[#141414] text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer transition-colors"
+                                title="Edit Nama, Jabatan, atau Outlet"
+                              >
+                                <Edit3 size={13} className="text-[#D97706]" /> Edit
+                              </button>
+
                               <button
                                 type="button"
                                 onClick={() => {
@@ -796,6 +874,156 @@ export default function EmployeeModule({
           </div>
         </div>
       )}
+
+      {/* MODAL EDIT DATA KARYAWAN */}
+      <AnimatePresence>
+        {editingEmp && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !isSavingEdit && setEditingEmp(null)}
+              className="fixed inset-0 bg-zinc-950/50 backdrop-blur-sm cursor-pointer"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              className="relative w-full max-w-md bg-white rounded-3xl p-6 border border-zinc-200 shadow-2xl z-10 space-y-4"
+            >
+              <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#FEF3C7] border border-[#FDE68A] text-[#B45309] flex items-center justify-center">
+                    <Edit3 size={18} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-[#141414] text-base">
+                      Edit Data Karyawan
+                    </h3>
+                    <p className="text-[11px] text-[#52525B] font-medium">
+                      Perbarui nama lengkap pribadi, jabatan, atau penempatan outlet.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingEmp(null)}
+                  className="w-8 h-8 rounded-full bg-[#FAFAFA] hover:bg-zinc-200 border border-zinc-200 flex items-center justify-center text-[#52525B] cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEditEmployee} className="space-y-4">
+                {editError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-bold p-3 rounded-xl">
+                    {editError}
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[#52525B] mb-1">
+                    Email Login Akun
+                  </label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={editingEmp.email}
+                    className="w-full bg-zinc-100 border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-[#52525B] cursor-not-allowed"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[#141414] mb-1">
+                    Nama Lengkap Karyawan <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: Siti Rahmawati"
+                    value={editingEmp.editFullName}
+                    onChange={(e) =>
+                      setEditingEmp({ ...editingEmp, editFullName: e.target.value })
+                    }
+                    className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#141414] focus:outline-none focus:bg-white focus:border-[#F59E0B]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#141414] mb-1">
+                      Jabatan (Role)
+                    </label>
+                    <select
+                      value={editingEmp.editRole}
+                      disabled={(editingEmp.role || '').toLowerCase() === 'superadmin'}
+                      onChange={(e) =>
+                        setEditingEmp({ ...editingEmp, editRole: e.target.value })
+                      }
+                      className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl px-3 py-2.5 text-xs font-bold text-[#141414] disabled:opacity-60"
+                    >
+                      {(editingEmp.role || '').toLowerCase() === 'superadmin' ? (
+                        <option value="superadmin">Superadmin (Dilindungi)</option>
+                      ) : (
+                        <>
+                          <option value="kasir">Kasir POS</option>
+                          <option value="stocker">Stocker Gudang</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#141414] mb-1">
+                      Penempatan Outlet
+                    </label>
+                    <select
+                      value={editingEmp.editOutlet}
+                      onChange={(e) =>
+                        setEditingEmp({ ...editingEmp, editOutlet: e.target.value })
+                      }
+                      className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl px-3 py-2.5 text-xs font-bold text-[#141414]"
+                    >
+                      {OUTLET_OPTIONS.map((out) => (
+                        <option key={out} value={out}>
+                          {out}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-zinc-100">
+                  <button
+                    type="button"
+                    disabled={isSavingEdit}
+                    onClick={() => setEditingEmp(null)}
+                    className="px-4 py-2.5 rounded-xl bg-white border border-zinc-200 text-xs font-bold text-[#52525B] cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingEdit}
+                    className="px-5 py-2.5 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] text-xs font-extrabold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {isSavingEdit ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" /> Menyimpan...
+                      </>
+                    ) : (
+                      <>
+                        <Check size={14} /> Simpan Perubahan
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* MODAL NONAKTIFKAN / AKTIFKAN KARYAWAN (ARSIp AUDIT AMAN) */}
       <AnimatePresence>

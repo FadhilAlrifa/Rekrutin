@@ -24,7 +24,7 @@ export default function MenuManagementModule({
     category: 'Minuman',
     price: '',
     expiryDate: '25 Oct 2026',
-    image: 'https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&w=500&q=80',
+    image: '',
     recipe: [{ name: '', qty: '', unit: 'gram' }]
   });
 
@@ -58,7 +58,7 @@ export default function MenuManagementModule({
       category: 'Minuman',
       price: '',
       expiryDate: '25 Oct 2026',
-      image: 'https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&w=500&q=80',
+      image: '',
       recipe: [{ name: '', qty: '', unit: 'gram' }]
     });
     setIsModalOpen(true);
@@ -101,7 +101,7 @@ export default function MenuManagementModule({
       category: formData.category,
       price: Number(formData.price),
       expiry_date: formData.expiryDate || null,
-      image: formData.image,
+      image: formData.image || '/logo-stocko.png',
       recipe: cleanRecipe
     };
 

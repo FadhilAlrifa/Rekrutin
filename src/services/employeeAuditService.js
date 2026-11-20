@@ -3,7 +3,7 @@ import { fetchEmployees, deleteEmployeeRole } from './stockoService.js';
 
 const EMPLOYEE_PROFILES_STORAGE_KEY = 'stocko_employee_profiles_v1';
 const EMPLOYEE_SESSIONS_STORAGE_KEY = 'stocko_employee_sessions_v1';
-const UNAVAILABLE_TABLES_KEY = 'stocko_unavailable_tables_v1';
+const unavailableTablesSet = new Set();
 
 const GENERIC_SHARED_NAME_REGEX =
   /^(kasir|cashier|stocker|gudang|admin|superadmin|staff|karyawan|team|shared|umum|bersama|shift|akun|operator|user|demo)(\s*\d*)$/i;
@@ -26,23 +26,11 @@ function writeLocalJson(key, value) {
 }
 
 function isTableUnavailable(table) {
-  try {
-    const list = JSON.parse(window.sessionStorage.getItem(UNAVAILABLE_TABLES_KEY) || '[]');
-    return list.includes(table);
-  } catch {
-    return false;
-  }
+  return unavailableTablesSet.has(table);
 }
 
 function markTableUnavailable(table) {
-  try {
-    const list = JSON.parse(window.sessionStorage.getItem(UNAVAILABLE_TABLES_KEY) || '[]');
-    if (!list.includes(table)) {
-      window.sessionStorage.setItem(UNAVAILABLE_TABLES_KEY, JSON.stringify([...list, table]));
-    }
-  } catch {
-    // Abaikan
-  }
+  unavailableTablesSet.add(table);
 }
 
 function isMissingResourceError(error) {
@@ -308,6 +296,83 @@ export async function setEmployeeActiveStatus(emp, isActive, reason = '') {
     isActive: Boolean(isActive),
     status: nextStatus,
     reason: cleanReason
+  };
+}
+
+/**
+ * Perbarui profil nama lengkap, penempatan outlet, dan jabatan karyawan (tetap menjaga aturan 1 akun = 1 karyawan).
+ */
+export async function updateEmployeeProfile({
+  employee,
+  fullName,
+  role,
+  outletName = 'Cabang Utama - Makassar',
+  existingEmployees = []
+}) {
+  if (!employee) return { success: false, message: 'Data karyawan tidak ditemukan.' };
+
+  const isSuperadmin = (employee.role || '').toLowerCase() === 'superadmin';
+  const nameValidation = validatePersonalEmployeeName(
+    fullName,
+    existingEmployees,
+    employee.email
+  );
+  if (!nameValidation.valid) {
+    return { success: false, message: nameValidation.message };
+  }
+
+  const cleanName = nameValidation.cleanName;
+  const resolvedRole = isSuperadmin ? 'superadmin' : role || employee.role || 'kasir';
+  const resolvedOutlet = outletName || employee.outletName || 'Cabang Utama - Makassar';
+  const emailKey = String(employee.email || '').toLowerCase();
+
+  const localMap = readLocalJson(EMPLOYEE_PROFILES_STORAGE_KEY, {});
+  localMap[emailKey] = {
+    ...(localMap[emailKey] || {}),
+    fullName: cleanName,
+    outletName: resolvedOutlet,
+    isActive: employee.isActive !== false,
+    status: employee.status || (employee.isActive !== false ? 'active' : 'inactive')
+  };
+  writeLocalJson(EMPLOYEE_PROFILES_STORAGE_KEY, localMap);
+
+  let dbUpdated = false;
+  if (!isTableUnavailable('user_roles.extended')) {
+    const patch = {
+      full_name: cleanName,
+      outlet_name: resolvedOutlet,
+      ...(isSuperadmin ? {} : { role: resolvedRole })
+    };
+
+    const query = employee.id
+      ? supabase.from('user_roles').update(patch).eq('id', employee.id).select()
+      : supabase.from('user_roles').update(patch).eq('email', employee.email).select();
+
+    const { data, error } = await query;
+    if (error) {
+      if (isMissingResourceError(error)) {
+        markTableUnavailable('user_roles.extended');
+        // Tetap coba update role saja bila bukan superadmin dan kolom extended belum dimigrasi
+        if (!isSuperadmin && employee.id) {
+          await supabase.from('user_roles').update({ role: resolvedRole }).eq('id', employee.id);
+        }
+      } else {
+        return { success: false, message: error.message };
+      }
+    } else if (Array.isArray(data) && data.length > 0) {
+      dbUpdated = true;
+    }
+  }
+
+  return {
+    success: true,
+    dbUpdated,
+    employee: {
+      ...employee,
+      fullName: cleanName,
+      role: resolvedRole,
+      outletName: resolvedOutlet
+    }
   };
 }
 

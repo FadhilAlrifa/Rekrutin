@@ -35,7 +35,8 @@ import {
   recordAuditLog,
   fetchStockMovements,
   recordStockMovement,
-  fetchSeasonalEvents
+  fetchSeasonalEvents,
+  clearUnavailableTablesCache
 } from './services/stockoService';
 import {
   fetchStaffProfiles,
@@ -72,8 +73,30 @@ export default function App() {
   const [stockMovements, setStockMovements] = useState([]);
   const [seasonalEvents, setSeasonalEvents] = useState(DEFAULT_SEASONAL_EVENTS);
   const [staffProfiles, setStaffProfiles] = useState([]);
+  const [isRefreshingAudit, setIsRefreshingAudit] = useState(false);
   const [authNotice, setAuthNotice] = useState('');
   const activeSessionIdRef = useRef(null);
+
+  const refreshAuditData = async () => {
+    setIsRefreshingAudit(true);
+    clearUnavailableTablesCache();
+    const [dbAudit, dbMovements, staffRes] = await Promise.all([
+      fetchAuditLogs(),
+      fetchStockMovements(),
+      fetchStaffProfiles()
+    ]);
+    if (Array.isArray(dbAudit)) setAuditLogs(dbAudit);
+    if (Array.isArray(dbMovements)) setStockMovements(dbMovements);
+    if (staffRes?.success && Array.isArray(staffRes.data)) setStaffProfiles(staffRes.data);
+    setIsRefreshingAudit(false);
+  };
+
+  const handleChangeTab = (tabId) => {
+    setActiveTab(tabId);
+    if (tabId === 'audit-trail') {
+      refreshAuditData();
+    }
+  };
 
   // State Paket Langganan ('starter' | 'pro' | 'enterprise') - Default 'pro' (Core Product)
   const [subscriptionPlan, setSubscriptionPlan] = useState('pro');
@@ -822,7 +845,7 @@ export default function App() {
               {/* Navbar Samping */}
               <DashboardNavbar
                 activeTab={activeTab}
-                setActiveTab={setActiveTab}
+                setActiveTab={handleChangeTab}
                 alertCount={alertCount}
                 lowStockCount={lowStockCount}
                 userRole={userRole}
@@ -1120,6 +1143,8 @@ export default function App() {
                             auditLogs={auditLogs}
                             stockMovements={stockMovements}
                             staffProfiles={staffProfiles}
+                            onRefresh={refreshAuditData}
+                            isRefreshing={isRefreshingAudit}
                           />
                         ))}
                     </motion.div>

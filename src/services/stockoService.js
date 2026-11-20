@@ -9,34 +9,24 @@ const AUDIT_LOGS_STORAGE_KEY = 'stocko_audit_logs_v1';
 const STOCK_MOVEMENTS_STORAGE_KEY = 'stocko_stock_movements_v1';
 const SEASONAL_EVENTS_STORAGE_KEY = 'stocko_seasonal_events_v1';
 const TX_META_STORAGE_KEY = 'stocko_tx_metadata_v1';
-const UNAVAILABLE_TABLES_KEY = 'stocko_unavailable_tables_v1';
 const unavailableTablesSet = new Set();
 const inFlightTableQueries = new Map();
 
-function markTableUnavailable(table) {
-  unavailableTablesSet.add(table);
+export function clearUnavailableTablesCache() {
+  unavailableTablesSet.clear();
   try {
-    const existing = JSON.parse(window.sessionStorage.getItem(UNAVAILABLE_TABLES_KEY) || '[]');
-    if (!existing.includes(table)) {
-      window.sessionStorage.setItem(UNAVAILABLE_TABLES_KEY, JSON.stringify([...existing, table]));
-    }
-  } catch {
-    // Abaikan jika sessionStorage dibatasi browser
-  }
-}
-
-function isTableKnownUnavailable(table) {
-  if (unavailableTablesSet.has(table)) return true;
-  try {
-    const existing = JSON.parse(window.sessionStorage.getItem(UNAVAILABLE_TABLES_KEY) || '[]');
-    if (existing.includes(table)) {
-      unavailableTablesSet.add(table);
-      return true;
-    }
+    window.sessionStorage.removeItem('stocko_unavailable_tables_v1');
   } catch {
     // Abaikan
   }
-  return false;
+}
+
+function markTableUnavailable(table) {
+  unavailableTablesSet.add(table);
+}
+
+function isTableKnownUnavailable(table) {
+  return unavailableTablesSet.has(table);
 }
 
 function isMissingTableError(error) {

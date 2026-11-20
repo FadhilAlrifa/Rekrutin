@@ -9,7 +9,8 @@ import {
   AlertTriangle,
   Package,
   ClipboardList,
-  Briefcase
+  Briefcase,
+  RefreshCw
 } from 'lucide-react';
 
 const ACTION_BADGES = {
@@ -60,7 +61,9 @@ function matchesRoleFilter(rowRole, selectedRole) {
 export default function AuditTrailModule({
   auditLogs = [],
   stockMovements = [],
-  staffProfiles = []
+  staffProfiles = [],
+  onRefresh,
+  isRefreshing = false
 }) {
   const [activeSubTab, setActiveSubTab] = useState('audit'); // 'audit' | 'movements'
   const [searchQuery, setSearchQuery] = useState('');
@@ -191,7 +194,19 @@ export default function AuditTrailModule({
           </p>
         </div>
 
-        <div className="flex items-center bg-zinc-200/70 p-1 rounded-xl shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {onRefresh && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className="bg-white hover:bg-zinc-100 border border-zinc-200 text-[#141414] font-bold text-xs px-3.5 py-2 rounded-xl inline-flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-60"
+            >
+              <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+              Muat Ulang
+            </button>
+          )}
+          <div className="flex items-center bg-zinc-200/70 p-1 rounded-xl">
           <button
             type="button"
             onClick={() => setActiveSubTab('audit')}
@@ -214,6 +229,7 @@ export default function AuditTrailModule({
           >
             <Package size={14} /> Stock Movements ({filteredMovements.length})
           </button>
+          </div>
         </div>
       </div>
 
