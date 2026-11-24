@@ -28,23 +28,23 @@ gsap.registerPlugin(ScrollTrigger, useGSAP);
 const SCROLL_STEPS = [
   {
     num: '01',
-    badge: 'Front-of-House Speed',
+    badge: 'Kasir & QR Meja',
     title: 'Transaksi Kasir & QR Meja Instan',
-    desc: 'Pesanan masuk dari layar kasir utama maupun pemindaian QR mandiri dari meja pelanggan. Sistem otomatis memvalidasi kecukupan bahan baku sebelum pembayaran dikunci.',
+    desc: 'Pesanan masuk dari kasir atau scan QR di meja pelanggan. Sistem langsung cek apakah bahan baku cukup sebelum pembayaran diproses.',
     icon: Store
   },
   {
     num: '02',
-    badge: 'Automated BOM Engine',
-    title: 'Konversi & Potong Resep Real-Time',
-    desc: 'Begitu transaksi selesai, mesin Bill of Materials mengonversi satuan gram/ml ke kg/liter hingga presisi 3 desimal dan memotong stok gudang detik itu juga.',
+    badge: 'Potong Stok Resep',
+    title: 'Stok Gudang Terpotong Otomatis',
+    desc: 'Begitu transaksi selesai, sistem langsung menghitung takaran resep (gram/ml ke kg/liter) dan memotong stok bahan di gudang.',
     icon: Layers
   },
   {
     num: '03',
-    badge: 'FEFO & Multi-Outlet Sync',
-    title: 'Peringatan Dini FEFO & Audit Terpusat',
-    desc: 'Batch bahan baku yang mendekati kedaluwarsa (≤ 30 hari) diprioritaskan lebih dulu, sementara riwayat mutasi stok dan laporan omzet tersinkronisasi ke seluruh cabang.',
+    badge: 'Kedaluwarsa & Cabang',
+    title: 'Pengingat Bahan Hampir Basi & Laporan Cabang',
+    desc: 'Bahan yang paling dekat tanggal kedaluwarsanya (≤ 30 hari) diingatkan untuk dipakai duluan, dan laporan semua cabang langsung terkumpul jadi satu.',
     icon: ShieldCheck
   }
 ];
@@ -168,7 +168,7 @@ export default function WhyChooseUs() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end pb-6 border-b border-zinc-800">
             <div className="lg:col-span-8 space-y-3">
               <span className="why-sub-reveal font-mono text-xs uppercase tracking-[0.2em] text-[#F59E0B] block gpu-accelerated">
-                [ 02 // PINNED ARCHITECTURE & AKURASI 99.9% ]
+                [ 02 // CARA KERJA ]
               </span>
               <h2
                 ref={headingRef}
@@ -176,16 +176,16 @@ export default function WhyChooseUs() {
               >
                 <MaskedWords
                   segments={[
-                    { text: 'Bukan Sekadar Kasir.' },
-                    { text: 'Kendali Penuh', className: 'font-serif italic font-normal text-[#F59E0B]' },
-                    { text: 'Gudang Anda.' }
+                    { text: 'Dari Meja Kasir,' },
+                    { text: 'Stok Gudang', className: 'font-serif italic font-normal text-[#F59E0B]' },
+                    { text: 'Ikut Terjaga.' }
                   ]}
                 />
               </h2>
             </div>
             <div className="lg:col-span-4 why-sub-reveal gpu-accelerated">
               <p className="text-zinc-400 font-medium text-xs sm:text-sm leading-relaxed">
-                Gulir layar ke bawah (atau ketuk tiap tahap di mobile) untuk menelusuri alur sinkronisasi 3 tahap dari meja kasir hingga stok gudang.
+                Scroll ke bawah (atau ketuk tiap langkah di HP) untuk melihat bagaimana transaksi kasir terhubung langsung ke stok gudang.
               </p>
             </div>
           </div>
@@ -242,13 +242,13 @@ export default function WhyChooseUs() {
                       </div>
                       <div>
                         <span className="font-mono text-[10px] uppercase tracking-wider text-[#F59E0B]">
-                          STAGE 01 // POS & KIOSK
+                          TAHAP 01 // KASIR & QR MEJA
                         </span>
                         <h4 className="text-base font-bold text-[#FAFAFA]">Pesanan Masuk #ORD-8821</h4>
                       </div>
                     </div>
                     <span className="font-mono text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-3 py-1 rounded-full">
-                      QRIS Verified
+                      QRIS Lunas
                     </span>
                   </div>
 
@@ -271,7 +271,7 @@ export default function WhyChooseUs() {
 
                   <div className="bg-emerald-950/40 border border-emerald-800/50 rounded-xl p-3.5 flex items-center justify-between text-xs">
                     <span className="text-emerald-300 font-semibold flex items-center gap-2">
-                      <CheckCircle2 size={15} /> Cross-Menu Stock Check: Tersedia
+                      <CheckCircle2 size={15} /> Cek Stok Bahan: Tersedia
                     </span>
                     <span className="font-mono font-bold text-[#FAFAFA]">Total: Rp 69.000</span>
                   </div>
@@ -286,9 +286,9 @@ export default function WhyChooseUs() {
                       </div>
                       <div>
                         <span className="font-mono text-[10px] uppercase tracking-wider text-[#F59E0B]">
-                          STAGE 02 // AUTOMATED BOM
+                          TAHAP 02 // HITUNG TAKARAN RESEP
                         </span>
-                        <h4 className="text-base font-bold text-[#FAFAFA]">Kalkulasi & Pemotongan Gramasi</h4>
+                        <h4 className="text-base font-bold text-[#FAFAFA]">Hitung & Potong Takaran Bahan</h4>
                       </div>
                     </div>
                     <span className="font-mono text-xs font-bold text-[#141414] bg-[#F59E0B] px-3 py-1 rounded-full">
@@ -318,10 +318,10 @@ export default function WhyChooseUs() {
                     <div className="flex items-center gap-2.5">
                       <Package size={16} className="text-[#F59E0B]" />
                       <span className="font-semibold text-zinc-200">
-                        Database gudang diperbarui otomatis tanpa jeda
+                        Stok gudang langsung terupdate otomatis
                       </span>
                     </div>
-                    <span className="text-emerald-400 font-mono font-bold">0% Human Error</span>
+                    <span className="text-emerald-400 font-mono font-bold">Tanpa Hitung Manual</span>
                   </div>
                 </div>
 
@@ -334,9 +334,9 @@ export default function WhyChooseUs() {
                       </div>
                       <div>
                         <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-400">
-                          STAGE 03 // FEFO & MULTI-OUTLET
+                          TAHAP 03 // KEDALUWARSA & CABANG
                         </span>
-                        <h4 className="text-base font-bold text-[#FAFAFA]">Proteksi Kedaluwarsa & Sinkronisasi</h4>
+                        <h4 className="text-base font-bold text-[#FAFAFA]">Pengingat Kedaluwarsa & Sinkronisasi Cabang</h4>
                       </div>
                     </div>
                     <span className="font-mono text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-3 py-1 rounded-full">
@@ -359,9 +359,9 @@ export default function WhyChooseUs() {
                     <div className="bg-[#111111] border border-zinc-800 rounded-xl p-4 space-y-1.5">
                       <div className="flex items-center justify-between text-xs font-bold text-emerald-400">
                         <span className="flex items-center gap-1.5">
-                          <Building2 size={14} /> Central Kitchen
+                          <Building2 size={14} /> Semua Cabang
                         </span>
-                        <span className="font-mono">Live</span>
+                        <span className="font-mono">Aktif</span>
                       </div>
                       <p className="text-sm font-bold text-[#FAFAFA]">Makassar • Bandung • Jakarta</p>
                       <p className="text-[11px] text-zinc-400">Laporan & mutasi terpusat</p>
@@ -370,7 +370,7 @@ export default function WhyChooseUs() {
 
                   <div className="bg-[#111111] border border-zinc-800 rounded-xl p-4 flex items-center justify-between text-xs">
                     <span className="text-zinc-300 font-semibold flex items-center gap-2">
-                      <TrendingUp size={15} className="text-emerald-400" /> Rekonsiliasi Kasir vs Gudang
+                      <TrendingUp size={15} className="text-emerald-400" /> Cocokkan Kasir & Gudang
                     </span>
                     <span className="font-mono font-bold text-[#F59E0B]">Selisih: Rp 0</span>
                   </div>
@@ -390,9 +390,9 @@ export default function WhyChooseUs() {
                 <SlidersHorizontal size={18} />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-[#FAFAFA]">Simulasi Dampak Operasional</h3>
+                <h3 className="text-xl font-bold text-[#FAFAFA]">Perbandingan Cara Lama vs Stocko</h3>
                 <p className="text-xs text-zinc-400">
-                  Bandingkan indikator efisiensi antara pencatatan konvensional dan Stocko.
+                  Lihat bedanya mencatat stok secara manual dibandingkan pakai Stocko.
                 </p>
               </div>
             </div>
@@ -400,7 +400,7 @@ export default function WhyChooseUs() {
             <div className="inline-flex bg-[#111111] p-1 rounded-full border border-zinc-800 self-start">
               {[
                 { id: 'manual', label: 'Cara Manual' },
-                { id: 'stocko', label: 'Otomatisasi Stocko' }
+                { id: 'stocko', label: 'Pakai Stocko' }
               ].map((tab) => {
                 const active = mode === tab.id;
                 return (

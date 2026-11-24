@@ -235,7 +235,7 @@ export default function Hero({ onOpenApp, onOpenRegister }) {
           <div className="hero-eyebrow inline-flex items-center gap-2.5 bg-white border border-zinc-200 px-4 py-1.5 rounded-full mb-8 shadow-sm gpu-accelerated">
             <span className="w-2 h-2 rounded-full bg-[#F59E0B]" />
             <span className="font-mono text-[11px] font-semibold text-[#52525B] uppercase tracking-[0.16em]">
-              SYS // SMART POS & AUTOMATED BOM ENGINE
+              Ubah transaksimu menjadi keputusan inventaris yang cerdas
             </span>
           </div>
 
@@ -291,12 +291,12 @@ export default function Hero({ onOpenApp, onOpenRegister }) {
               <span className="font-mono text-sm font-bold text-[#141414]">2,000+ UMKM</span>
             </div>
             <div className="px-6 py-4 flex items-center justify-between sm:justify-center gap-3">
-              <span className="font-mono text-xs text-[#52525B] uppercase tracking-wider">Akurasi BOM</span>
+              <span className="font-mono text-xs text-[#52525B] uppercase tracking-wider">Akurasi Stok</span>
               <span className="font-mono text-sm font-bold text-[#D97706]">99.9% Presisi</span>
             </div>
             <div className="px-6 py-4 flex items-center justify-between sm:justify-center gap-3">
-              <span className="font-mono text-xs text-[#52525B] uppercase tracking-wider">Radar FEFO</span>
-              <span className="font-mono text-sm font-bold text-emerald-700">≤ 30 Hari Alert</span>
+              <span className="font-mono text-xs text-[#52525B] uppercase tracking-wider">Cek Kedaluwarsa</span>
+              <span className="font-mono text-sm font-bold text-emerald-700">Pengingat ≤ 30 Hari</span>
             </div>
           </div>
         </div>

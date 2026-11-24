@@ -125,7 +125,7 @@ export default function Features() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pb-16 border-b border-zinc-200 mb-14 items-end">
           <div className="lg:col-span-8 space-y-4">
             <span className="features-editorial-sub font-mono text-xs uppercase tracking-[0.2em] text-[#D97706] font-bold block gpu-accelerated">
-              [ 01 // KAPABILITAS INTI ]
+              [ 01 // FITUR UTAMA ]
             </span>
             <h2
               ref={headingRef}
@@ -133,16 +133,16 @@ export default function Features() {
             >
               <MaskedWords
                 segments={[
-                  { text: 'Sistem Operasional' },
-                  { text: 'Berlapis', className: 'font-serif italic font-normal text-[#F59E0B]' },
-                  { text: 'Untuk Bisnis F&B Modern.' }
+                  { text: 'Fitur Lengkap untuk' },
+                  { text: 'Kelola Kasir', className: 'font-serif italic font-normal text-[#F59E0B]' },
+                  { text: 'dan Stok Gudang.' }
                 ]}
               />
             </h2>
           </div>
           <div className="lg:col-span-4 features-editorial-sub gpu-accelerated">
             <p className="text-sm text-[#52525B] leading-relaxed font-medium">
-              Gulir untuk menumpuk setiap modul inti. Seluruh kartu bersifat interaktif dan dapat diuji langsung di tempat.
+              Scroll ke bawah untuk melihat fitur-fiturnya. Kamu bisa coba klik langsung setiap simulasinya.
             </p>
           </div>
         </div>
@@ -163,7 +163,7 @@ export default function Features() {
                     01 / 04
                   </span>
                   <span className="font-mono text-xs text-[#52525B] uppercase tracking-widest">
-                    Automated BOM Engine
+                    Potong Stok Resep
                   </span>
                 </div>
 
@@ -257,7 +257,7 @@ export default function Features() {
                     02 / 04
                   </span>
                   <span className="font-mono text-xs text-[#52525B] uppercase tracking-widest">
-                    FIFO / FEFO Radar
+                    Pantau Kedaluwarsa
                   </span>
                 </div>
 
@@ -351,7 +351,7 @@ export default function Features() {
                     03 / 04
                   </span>
                   <span className="font-mono text-xs text-[#52525B] uppercase tracking-widest">
-                    Real-Time Reporting
+                    Laporan Penjualan
                   </span>
                 </div>
 
@@ -430,23 +430,23 @@ export default function Features() {
                     04 / 04
                   </span>
                   <span className="font-mono text-xs text-[#52525B] uppercase tracking-widest">
-                    Omnichannel POS & Kiosk
+                    Kasir & QR Meja
                   </span>
                 </div>
 
                 <h3 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#141414]">
                   Kasir Cepat &{' '}
-                  <span className="font-serif italic font-normal text-[#F59E0B]">QR Self-Order.</span>
+                  <span className="font-serif italic font-normal text-[#F59E0B]">QR Meja Mandiri.</span>
                 </h3>
 
                 <p className="text-sm text-[#52525B] leading-relaxed max-w-lg">
-                  Layani pelanggan langsung di meja kasir atau izinkan pelanggan memesan mandiri dari meja melalui QR Code tanpa perlu instal aplikasi tambahan.
+                  Layani pelanggan langsung di kasir atau biarkan pelanggan pesan sendiri dari meja lewat scan QR Code tanpa perlu instal aplikasi.
                 </p>
 
                 <div className="inline-flex bg-[#FAFAFA] p-1 rounded-full border border-zinc-200">
                   {[
                     { id: 'kasir', label: 'Kasir Utama', icon: Store },
-                    { id: 'kiosk', label: 'QR Meja Kiosk', icon: Smartphone }
+                    { id: 'kiosk', label: 'QR Meja Mandiri', icon: Smartphone }
                   ].map((ch) => {
                     const Icon = ch.icon;
                     const active = posChannel === ch.id;

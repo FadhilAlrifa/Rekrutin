@@ -23,7 +23,7 @@ export default function Footer({ onOpenRegister }) {
             </div>
 
             <p className="text-sm text-zinc-400 font-medium leading-relaxed max-w-md">
-              Sistem Smart Inventory & POS berbasis integrasi BOM dan FEFO di bawah ekosistem teknologi PT. Duluin Solusi Indonesia untuk efisiensi bisnis F&B modern.
+              Aplikasi kasir dan pengelolaan stok bahan baku dari PT. Duluin Solusi Indonesia untuk membantu operasional usaha kuliner sehari-hari.
             </p>
 
             <div className="space-y-3 text-sm font-medium pt-1">
@@ -103,7 +103,7 @@ export default function Footer({ onOpenRegister }) {
         {/* Copyright */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-2 font-mono text-xs text-zinc-500">
           <span>&copy; {new Date().getFullYear()} PT. Duluin Solusi Indonesia.</span>
-          <span>SMART POS & INVENTORY ENGINE</span>
+          <span>APLIKASI KASIR & STOK GUDANG</span>
         </div>
       </div>
 

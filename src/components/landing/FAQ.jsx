@@ -19,24 +19,24 @@ export default function FAQ() {
 
   const faqs = [
     {
-      tag: '01 // FEFO',
+      tag: '01 // KEDALUWARSA',
       q: 'Bagaimana sistem FEFO (First Expired, First Out) bekerja di Stocko?',
       a: 'Saat Anda mencatat stok masuk (restock), sistem mencatat tanggal kedaluwarsa setiap bahan baku. Stocko secara otomatis memprioritaskan bahan yang masa simpannya paling dekat (≤ 30 hari) dan menampilkan peringatan visual di modul Peringatan Gudang.'
     },
     {
-      tag: '02 // BOM',
+      tag: '02 // STOK RESEP',
       q: 'Apakah modul POS langsung terhubung dengan stok bahan mentah di gudang?',
       a: 'Ya. Setiap transaksi penjualan di meja kasir maupun QR Self-Order langsung mengonversi satuan (gram/ml ke kg/liter) dan memotong jumlah bahan baku di database melalui mesin Bill of Materials secara real-time.'
     },
     {
-      tag: '03 // VALIDASI',
+      tag: '03 // CEK BAHAN',
       q: 'Apa yang terjadi jika bahan baku di gudang tidak cukup saat kasir menginput pesanan?',
       a: 'Mesin Cross-Menu Validation Stocko menghitung akumulasi kebutuhan bahan dari seluruh item di keranjang secara kolektif. Jika ada bahan yang tidak mencukupi, sistem otomatis mengunci penambahan porsi sebelum transaksi terjadi.'
     },
     {
-      tag: '04 // RBAC',
+      tag: '04 // HAK AKSES',
       q: 'Bisakah saya memisahkan akses antara Kasir dan Staf Gudang?',
-      a: 'Tentu. Melalui sistem Role-Based Access Control (RBAC), pemilik gerai (Superadmin) dapat membuat akun khusus Kasir yang hanya membuka layar penjualan dan akun Stocker yang khusus mengelola inventaris gudang.'
+      a: 'Tentu. Melalui sistem pembagian hak akses, pemilik gerai dapat membuat akun khusus Kasir yang hanya membuka layar penjualan dan akun Stocker yang khusus mengelola inventaris gudang.'
     }
   ];
 
@@ -64,7 +64,7 @@ export default function FAQ() {
           <div className="lg:col-span-4 lg:sticky lg:top-28 space-y-6">
             <div className="space-y-3">
               <span className="faq-reveal font-mono text-xs uppercase tracking-[0.2em] text-[#D97706] font-bold block gpu-accelerated">
-                [ 05 // PUSAT INFORMASI ]
+                [ 05 // TANYA JAWAB ]
               </span>
               <h2
                 ref={headingRef}

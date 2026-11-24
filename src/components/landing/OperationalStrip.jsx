@@ -9,33 +9,33 @@ gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 const OPERATIONAL_PILLARS = [
   {
-    code: '01 // BOM ENGINE',
+    code: '01 // TAKARAN RESEP',
     metric: '0.001 kg/L',
-    title: 'Konversi Resep Presisi',
+    title: 'Potong Stok Sesuai Resep',
     desc: 'Setiap penjualan otomatis memotong gramasi & mililiter bahan baku di gudang.',
     target: 'features',
     icon: Layers
   },
   {
-    code: '02 // FEFO GUARD',
+    code: '02 // CEK KEDALUWARSA',
     metric: '≤ 30 Hari',
-    title: 'Deteksi Dini Kedaluwarsa',
-    desc: 'Prioritaskan pemakaian batch bahan tertua sebelum melewati tanggal simpan.',
+    title: 'Pengingat Bahan Hampir Basi',
+    desc: 'Prioritaskan pemakaian stok bahan yang paling cepat kedaluwarsa.',
     target: 'why-us',
     icon: Clock
   },
   {
-    code: '03 // ANTI-MINUS',
-    metric: 'Real-Time',
-    title: 'Validasi Porsi Otomatis',
-    desc: 'Menu dengan bahan baku kosong langsung terkunci di kasir & QR Self-Order.',
+    code: '03 // CEGAH STOK HABIS',
+    metric: 'Otomatis',
+    title: 'Cek Porsi Sebelum Pesan',
+    desc: 'Menu yang bahannya habis langsung tidak bisa dipesan di kasir maupun QR meja.',
     target: 'features',
     icon: ShieldCheck
   },
   {
-    code: '04 // CHECKOUT',
+    code: '04 // PEMBAYARAN',
     metric: '< 3 Detik',
-    title: 'Kasir & Struk Senyap',
+    title: 'Bayar & Cetak Struk Cepat',
     desc: 'Pembayaran QRIS, Tunai, Kartu, dan cetak struk thermal tanpa hambatan.',
     target: 'benefits',
     icon: Zap

@@ -78,7 +78,7 @@ export default function CTA({ onOpenApp, onOpenRegister }) {
       <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 text-center">
         <div className="cta-card-reveal bg-[#FAFAFA] border border-zinc-200 rounded-3xl p-8 sm:p-14 md:p-20 relative overflow-hidden space-y-7 gpu-accelerated">
           <span className="cta-reveal font-mono text-xs uppercase tracking-[0.2em] text-[#D97706] font-bold block gpu-accelerated">
-            [ READY TO DEPLOY ]
+            [ SIAP DICOBA ]
           </span>
 
           <h2
@@ -87,15 +87,15 @@ export default function CTA({ onOpenApp, onOpenRegister }) {
           >
             <MaskedWords
               segments={[
-                { text: 'Digitalisasi Kasir &' },
-                { text: 'Gudang Gerai', className: 'font-serif italic font-normal text-[#F59E0B]' },
-                { text: 'Anda Hari Ini.' }
+                { text: 'Rapikan Kasir &' },
+                { text: 'Stok Gudang', className: 'font-serif italic font-normal text-[#F59E0B]' },
+                { text: 'Usahamu Sekarang.' }
               ]}
             />
           </h2>
 
           <p className="cta-reveal text-sm sm:text-base text-[#52525B] font-medium max-w-xl mx-auto leading-relaxed gpu-accelerated">
-            Integrasikan pencatatan transaksi kasir, pemotongan bahan baku otomatis (BOM), dan peringatan kedaluwarsa FEFO dalam satu sistem terpadu.
+            Catat penjualan kasir, potong stok bahan baku otomatis, dan pantau tanggal kedaluwarsa dalam satu aplikasi.
           </p>
 
           <div className="cta-reveal flex flex-col sm:flex-row items-center justify-center gap-4 pt-2 gpu-accelerated">

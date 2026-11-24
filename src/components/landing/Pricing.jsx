@@ -54,7 +54,7 @@ export default function Pricing({ onSelectPlan, onSimulatePlan }) {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end pb-12 border-b border-zinc-200 mb-14">
           <div className="lg:col-span-7 space-y-3">
             <span className="pricing-sub-reveal font-mono text-xs uppercase tracking-[0.2em] text-[#D97706] font-bold block gpu-accelerated">
-              [ 04 // INVESTASI TRANSPARAN ]
+              [ 04 // PILIHAN PAKET ]
             </span>
             <h2
               ref={headingRef}
@@ -62,9 +62,9 @@ export default function Pricing({ onSelectPlan, onSimulatePlan }) {
             >
               <MaskedWords
                 segments={[
-                  { text: 'Skema Paket' },
-                  { text: 'Skalabel', className: 'font-serif italic font-normal text-[#F59E0B]' },
-                  { text: 'Sesuai Gerai Anda.' }
+                  { text: 'Pilih Paket' },
+                  { text: 'Sesuai', className: 'font-serif italic font-normal text-[#F59E0B]' },
+                  { text: 'Kebutuhan Usaha.' }
                 ]}
               />
             </h2>
@@ -72,7 +72,7 @@ export default function Pricing({ onSelectPlan, onSimulatePlan }) {
 
           <div className="pricing-sub-reveal lg:col-span-5 flex flex-col lg:items-end gap-4 gpu-accelerated">
             <p className="text-[#52525B] font-medium text-sm lg:text-right">
-              Mulai dari kasir mandiri hingga otomatisasi BOM dan manajemen multi-outlet terpusat.
+              Mulai dari satu kasir sampai kelola stok resep dan banyak cabang sekaligus.
             </p>
 
             {/* Billing Cycle Switcher */}
@@ -135,7 +135,7 @@ export default function Pricing({ onSelectPlan, onSimulatePlan }) {
               >
                 {plan.highlight && (
                   <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[#F59E0B] text-[#141414] font-mono text-[10px] font-extrabold uppercase tracking-wider px-4 py-1 rounded-full whitespace-nowrap inline-flex items-center gap-1.5 shadow-sm">
-                    <Award size={12} /> Core Product • Paling Populer
+                    <Award size={12} /> Paling Populer
                   </div>
                 )}
 

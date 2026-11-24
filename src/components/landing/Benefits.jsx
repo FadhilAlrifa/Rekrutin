@@ -21,41 +21,41 @@ export default function Benefits() {
   const ownerBenefits = [
     {
       title: 'Pemantauan pergerakan stok secara real-time',
-      metric: 'Live BOM Audit',
+      metric: 'Pantau Langsung',
       detail: 'Stok bahan mentah langsung berkurang mengikuti gramasi resep setiap menu yang terjual.'
     },
     {
       title: 'Peringatan dini bahan baku hampir basi (FEFO)',
-      metric: 'Zero Food Waste',
+      metric: 'Kurangi Terbuang',
       detail: 'Notifikasi otomatis ≤ 30 hari sebelum tanggal kedaluwarsa untuk rotasi stok yang tertib.'
     },
     {
       title: 'Otomatisasi laporan omzet & analitik produk terlaris',
-      metric: 'Ekspor CSV Instan',
+      metric: 'Download Laporan',
       detail: 'Rekapitulasi transaksi harian, bulanan, dan metode pembayaran tanpa olah spreadsheet manual.'
     },
     {
       title: 'Mencegah kebocoran dan selisih stok fisik vs sistem',
-      metric: 'RBAC Terkunci',
-      detail: 'Hak akses terpisah antara Superadmin, Kasir POS, dan Stocker Gudang.'
+      metric: 'Akses Terpisah',
+      detail: 'Akses akun dipisah antara Pemilik, Kasir, dan Petugas Gudang.'
     }
   ];
 
   const cashierBenefits = [
     {
-      title: 'Proses checkout transaksi secepat kilat',
+      title: 'Proses pembayaran di kasir lebih cepat',
       metric: '< 3 Detik / Order',
       detail: 'Dilengkapi tombol cepat Uang Pas, 50rb, dan 100rb untuk mempercepat antrean kasir.'
     },
     {
       title: 'Pencatatan kustomisasi pesanan (catatan dapur) akurat',
-      metric: 'Zero Salah Pesan',
+      metric: 'Minim Salah Catat',
       detail: 'Tambahkan instruksi khusus seperti kurang manis atau tanpa es langsung pada item keranjang.'
     },
     {
       title: 'Pencetakan struk instan & dukungan pembayaran digital',
       metric: 'QRIS • Tunai • Kartu',
-      detail: 'Cetak struk senyap (Silent Print) tanpa membuka tab baru yang mengganggu layar kasir.'
+      detail: 'Langsung cetak struk tanpa membuka tab baru yang mengganggu layar kasir.'
     },
     {
       title: 'Validasi stok otomatis sebelum pesanan dibuat',
@@ -87,7 +87,7 @@ export default function Benefits() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end pb-10 border-b border-zinc-200">
           <div className="lg:col-span-8 space-y-3">
             <span className="benefits-reveal font-mono text-xs uppercase tracking-[0.2em] text-[#D97706] font-bold block gpu-accelerated">
-              [ 03 // SINERGI OPERASIONAL ]
+              [ 03 // MANFAAT ]
             </span>
             <h2
               ref={headingRef}
@@ -103,7 +103,7 @@ export default function Benefits() {
           </div>
           <div className="lg:col-span-4 benefits-reveal gpu-accelerated">
             <p className="text-[#52525B] font-medium text-sm leading-relaxed">
-              Klik atau arahkan kursor pada tiap poin untuk melihat metrik efisiensi bagi back-of-house maupun front-of-house.
+              Klik atau arahkan kursor ke tiap poin untuk melihat manfaatnya bagi pemilik, gudang, dan kasir.
             </p>
           </div>
         </div>
@@ -118,7 +118,7 @@ export default function Benefits() {
               </div>
               <div>
                 <span className="font-mono text-[10px] uppercase tracking-widest text-[#D97706] font-bold">
-                  BACK-OF-HOUSE
+                  PEMILIK & GUDANG
                 </span>
                 <h3 className="text-xl sm:text-2xl font-extrabold text-[#141414]">
                   Untuk Pemilik & Gudang
@@ -179,7 +179,7 @@ export default function Benefits() {
               </div>
               <div>
                 <span className="font-mono text-[10px] uppercase tracking-widest text-[#52525B] font-bold">
-                  FRONT-OF-HOUSE
+                  KASIR & PELAYAN
                 </span>
                 <h3 className="text-xl sm:text-2xl font-extrabold text-[#141414]">
                   Untuk Kasir & Pramusaji
