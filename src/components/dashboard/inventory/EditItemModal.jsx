@@ -1,14 +1,34 @@
 import { motion } from 'framer-motion';
-import { X, Edit3, Calendar, Package, Check, TrendingUp, TrendingDown } from 'lucide-react';
+import {
+  X,
+  Edit3,
+  Calendar,
+  Package,
+  Check,
+  TrendingUp,
+  TrendingDown,
+  Layers,
+  Trash2
+} from 'lucide-react';
 import { computeIngredientPriceComparison } from '../../../utils/cogsCalculator';
+import { summarizeIngredientBatches } from '../../../utils/fefoBatchEngine';
 
-export default function EditItemModal({ isOpen, onClose, onSubmit, editingItem, setEditingItem }) {
+export default function EditItemModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  editingItem,
+  setEditingItem,
+  onDisposeExpiredBatch
+}) {
   if (!isOpen || !editingItem) return null;
 
   const priceComparison = computeIngredientPriceComparison({
     initialPurchasePrice: editingItem.initialPurchasePrice ?? 0,
     currentMarketPrice: editingItem.currentMarketPrice ?? editingItem.unitPrice ?? 0
   });
+  const batchSummary = summarizeIngredientBatches(editingItem);
+  const firstUsableBatchId = batchSummary.usableBatches[0]?.id;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
@@ -239,6 +259,89 @@ export default function EditItemModal({ isOpen, onClose, onSubmit, editingItem, 
               <p className="text-[11px] font-medium text-[#52525B] leading-relaxed">
                 * Buffer minimum memicu peringatan restock otomatis saat stok gudang menipis.
               </p>
+            </div>
+
+            {/* Bagian 3: Rincian Multi-Batch & Urutan FEFO */}
+            <div className="space-y-3 pt-2 border-t border-zinc-100">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Layers size={14} className="text-[#D97706]" />
+                  <span className="font-mono text-[10px] font-bold text-[#52525B] uppercase tracking-wider">
+                    Rincian Batch Aktif — Urutan FEFO ({batchSummary.batchCount})
+                  </span>
+                </div>
+                <span className="font-mono text-[10px] font-bold text-[#141414]">
+                  Layak: {batchSummary.usableStock} {editingItem.unit}
+                  {batchSummary.expiredStock > 0 ? ` • Exp: ${batchSummary.expiredStock}` : ''}
+                </span>
+              </div>
+
+              {batchSummary.activeBatches.length === 0 ? (
+                <div className="bg-[#FAFAFA] border border-[#E5E5E5] rounded-xl p-3.5 text-[11px] text-[#52525B] font-medium">
+                  Belum ada batch aktif (stok 0). Catat melalui menu Barang Masuk untuk membuat batch baru.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {batchSummary.activeBatches.map((batch) => {
+                    const isBatchExpired = batchSummary.expiredBatches.some((eb) => eb.id === batch.id);
+                    const isFirstFefo = !isBatchExpired && batch.id === firstUsableBatchId;
+                    return (
+                      <div
+                        key={batch.id}
+                        className={`rounded-xl border p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
+                          isBatchExpired
+                            ? 'bg-red-50/60 border-red-200'
+                            : isFirstFefo
+                            ? 'bg-[#FEF3C7]/60 border-[#F59E0B]'
+                            : 'bg-[#FAFAFA] border-[#E5E5E5]'
+                        }`}
+                      >
+                        <div className="min-w-0 space-y-0.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-mono text-xs font-extrabold text-[#141414]">
+                              {batch.batchCode}
+                            </span>
+                            {isBatchExpired ? (
+                              <span className="font-mono text-[9px] font-extrabold uppercase px-2 py-0.5 rounded bg-red-600 text-white">
+                                Expired • Jangan Dipakai
+                              </span>
+                            ) : isFirstFefo ? (
+                              <span className="font-mono text-[9px] font-extrabold uppercase px-2 py-0.5 rounded bg-[#F59E0B] text-[#141414]">
+                                Prioritas FEFO #1
+                              </span>
+                            ) : (
+                              <span className="font-mono text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-white border border-[#E5E5E5] text-[#52525B]">
+                                Antrean FEFO
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-[#52525B] font-medium">
+                            Exp: <strong className={isBatchExpired ? 'text-red-700' : 'text-[#141414]'}>{batch.expiryDate || 'Tidak ada'}</strong>
+                            {batch.entryDate ? ` • Masuk: ${batch.entryDate}` : ''}
+                            {batch.stockerName ? ` • Input: ${batch.stockerName}` : ''}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-mono text-xs font-extrabold text-[#141414] bg-white border border-[#E5E5E5] px-2.5 py-1 rounded-lg">
+                            {batch.qty} {editingItem.unit}
+                          </span>
+                          {isBatchExpired && onDisposeExpiredBatch && (
+                            <button
+                              type="button"
+                              onClick={() => onDisposeExpiredBatch(editingItem, batch)}
+                              className="px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[10px] font-extrabold inline-flex items-center gap-1 cursor-pointer transition-colors"
+                              title="Tarik stok batch kedaluwarsa & catat sebagai Waste"
+                            >
+                              <Trash2 size={11} /> Buang ke Waste
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 

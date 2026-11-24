@@ -54,7 +54,8 @@ import {
   fetchRetailPurchasePriceHistory,
   fetchTransactions,
   fetchDailySalesHistory,
-  syncDailySalesHistoryEntries
+  syncDailySalesHistoryEntries,
+  syncIngredientBatchesToDb
 } from './services/stockoService';
 import {
   fetchStaffProfiles,
@@ -75,6 +76,7 @@ import {
 } from './utils/seasonalForecasting';
 import { buildDailySalesHistory } from './utils/dailySalesHistory';
 import { checkExpiryStatus } from './utils/inventoryStatus';
+import { deductBatchesFefo, restoreBatchesFefo } from './utils/fefoBatchEngine';
 
 function AppContent() {
   const { showToast } = useNotify();
@@ -286,22 +288,46 @@ function AppContent() {
       if (idx < 0) continue;
 
       const cur = updatedIngredients[idx];
-      const deltaSigned = isAddition ? Math.abs(Number(d.amount || 0)) : -Math.abs(Number(d.amount || 0));
+      const absAmount = Math.abs(Number(d.amount || 0));
       const beforeStock = Number(cur.stock) || 0;
-      const afterStock = Math.max(0, Number((beforeStock + deltaSigned).toFixed(3)));
 
-      updatedIngredients[idx] = { ...cur, stock: afterStock };
-      await updateIngredientStock(cur.id, afterStock);
+      let nextItemState;
+      let actualSignedDelta;
+      let batchTraceLabel = '';
+
+      if (isAddition) {
+        const restored = restoreBatchesFefo(cur, absAmount);
+        nextItemState = restored.updatedIngredient;
+        actualSignedDelta = absAmount;
+      } else {
+        const deducted = deductBatchesFefo(cur, absAmount);
+        nextItemState = deducted.updatedIngredient;
+        actualSignedDelta = -Number(deducted.deductedTotal || 0);
+        if (deducted.allocations && deducted.allocations.length > 0) {
+          batchTraceLabel =
+            ' [FEFO: ' +
+            deducted.allocations
+              .map((a) => `${a.batchCode} (-${a.deductedQty}, exp ${a.expiryDate})`)
+              .join('; ') +
+            ']';
+        }
+      }
+
+      const afterStock = Math.max(0, Number(nextItemState.stock) || 0);
+      updatedIngredients[idx] = nextItemState;
+      await updateIngredientStock(cur.id, afterStock, nextItemState.expiryDate);
+      await syncIngredientBatchesToDb(cur.id, nextItemState.batches || []);
 
       const cleanName = String(cur.name || '').split(' | ')[0];
+      const fullReason = `${reason}${batchTraceLabel}`;
       const logEntry = {
         id: `MOV-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         timestamp: new Date().toISOString(),
         itemName: cleanName,
         type: logType,
-        qty: `${deltaSigned >= 0 ? `+${deltaSigned}` : deltaSigned} ${cur.unit}`,
+        qty: `${actualSignedDelta >= 0 ? `+${actualSignedDelta}` : actualSignedDelta} ${cur.unit}`,
         outlet: resolvedOutletLabel,
-        note: reason
+        note: fullReason
       };
       newLogs.push(logEntry);
       recordStockMutationLog({ ...logEntry, ingredientId: cur.id });
@@ -313,14 +339,17 @@ function AppContent() {
         entityName: cleanName,
         beforeValue: `${beforeStock} ${cur.unit}`,
         afterValue: `${afterStock} ${cur.unit}`,
-        deltaLabel: `${deltaSigned >= 0 ? `+${deltaSigned}` : deltaSigned} ${cur.unit}`,
-        reason,
+        deltaLabel: `${actualSignedDelta >= 0 ? `+${actualSignedDelta}` : actualSignedDelta} ${cur.unit}`,
+        reason: fullReason,
         movementType,
-        qtyChange: deltaSigned,
+        qtyChange: actualSignedDelta,
         beforeStock,
         afterStock,
         unit: cur.unit,
-        costImpact: movementType === 'WASTE_LOSS' ? Math.round(Math.abs(deltaSigned) * Number(cur.unitPrice || 0)) : 0,
+        costImpact:
+          movementType === 'WASTE_LOSS'
+            ? Math.round(Math.abs(actualSignedDelta) * Number(cur.currentMarketPrice ?? cur.unitPrice ?? 0))
+            : 0,
         orderId
       });
     }

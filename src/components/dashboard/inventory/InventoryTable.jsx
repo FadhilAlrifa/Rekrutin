@@ -121,6 +121,11 @@ export default function InventoryTable({
 
             const {
               diffDays,
+              effectiveExpiryDate,
+              usableStock,
+              expiredStock,
+              batchCount,
+              expiredBatchCount,
               isExpired,
               isNearExpiry,
               isBelowMin,
@@ -147,7 +152,23 @@ export default function InventoryTable({
                   </div>
                   <div className="flex flex-col">
                     <span className="truncate max-w-[140px] sm:max-w-[200px] md:max-w-xs">{ingName}</span>
-                    <span className="text-[11px] font-medium text-[#52525B]">{ingCategory}</span>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                      <span className="text-[11px] font-medium text-[#52525B]">{ingCategory}</span>
+                      {(batchCount > 1 || expiredBatchCount > 0) && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEdit(ing)}
+                          className={`font-mono text-[9px] font-bold px-1.5 py-0.5 rounded border cursor-pointer transition-colors ${
+                            expiredBatchCount > 0
+                              ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                              : 'bg-[#FEF3C7] text-[#B45309] border-[#FDE68A] hover:bg-[#FDE68A]'
+                          }`}
+                          title="Klik untuk melihat rincian batch FEFO"
+                        >
+                          {batchCount} Batch FEFO
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </td>
 
@@ -155,6 +176,11 @@ export default function InventoryTable({
                   <div className={`font-mono font-bold text-[14px] ${isBelowMin ? 'text-red-600' : 'text-[#141414]'}`}>
                     {ing.stock} <span className="text-[11px] text-[#52525B] font-medium ml-0.5">{ing.unit}</span>
                   </div>
+                  {expiredStock > 0 && (
+                    <span className="block font-mono text-[10px] font-bold text-red-600">
+                      Layak: {usableStock} • Exp: {expiredStock}
+                    </span>
+                  )}
                   <div className="flex items-center gap-2 mt-1">
                     <div className="w-16 h-1.5 bg-zinc-200 rounded-full overflow-hidden">
                       <div
@@ -243,7 +269,7 @@ export default function InventoryTable({
                           : ''
                       }
                     >
-                      {formatTanggal(ing.expiryDate)}
+                      {formatTanggal(effectiveExpiryDate)}
                     </span>
                     {isExpired && diffDays !== null && (
                       <span className="font-mono text-[10px] font-bold text-red-600">
@@ -256,6 +282,15 @@ export default function InventoryTable({
                       </span>
                     )}
                   </div>
+                  {batchCount > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEdit(ing)}
+                      className="mt-0.5 font-mono text-[10px] font-semibold text-[#B45309] hover:underline cursor-pointer"
+                    >
+                      FEFO terdekat (+{batchCount - 1} batch lain)
+                    </button>
+                  )}
                 </td>
 
                 <td className="py-3.5 px-3 md:px-4 whitespace-nowrap">

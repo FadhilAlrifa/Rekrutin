@@ -20,8 +20,17 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../../services/supabaseClient';
 import { cleanIngredientName } from '../../../utils/cogsCalculator';
-import { saveIngredientInitialPrice } from '../../../services/stockoService';
+import {
+  saveIngredientInitialPrice,
+  syncIngredientBatchesToDb,
+  updateIngredientStock
+} from '../../../services/stockoService';
 import { checkExpiryStatus, evaluateIngredientStatus } from '../../../utils/inventoryStatus';
+import {
+  addStockInBatch,
+  deductBatchesFefo,
+  disposeExpiredBatchAsWaste
+} from '../../../utils/fefoBatchEngine';
 import { useNotify } from '../../common/NotificationContext';
 
 // Impor komponen terpisah
@@ -110,8 +119,18 @@ export default function InventoryModule({
 
     if (existingIndex >= 0) {
       const targetItem = ingredients[existingIndex];
-      const newTotalStock = Number((Number(targetItem.stock) + qtyToAdd).toFixed(3));
-      const targetExpiry = stockInData.newExpiryDate || targetItem.expiryDate;
+      const stockerName = currentOperator?.name || 'Petugas Gudang';
+      const batchResult = addStockInBatch(targetItem, {
+        addedQty: qtyToAdd,
+        entryDate: incomingEntryDate,
+        expiryDate: stockInData.newExpiryDate || '',
+        stockerName,
+        notes: 'Restock barang masuk gudang'
+      });
+      const updatedFromBatch = batchResult.updatedIngredient;
+      const newTotalStock = updatedFromBatch.stock;
+      const targetExpiry = updatedFromBatch.expiryDate || null;
+
       const nextMarketPrice =
         incomingMarketPrice !== null ? incomingMarketPrice : incomingBatchPrice;
       const currentStoredMarket = Number(
@@ -142,15 +161,14 @@ export default function InventoryModule({
         return;
       }
 
+      await syncIngredientBatchesToDb(targetItem.id, updatedFromBatch.batches || []);
+
       const resolvedUpdatedMarket =
         nextMarketPrice !== null ? nextMarketPrice : currentStoredMarket;
 
       const updatedIngredients = [...ingredients];
       updatedIngredients[existingIndex] = {
-        ...targetItem,
-        stock: newTotalStock,
-        expiryDate: targetExpiry,
-        entryDate: incomingEntryDate,
+        ...updatedFromBatch,
         initialPurchasePrice: preservedInitial,
         currentMarketPrice: resolvedUpdatedMarket,
         unitPrice: resolvedUpdatedMarket
@@ -163,12 +181,16 @@ export default function InventoryModule({
         onUpdateIngredientPrice
       ) {
         await onUpdateIngredientPrice({
-          ingredient: { ...targetItem, initialPurchasePrice: preservedInitial },
+          ingredient: { ...updatedFromBatch, initialPurchasePrice: preservedInitial },
           newPrice: nextMarketPrice,
           initialPrice: preservedInitial,
           notes: 'Update harga pasar saat barang masuk'
         });
       }
+
+      const batchNote = `${batchResult.newBatch.batchCode} (Exp: ${
+        batchResult.newBatch.expiryDate || 'Tanpa Exp'
+      })`;
 
       onAddStockLog?.({
         id: 'LOG-' + Date.now(),
@@ -178,7 +200,7 @@ export default function InventoryModule({
         type: 'MASUK (Restock Supplier)',
         qty: `+${qtyToAdd} ${targetItem.unit}`,
         outlet: activeOutlet === 'Semua Cabang (Terpusat)' ? 'Cabang Utama - Makassar' : activeOutlet,
-        note: 'Pencatatan barang masuk gudang'
+        note: `Batch baru ${batchNote} • Oleh ${stockerName}`
       });
 
       onRecordAudit?.({
@@ -189,12 +211,13 @@ export default function InventoryModule({
         beforeValue: `${targetItem.stock} ${targetItem.unit}`,
         afterValue: `${newTotalStock} ${targetItem.unit}`,
         deltaLabel: `+${qtyToAdd} ${targetItem.unit}`,
-        reason: 'Restock barang masuk gudang',
+        reason: `Restock batch ${batchNote}`,
         movementType: 'STOCK_IN',
         qtyChange: qtyToAdd,
         beforeStock: targetItem.stock,
         afterStock: newTotalStock,
-        unit: targetItem.unit
+        unit: targetItem.unit,
+        stockerName
       });
     } else {
       const resolvedInitialPrice =
@@ -238,18 +261,29 @@ export default function InventoryModule({
       }
 
       if (data && data.length > 0) {
-        const insertedItem = {
+        const stockerName = currentOperator?.name || 'Petugas Gudang';
+        const baseInserted = {
           id: data[0].id,
           name: data[0].name,
-          stock: data[0].stock,
+          stock: 0,
           unit: data[0].unit,
           minLimit: data[0].min_stock_threshold ?? data[0].min_limit,
           unitPrice: resolvedMarketPrice,
           currentMarketPrice: resolvedMarketPrice,
           initialPurchasePrice: resolvedInitialPrice,
-          expiryDate: data[0].expiry_date,
-          entryDate: data[0].entry_date
+          expiryDate: data[0].expiry_date || '',
+          entryDate: data[0].entry_date || '',
+          batches: []
         };
+        const { updatedIngredient: insertedItem, newBatch } = addStockInBatch(baseInserted, {
+          addedQty: qtyToAdd,
+          entryDate: incomingEntryDate,
+          expiryDate: stockInData.newExpiryDate || '',
+          stockerName,
+          notes: 'Registrasi bahan baku baru'
+        });
+
+        await syncIngredientBatchesToDb(insertedItem.id, insertedItem.batches || []);
         setIngredients([insertedItem, ...ingredients]);
 
         if (resolvedMarketPrice > 0 && onUpdateIngredientPrice) {
@@ -271,7 +305,7 @@ export default function InventoryModule({
           type: 'MASUK (Bahan Baru)',
           qty: `+${qtyToAdd} ${stockInData.unit}`,
           outlet: activeOutlet === 'Semua Cabang (Terpusat)' ? 'Cabang Utama - Makassar' : activeOutlet,
-          note: 'Registrasi bahan baku baru'
+          note: `Batch ${newBatch.batchCode} • Registrasi bahan baru`
         });
 
         onRecordAudit?.({
@@ -282,12 +316,13 @@ export default function InventoryModule({
           beforeValue: `0 ${stockInData.unit}`,
           afterValue: `${qtyToAdd} ${stockInData.unit}`,
           deltaLabel: `+${qtyToAdd} ${stockInData.unit}`,
-          reason: 'Registrasi bahan baku baru',
+          reason: `Registrasi bahan baku baru (${newBatch.batchCode})`,
           movementType: 'STOCK_IN',
           qtyChange: qtyToAdd,
           beforeStock: 0,
           afterStock: qtyToAdd,
-          unit: stockInData.unit
+          unit: stockInData.unit,
+          stockerName
         });
       }
     }
@@ -318,11 +353,19 @@ export default function InventoryModule({
     if (!targetIng || !ckTransfer.qty) return;
 
     const addAmount = parseFloat(ckTransfer.qty);
-    const newTotalStock = Number((Number(targetIng.stock) + addAmount).toFixed(3));
+    const stockerName = currentOperator?.name || 'Petugas Gudang';
+    const { updatedIngredient: ckUpdated, newBatch } = addStockInBatch(targetIng, {
+      addedQty: addAmount,
+      entryDate: todayDate,
+      expiryDate: targetIng.expiryDate || '',
+      stockerName,
+      notes: ckTransfer.notes || `Transfer Central Kitchen → ${ckTransfer.targetOutlet}`
+    });
+    const newTotalStock = ckUpdated.stock;
 
     const { error } = await supabase
       .from('ingredients')
-      .update({ stock: newTotalStock })
+      .update({ stock: newTotalStock, expiry_date: ckUpdated.expiryDate || null })
       .eq('id', targetIng.id);
 
     if (error) {
@@ -334,8 +377,9 @@ export default function InventoryModule({
       return;
     }
 
+    await syncIngredientBatchesToDb(targetIng.id, ckUpdated.batches || []);
     setIngredients((prev) =>
-      prev.map((i) => (i.id === targetIng.id ? { ...i, stock: newTotalStock } : i))
+      prev.map((i) => (i.id === targetIng.id ? ckUpdated : i))
     );
 
     const cleanName = cleanIngredientName(targetIng.name);
@@ -347,7 +391,7 @@ export default function InventoryModule({
       type: 'TRANSFER CENTRAL KITCHEN',
       qty: `+${addAmount} ${targetIng.unit}`,
       outlet: ckTransfer.targetOutlet,
-      note: ckTransfer.notes || 'Pasokan Gudang Pusat'
+      note: `${ckTransfer.notes || 'Pasokan Gudang Pusat'} (${newBatch.batchCode})`
     });
 
     onRecordAudit?.({
@@ -437,17 +481,52 @@ export default function InventoryModule({
 
     await saveIngredientInitialPrice(editingItem.id, parsedInitialPrice, parsedMarketPrice);
 
+    const targetStockVal = Math.max(0, parseFloat(editingItem.stock) || 0);
+    const prevStockVal = prevIng ? Number(prevIng.stock) || 0 : targetStockVal;
+    const stockDiff = Number((targetStockVal - prevStockVal).toFixed(3));
+    const stockerName = currentOperator?.name || 'Petugas Gudang';
+    let nextBatches = prevIng?.batches || editingItem.batches || [];
+    let resolvedExpiryDate = editingItem.expiryDate || '';
+
+    if (prevIng && stockDiff > 0) {
+      const addedRes = addStockInBatch(prevIng, {
+        addedQty: stockDiff,
+        entryDate: editingItem.entryDate || todayDate,
+        expiryDate: editingItem.expiryDate || '',
+        stockerName,
+        notes: (editingItem.adjustmentReason || '').trim() || 'Penambahan opname manual'
+      });
+      nextBatches = addedRes.updatedIngredient.batches;
+      resolvedExpiryDate = addedRes.updatedIngredient.expiryDate || resolvedExpiryDate;
+    } else if (prevIng && stockDiff < 0) {
+      const dedRes = deductBatchesFefo(prevIng, Math.abs(stockDiff));
+      nextBatches = dedRes.updatedIngredient.batches;
+      resolvedExpiryDate = dedRes.updatedIngredient.expiryDate || resolvedExpiryDate;
+    } else if (Array.isArray(nextBatches) && nextBatches.length === 1) {
+      nextBatches = [
+        {
+          ...nextBatches[0],
+          expiryDate: editingItem.expiryDate || '',
+          entryDate: editingItem.entryDate || nextBatches[0].entryDate
+        }
+      ];
+    }
+
+    await syncIngredientBatchesToDb(editingItem.id, nextBatches);
+
     setIngredients((prev) =>
       prev.map((ing) =>
         ing.id === editingItem.id
           ? {
               ...editingItem,
               name: finalName,
-              stock: parseFloat(editingItem.stock),
+              stock: targetStockVal,
               minLimit: parseFloat(editingItem.minLimit),
+              expiryDate: resolvedExpiryDate,
               initialPurchasePrice: parsedInitialPrice,
               currentMarketPrice: parsedMarketPrice,
-              unitPrice: parsedMarketPrice
+              unitPrice: parsedMarketPrice,
+              batches: nextBatches
             }
           : ing
       )
@@ -502,6 +581,82 @@ export default function InventoryModule({
 
     setIsEditModalOpen(false);
     setEditingItem(null);
+  };
+
+  const handleDisposeExpiredBatch = async (item, batch) => {
+    const cleanName = cleanIngredientName(item?.name);
+    const confirmed = await showConfirm({
+      title: `Buang Batch Expired (${batch.batchCode})?`,
+      message: `Batch ${batch.batchCode} (${cleanName}, ${batch.qty} ${item.unit}, Exp: ${batch.expiryDate}) sudah kedaluwarsa dan tidak boleh dipakai POS. Tarik dari stok gudang dan catat sebagai Waste?`,
+      variant: 'danger',
+      confirmText: 'Ya, Catat sebagai Waste',
+      cancelText: 'Batal'
+    });
+    if (!confirmed) return;
+
+    const currentItem = ingredients.find((i) => String(i.id) === String(item.id)) || item;
+    const { updatedIngredient, disposedQty } = disposeExpiredBatchAsWaste(currentItem, batch.id);
+
+    await updateIngredientStock(
+      currentItem.id,
+      updatedIngredient.stock,
+      updatedIngredient.expiryDate || null
+    );
+    await syncIngredientBatchesToDb(currentItem.id, updatedIngredient.batches || []);
+
+    setIngredients((prev) =>
+      prev.map((ing) => (String(ing.id) === String(currentItem.id) ? updatedIngredient : ing))
+    );
+    setEditingItem((prev) =>
+      prev && String(prev.id) === String(currentItem.id)
+        ? {
+            ...prev,
+            stock: updatedIngredient.stock,
+            originalStock: updatedIngredient.stock,
+            expiryDate: updatedIngredient.expiryDate,
+            batches: updatedIngredient.batches
+          }
+        : prev
+    );
+
+    const stockerName = currentOperator?.name || 'Petugas Gudang';
+    const unitMarket = Number(currentItem.currentMarketPrice ?? currentItem.unitPrice ?? 0);
+    const wasteCostImpact = Math.round(disposedQty * unitMarket);
+
+    onAddStockLog?.({
+      id: 'WST-BATCH-' + Date.now(),
+      ingredientId: currentItem.id,
+      timestamp: new Date().toISOString(),
+      itemName: cleanName,
+      type: 'WASTE (Batch Kedaluwarsa)',
+      qty: `-${disposedQty} ${currentItem.unit}`,
+      outlet: activeOutlet === 'Semua Cabang (Terpusat)' ? 'Cabang Utama - Makassar' : activeOutlet,
+      note: `Penarikan batch expired ${batch.batchCode} (Exp ${batch.expiryDate}) oleh ${stockerName}`
+    });
+
+    onRecordAudit?.({
+      actionType: 'Waste Loss',
+      entityType: 'ingredient',
+      entityId: currentItem.id,
+      entityName: cleanName,
+      beforeValue: `${currentItem.stock} ${currentItem.unit}`,
+      afterValue: `${updatedIngredient.stock} ${currentItem.unit}`,
+      deltaLabel: `-${disposedQty} ${currentItem.unit}`,
+      reason: `Pembuangan batch kedaluwarsa ${batch.batchCode} (Exp: ${batch.expiryDate})`,
+      movementType: 'WASTE_LOSS',
+      qtyChange: -disposedQty,
+      beforeStock: currentItem.stock,
+      afterStock: updatedIngredient.stock,
+      unit: currentItem.unit,
+      costImpact: wasteCostImpact,
+      stockerName
+    });
+
+    showToast({
+      title: `Batch ${batch.batchCode} ditarik ke Waste`,
+      message: `${disposedQty} ${currentItem.unit} ${cleanName} dicatat sebagai kerugian kedaluwarsa.`,
+      variant: 'warning'
+    });
   };
 
   const handleDeleteIngredient = async (id, name) => {
@@ -968,6 +1123,7 @@ export default function InventoryModule({
           onSubmit={handleEditSubmit}
           editingItem={editingItem}
           setEditingItem={setEditingItem}
+          onDisposeExpiredBatch={handleDisposeExpiredBatch}
         />
       </AnimatePresence>
 

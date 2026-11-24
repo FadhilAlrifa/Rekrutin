@@ -1,5 +1,6 @@
 import { supabase, supabaseAdminAuth } from './supabaseClient.js';
 import { DEFAULT_SEASONAL_EVENTS } from '../utils/seasonalForecasting.js';
+import { ensureBatchesForIngredient, summarizeIngredientBatches } from '../utils/fefoBatchEngine.js';
 
 const PRICE_MAP_STORAGE_KEY = 'stocko_ingredient_prices_v1';
 const INITIAL_PRICE_MAP_STORAGE_KEY = 'stocko_ingredient_initial_prices_v1';
@@ -13,6 +14,7 @@ const TX_META_STORAGE_KEY = 'stocko_tx_metadata_v1';
 const RETAIL_PRODUCTS_META_KEY = 'stocko_retail_products_meta_v1';
 const RETAIL_PRICE_HISTORY_KEY = 'stocko_retail_price_history_v1';
 const DAILY_SALES_HISTORY_KEY = 'stocko_daily_sales_history_v1';
+const INGREDIENT_BATCHES_KEY = 'stocko_ingredient_batches_v1';
 const unavailableTablesSet = new Set();
 const inFlightTableQueries = new Map();
 
@@ -128,8 +130,85 @@ export function suggestMarketPrice(name, unit) {
   return 35;
 }
 
+export async function fetchIngredientBatchesMap() {
+  const localMap = readLocalJson(INGREDIENT_BATCHES_KEY, {});
+  const res = await runOptionalTableRead('ingredient_batches', () =>
+    supabase
+      .from('ingredient_batches')
+      .select('*')
+      .order('expiry_date', { ascending: true })
+      .order('created_at', { ascending: true })
+  );
+
+  if (res && !res.error && Array.isArray(res.data)) {
+    const map = {};
+    res.data.forEach((row) => {
+      const ingId = String(row.ingredient_id);
+      if (!map[ingId]) map[ingId] = [];
+      map[ingId].push({
+        id: row.id,
+        ingredientId: ingId,
+        batchCode: row.batch_code,
+        qty: Number(row.qty) || 0,
+        initialQty: Number(row.initial_qty) || 0,
+        unit: row.unit || 'pcs',
+        entryDate: row.entry_date || '',
+        expiryDate: row.expiry_date || '',
+        stockerName: row.stocker_name || 'Stok Awal',
+        notes: row.notes || '',
+        disposedAsWaste: Boolean(row.disposed_as_waste),
+        createdAt: row.created_at
+      });
+    });
+
+    // Gabungkan fallback local jika ada item yang belum tersync ke DB
+    Object.keys(localMap).forEach((k) => {
+      if (!map[k] && Array.isArray(localMap[k]) && localMap[k].length > 0) {
+        map[k] = localMap[k];
+      }
+    });
+
+    writeLocalJson(INGREDIENT_BATCHES_KEY, map);
+    return map;
+  }
+
+  return localMap;
+}
+
+export async function syncIngredientBatchesToDb(ingredientId, batches = []) {
+  if (!ingredientId) return;
+  const key = String(ingredientId);
+  const localMap = readLocalJson(INGREDIENT_BATCHES_KEY, {});
+  localMap[key] = batches;
+  writeLocalJson(INGREDIENT_BATCHES_KEY, localMap);
+
+  if (!Array.isArray(batches) || batches.length === 0) return;
+
+  const payload = batches.map((b) => ({
+    id: String(b.id),
+    ingredient_id: key,
+    batch_code: b.batchCode || 'BATCH',
+    qty: Math.max(0, Number(b.qty) || 0),
+    initial_qty: Math.max(0, Number(b.initialQty ?? b.qty) || 0),
+    unit: b.unit || 'pcs',
+    entry_date: b.entryDate || null,
+    expiry_date: b.expiryDate || null,
+    stocker_name: b.stockerName || '',
+    notes: b.notes || '',
+    disposed_as_waste: Boolean(b.disposedAsWaste),
+    updated_at: new Date().toISOString()
+  }));
+
+  await runOptionalTableWrite('ingredient_batches', () =>
+    supabase.from('ingredient_batches').upsert(payload, { onConflict: 'id' })
+  );
+}
+
 export async function fetchIngredients() {
-  const { data, error } = await supabase.from('ingredients').select('*');
+  const [{ data, error }, batchesMap] = await Promise.all([
+    supabase.from('ingredients').select('*'),
+    fetchIngredientBatchesMap()
+  ]);
   if (error) {
     console.error('Gagal memuat bahan baku:', error.message);
     return [];
@@ -166,7 +245,8 @@ export async function fetchIngredients() {
         ? cachedInitial
         : resolvedMarketPrice;
 
-    return {
+    const existingBatches = batchesMap[String(item.id)];
+    const baseItem = {
       id: item.id,
       name: item.name,
       stock: item.stock,
@@ -176,15 +256,30 @@ export async function fetchIngredients() {
       currentMarketPrice: resolvedMarketPrice,
       initialPurchasePrice: resolvedInitialPrice,
       expiryDate: item.expiry_date || item.expiryDate || '',
-      entryDate: item.entry_date || item.entryDate || ''
+      entryDate: item.entry_date || item.entryDate || '',
+      batches: Array.isArray(existingBatches) ? existingBatches : []
+    };
+
+    const hydratedBatches = ensureBatchesForIngredient(baseItem);
+    const batchSummary = summarizeIngredientBatches({ ...baseItem, batches: hydratedBatches });
+
+    return {
+      ...baseItem,
+      stock: existingBatches && existingBatches.length > 0 ? batchSummary.totalStock : item.stock,
+      expiryDate: batchSummary.earliestActiveExpiryDate || baseItem.expiryDate,
+      batches: hydratedBatches
     };
   });
 }
 
-export async function updateIngredientStock(id, newStock) {
+export async function updateIngredientStock(id, newStock, nextExpiryDate = null) {
+  const payload = { stock: newStock };
+  if (nextExpiryDate !== null && nextExpiryDate !== undefined) {
+    payload.expiry_date = nextExpiryDate || null;
+  }
   const { error } = await supabase
     .from('ingredients')
-    .update({ stock: newStock })
+    .update(payload)
     .eq('id', id);
   if (error) console.error('Gagal memperbarui stok:', error);
 }
