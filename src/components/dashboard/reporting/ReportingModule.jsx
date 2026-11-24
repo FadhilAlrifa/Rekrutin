@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
-import { fetchTransactions } from '../../../services/stockoService'; 
+import {
+  fetchTransactions,
+  fetchDailySalesHistory,
+  syncDailySalesHistoryEntries
+} from '../../../services/stockoService';
+import { buildDailySalesHistory } from '../../../utils/dailySalesHistory';
+import { useNotify } from '../../common/NotificationContext';
 
 // Import komponen terpisah
 import ReportingHeader from './ReportingHeader';
@@ -8,10 +14,21 @@ import ReportingMetrics from './ReportingMetrics';
 import BestSellersTable from './BestSellersTable';
 import TransactionHistory from './TransactionHistory';
 import ReceiptModal from './ReceiptModal';
+import DailySalesHistoryPanel from './DailySalesHistoryPanel';
 
-export default function ReportingModule({ subscriptionPlan = 'pro', activeOutlet = 'Semua Cabang (Terpusat)', onUpgradePlan }) {
+export default function ReportingModule({
+  subscriptionPlan = 'pro',
+  activeOutlet = 'Semua Cabang (Terpusat)',
+  onUpgradePlan,
+  products = [],
+  ingredients = [],
+  seasonalEvents = [],
+  businessType = 'fnb'
+}) {
+  const { showAlert, showToast } = useNotify();
   const [isLoading, setIsLoading] = useState(true);
   const [transactions, setTransactions] = useState([]);
+  const [persistedDailyRows, setPersistedDailyRows] = useState([]);
   const [metrics, setMetrics] = useState({
     totalRevenue: 0,
     todayRevenue: 0,
@@ -29,7 +46,11 @@ export default function ReportingModule({ subscriptionPlan = 'pro', activeOutlet
   useEffect(() => {
     async function loadReportData() {
       setIsLoading(true);
-      const txData = await fetchTransactions();
+      const [txData, dailyRows] = await Promise.all([
+        fetchTransactions(),
+        fetchDailySalesHistory()
+      ]);
+      setPersistedDailyRows(Array.isArray(dailyRows) ? dailyRows : []);
       
       let totalAllTime = 0;
       let count = txData.length;
@@ -88,6 +109,18 @@ export default function ReportingModule({ subscriptionPlan = 'pro', activeOutlet
       
       setTransactions(txData);
 
+      const builtDaily = buildDailySalesHistory({
+        transactions: txData,
+        products,
+        ingredients,
+        seasonalEvents,
+        persistedDailyRows: Array.isArray(dailyRows) ? dailyRows : [],
+        businessType
+      });
+      if (builtDaily.flatRows.length > 0) {
+        syncDailySalesHistoryEntries(builtDaily.flatRows, activeOutlet);
+      }
+
       const sortedProducts = Object.values(productMap)
         .sort((a, b) => b.sold - a.sold)
         .slice(0, 5); 
@@ -97,7 +130,8 @@ export default function ReportingModule({ subscriptionPlan = 'pro', activeOutlet
     }
 
     loadReportData();
-  }, []);
+    loadReportData();
+  }, [activeOutlet, businessType, ingredients, products, seasonalEvents]);
 
   const filteredTransactions = transactions.filter(tx => {
     const txDate = new Date(tx.created_at);
@@ -150,7 +184,14 @@ export default function ReportingModule({ subscriptionPlan = 'pro', activeOutlet
   };
 
   const handleDownloadReport = () => {
-    if (transactions.length === 0) return alert("Belum ada data untuk diunduh.");
+    if (transactions.length === 0) {
+      showAlert({
+        title: 'Data Belum Tersedia',
+        message: 'Belum ada data transaksi untuk diunduh sebagai laporan CSV.',
+        variant: 'info'
+      });
+      return;
+    }
     let csvContent = "Tanggal,Waktu,ID Transaksi,Sumber/Meja,Metode Bayar,Total Item,Total Pendapatan\n";
     transactions.forEach(tx => {
       const dateObj = new Date(tx.created_at);
@@ -163,6 +204,11 @@ export default function ReportingModule({ subscriptionPlan = 'pro', activeOutlet
     link.href = url;
     link.download = `Laporan_Stocko_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
+    showToast({
+      title: 'Laporan CSV berhasil diunduh',
+      message: `${transactions.length} transaksi diekspor ke file CSV.`,
+      variant: 'success'
+    });
   };
 
   const formatDateTime = (dateStr) => {
@@ -204,7 +250,16 @@ export default function ReportingModule({ subscriptionPlan = 'pro', activeOutlet
         />
       </div>
 
-      <ReceiptModal 
+      <DailySalesHistoryPanel
+        transactions={transactions}
+        products={products}
+        ingredients={ingredients}
+        seasonalEvents={seasonalEvents}
+        persistedDailyRows={persistedDailyRows}
+        businessType={businessType}
+      />
+
+      <ReceiptModal
         selectedTx={selectedTx} 
         onClose={() => setSelectedTx(null)} 
         formatDateTime={formatDateTime} 

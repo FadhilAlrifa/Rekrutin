@@ -1,6 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, Check, Building2, ShieldCheck, AlertTriangle, ArrowRight } from 'lucide-react';
+import {
+  Lock,
+  Check,
+  Building2,
+  ShieldCheck,
+  AlertTriangle,
+  ArrowRight,
+  CalendarClock,
+  History,
+  X
+} from 'lucide-react';
 import LandingPage from './components/landing/LandingPage';
 import Register from './Page/auth/Register';
 import Login from './Page/auth/Login';
@@ -15,6 +25,9 @@ import SeasonalAnalyticsModule from './components/dashboard/reporting/SeasonalAn
 import AuditTrailModule from './components/dashboard/audit/AuditTrailModule';
 import SelfOrderModule from './components/dashboard/self-order/SelfOrderModule';
 import EmployeeModule from './components/dashboard/employee/EmployeeModule';
+import NotificationProvider from './components/common/NotificationProvider';
+import { useNotify } from './components/common/NotificationContext';
+import HolidayReminderModal from './components/dashboard/inventory/HolidayReminderModal';
 import { supabase } from './services/supabaseClient';
 import {
   fetchProducts,
@@ -38,7 +51,10 @@ import {
   fetchSeasonalEvents,
   clearUnavailableTablesCache,
   updateRetailProductStock,
-  fetchRetailPurchasePriceHistory
+  fetchRetailPurchasePriceHistory,
+  fetchTransactions,
+  fetchDailySalesHistory,
+  syncDailySalesHistoryEntries
 } from './services/stockoService';
 import {
   fetchStaffProfiles,
@@ -52,9 +68,16 @@ import {
   resolveOrderCancellation,
   resolveOrderModification
 } from './utils/orderStateMachine';
-import { DEFAULT_SEASONAL_EVENTS } from './utils/seasonalForecasting';
+import {
+  DEFAULT_SEASONAL_EVENTS,
+  getUpcomingHolidayReminders,
+  getHistoricalPurchaseReferenceForEvent
+} from './utils/seasonalForecasting';
+import { buildDailySalesHistory } from './utils/dailySalesHistory';
+import { checkExpiryStatus } from './utils/inventoryStatus';
 
-export default function App() {
+function AppContent() {
+  const { showToast } = useNotify();
   const [currentView, setCurrentView] = useState('landing');
   const [activeTab, setActiveTab] = useState('pos');
 
@@ -76,10 +99,15 @@ export default function App() {
   const [auditLogs, setAuditLogs] = useState([]);
   const [stockMovements, setStockMovements] = useState([]);
   const [seasonalEvents, setSeasonalEvents] = useState(DEFAULT_SEASONAL_EVENTS);
+  const [transactions, setTransactions] = useState([]);
+  const [dailySalesRows, setDailySalesRows] = useState([]);
   const [staffProfiles, setStaffProfiles] = useState([]);
   const [isRefreshingAudit, setIsRefreshingAudit] = useState(false);
   const [authNotice, setAuthNotice] = useState('');
+  const [selectedReminderEvent, setSelectedReminderEvent] = useState(null);
+  const [dismissedReminderBanner, setDismissedReminderBanner] = useState(false);
   const activeSessionIdRef = useRef(null);
+  const holidayToastShownRef = useRef(false);
 
   const refreshAuditData = async () => {
     setIsRefreshingAudit(true);
@@ -179,13 +207,25 @@ export default function App() {
   const handleUpdateIngredientPrice = async (arg1, arg2, arg3) => {
     const ingredient = arg1?.ingredient ? arg1.ingredient : arg1;
     const newPrice = arg1?.ingredient ? arg1.newPrice : arg2;
+    const initialPrice = arg1?.ingredient ? arg1.initialPrice : undefined;
     const notes = arg1?.ingredient ? arg1.notes : arg3;
 
-    const oldPrice = Number(ingredient?.unitPrice ?? ingredient?.unit_price ?? 0);
-    const res = await updateIngredientPrice({ ingredient, newPrice, notes });
+    const oldPrice = Number(
+      ingredient?.currentMarketPrice ?? ingredient?.unitPrice ?? ingredient?.unit_price ?? 0
+    );
+    const res = await updateIngredientPrice({ ingredient, newPrice, initialPrice, notes });
     setIngredients((prev) =>
       prev.map((ing) =>
-        ing.id === ingredient.id ? { ...ing, unitPrice: Number(newPrice) } : ing
+        ing.id === ingredient.id
+          ? {
+              ...ing,
+              unitPrice: Number(res?.currentMarketPrice ?? newPrice),
+              currentMarketPrice: Number(res?.currentMarketPrice ?? newPrice),
+              initialPurchasePrice: Number(
+                res?.initialPurchasePrice ?? ing.initialPurchasePrice ?? oldPrice
+              )
+            }
+          : ing
       )
     );
     if (res?.entry) {
@@ -205,6 +245,12 @@ export default function App() {
       reason: notes || 'Pembaruan harga pasar bahan baku'
     });
 
+    showToast({
+      title: 'Harga bahan baku berhasil diperbarui',
+      message: `${String(ingredient?.name || '').split(' | ')[0]}: Rp ${Number(newPrice || 0).toLocaleString('id-ID')}`,
+      variant: 'success'
+    });
+
     return res;
   };
 
@@ -212,6 +258,11 @@ export default function App() {
     const res = await seedMarketPricesForMissing(ingredients);
     if (res?.updated && res.updated.length > 0) {
       setIngredients(res.updated);
+      showToast({
+        title: 'Estimasi harga pasar diterapkan',
+        message: `${res.entries?.length || 0} bahan baku diperbarui untuk kalkulasi HPP.`,
+        variant: 'success'
+      });
     }
     if (res?.entries && res.entries.length > 0) {
       setPriceHistory((prev) => [...res.entries, ...prev]);
@@ -414,7 +465,9 @@ export default function App() {
         dbMovements,
         dbEvents,
         staffRes,
-        retailHistoryRes
+        retailHistoryRes,
+        dbTransactions,
+        dbDailySales
       ] = await Promise.all([
         fetchProducts(),
         fetchIngredients(),
@@ -425,7 +478,9 @@ export default function App() {
         fetchStockMovements(),
         fetchSeasonalEvents(),
         fetchStaffProfiles(),
-        fetchRetailPurchasePriceHistory()
+        fetchRetailPurchasePriceHistory(),
+        fetchTransactions(),
+        fetchDailySalesHistory()
       ]);
 
       if (dbProducts && dbProducts.length > 0) setProducts(dbProducts);
@@ -438,6 +493,8 @@ export default function App() {
       if (Array.isArray(dbMovements)) setStockMovements(dbMovements);
       if (Array.isArray(dbEvents) && dbEvents.length > 0) setSeasonalEvents(dbEvents);
       if (staffRes?.success && Array.isArray(staffRes.data)) setStaffProfiles(staffRes.data);
+      if (Array.isArray(dbTransactions)) setTransactions(dbTransactions);
+      if (Array.isArray(dbDailySales)) setDailySalesRows(dbDailySales);
     }
     loadBackendData();
 
@@ -465,12 +522,67 @@ export default function App() {
   }, []);
 
   const checkExpiryAlert = (dateString) => {
-    if (!dateString) return false;
-    const diffDays = Math.ceil((new Date(dateString) - new Date()) / (1000 * 60 * 60 * 24));
-    return diffDays <= 30;
+    const status = checkExpiryStatus(dateString);
+    return status === 'expired' || status === 'hampir';
   };
 
+  const holidayReminderSummary = useMemo(
+    () => getUpcomingHolidayReminders(seasonalEvents),
+    [seasonalEvents]
+  );
+  const activeHolidayReminders = holidayReminderSummary.activeReminders;
+
+  const selectedReminderMeta = useMemo(() => {
+    if (!selectedReminderEvent) return null;
+    return (
+      holidayReminderSummary.allEventsWithStatus.find(
+        (e) => String(e.id) === String(selectedReminderEvent.id)
+      ) || getUpcomingHolidayReminders([selectedReminderEvent]).allEventsWithStatus[0]
+    );
+  }, [selectedReminderEvent, holidayReminderSummary]);
+
+  const holidayReferenceData = useMemo(() => {
+    if (!selectedReminderMeta) return null;
+    return getHistoricalPurchaseReferenceForEvent(selectedReminderMeta, {
+      stockMovements,
+      stockLogs,
+      priceHistory,
+      ingredients
+    });
+  }, [selectedReminderMeta, stockMovements, stockLogs, priceHistory, ingredients]);
+
+  useEffect(() => {
+    if (
+      currentView === 'app' &&
+      !holidayToastShownRef.current &&
+      activeHolidayReminders.length > 0 &&
+      (userRole === 'superadmin' || userRole === 'stocker') &&
+      subscriptionPlan !== 'starter'
+    ) {
+      holidayToastShownRef.current = true;
+      const topEvt = activeHolidayReminders[0];
+      showToast({
+        title: `Reminder ${topEvt.countdownBadge} Hari Besar`,
+        message: `${topEvt.name} (${topEvt.startDate}) — Harap update daftar harga & cek stok referensi tahun lalu.`,
+        variant: 'warning',
+        duration: 6000
+      });
+    }
+  }, [currentView, activeHolidayReminders, userRole, subscriptionPlan, showToast]);
+
   const businessType = merchantSettings?.businessType || 'fnb';
+
+  const favoriteMenuQuotas = useMemo(() => {
+    const built = buildDailySalesHistory({
+      transactions,
+      products,
+      ingredients,
+      seasonalEvents,
+      persistedDailyRows: dailySalesRows,
+      businessType
+    });
+    return (built.menuQuotaSummary || []).slice(0, 4);
+  }, [transactions, products, ingredients, seasonalEvents, dailySalesRows, businessType]);
   const lowStockIngredients = ingredients.filter(
     (ing) => Number(ing.stock) <= Number(ing.minLimit ?? 5)
   );
@@ -505,7 +617,7 @@ export default function App() {
     });
 
     const currentSubtotal = cartItems.reduce((sum, item) => sum + item.price * item.qty, 0);
-    await saveTransaction(currentSubtotal, cartItems, tableNumber, paymentMethod, {
+    const savedTxRows = await saveTransaction(currentSubtotal, cartItems, tableNumber, paymentMethod, {
       orderChannel: 'dine_in',
       paymentFlow: 'pay_first',
       paymentStatus: 'paid',
@@ -513,11 +625,39 @@ export default function App() {
       cashierId: currentOperator?.id,
       cashierName: currentOperator?.name || 'Kasir Aktif'
     });
+
+    if (Array.isArray(savedTxRows) && savedTxRows.length > 0) {
+      const nextTxList = [savedTxRows[0], ...transactions];
+      setTransactions(nextTxList);
+      const rebuiltDaily = buildDailySalesHistory({
+        transactions: nextTxList,
+        products,
+        ingredients,
+        seasonalEvents,
+        persistedDailyRows: dailySalesRows,
+        businessType
+      });
+      syncDailySalesHistoryEntries(rebuiltDaily.flatRows, resolvedOutletLabel);
+    }
+
+    showToast({
+      title: 'Transaksi POS tercatat',
+      message:
+        reqs.length > 0 || retailReqs.length > 0
+          ? `Stok otomatis terpotong untuk ${tableNumber}.`
+          : `Pembayaran ${tableNumber} berhasil diproses.`,
+      variant: 'success'
+    });
   };
 
   const handleSaveMerchantSettings = async (nextSettings) => {
     const saved = await saveMerchantSettings(nextSettings, currentOperator?.name || 'Owner');
     setMerchantSettings(saved);
+    showToast({
+      title: 'Pengaturan merchant tersimpan',
+      message: `Mode usaha aktif: ${saved?.businessType === 'retail' ? 'Ritel' : 'F&B / Kafe'}.`,
+      variant: 'success'
+    });
   };
 
   const handlePlaceWorkflowOrder = async ({
@@ -834,6 +974,15 @@ export default function App() {
         revisionHistory: updatedOrder.revisionHistory
       });
     }
+
+    showToast({
+      title: `Pesanan ${order.orderNumber} dibatalkan`,
+      message:
+        stockAction === 'restore'
+          ? 'Stok berhasil dikembalikan dan dicatat di Audit Trail.'
+          : 'Pembatalan & kerugian waste tercatat di Audit Trail.',
+      variant: stockAction === 'restore' ? 'info' : 'warning'
+    });
   };
 
   const handleSettleOpenBill = async (order, method = 'cash') => {
@@ -1091,6 +1240,68 @@ export default function App() {
                     </motion.div>
                   )}
 
+                  {/* REMINDER H-14 HARI BESAR & REFERENSI PEMBELIAN TAHUN LALU */}
+                  {!dismissedReminderBanner &&
+                    activeHolidayReminders.length > 0 &&
+                    (userRole === 'superadmin' || userRole === 'stocker') &&
+                    activeTab !== 'self-order' &&
+                    subscriptionPlan !== 'starter' && (() => {
+                      const topReminder = activeHolidayReminders[0];
+                      return (
+                        <div className="bg-white border-2 border-[#F59E0B] rounded-2xl px-5 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-sm">
+                          <div className="flex items-start gap-3.5">
+                            <div className="w-10 h-10 rounded-xl bg-[#FEF3C7] border border-[#FDE68A] text-[#B45309] flex items-center justify-center shrink-0">
+                              <CalendarClock size={20} />
+                            </div>
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-mono text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-[#F59E0B] text-[#141414]">
+                                  {topReminder.countdownBadge} Menuju Hari H
+                                </span>
+                                <span className="text-xs sm:text-sm font-extrabold text-[#141414]">
+                                  Reminder Hari Besar: {topReminder.name} ({topReminder.startDate})
+                                </span>
+                              </div>
+                              <p className="text-xs font-semibold text-[#78350F]">
+                                Harap update daftar harga bahan baku &amp; siapkan restock sebelum vendor tutup.{' '}
+                                <span className="font-medium text-[#52525B]">
+                                  (Stok buffer minimum tetap berbasis riwayat historis.)
+                                </span>
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedReminderEvent(topReminder)}
+                              className="px-3.5 py-2 rounded-xl bg-[#FAFAFA] hover:bg-zinc-100 border border-[#E5E5E5] text-[#141414] text-[11px] font-extrabold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                            >
+                              <History size={13} className="text-[#D97706]" />
+                              Lihat Referensi Tahun Lalu
+                            </button>
+                            {activeTab !== 'inventory' && (
+                              <button
+                                type="button"
+                                onClick={() => setActiveTab('inventory')}
+                                className="px-4 py-2 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] text-[11px] font-extrabold inline-flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+                              >
+                                Update Daftar Harga <ArrowRight size={13} />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setDismissedReminderBanner(true)}
+                              aria-label="Tutup banner reminder hari besar"
+                              className="w-8 h-8 rounded-lg hover:bg-zinc-100 text-zinc-400 hover:text-[#141414] flex items-center justify-center cursor-pointer transition-colors"
+                            >
+                              <X size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                   {/* REAL-TIME BUFFER INVENTORY / LOW-STOCK ALERT BANNER */}
                   {businessType === 'retail' &&
                     retailLowStockProducts.length > 0 &&
@@ -1266,6 +1477,8 @@ export default function App() {
                             onRecordAudit={handleRecordAudit}
                             currentOperator={currentOperator}
                             onUpgradePlan={setSubscriptionPlan}
+                            holidayReminders={activeHolidayReminders}
+                            onOpenHolidayReminder={setSelectedReminderEvent}
                           />
                         ))}
 
@@ -1297,6 +1510,10 @@ export default function App() {
                           subscriptionPlan={subscriptionPlan}
                           activeOutlet={activeOutlet}
                           onUpgradePlan={setSubscriptionPlan}
+                          products={products}
+                          ingredients={ingredients}
+                          seasonalEvents={seasonalEvents}
+                          businessType={businessType}
                         />
                       )}
 
@@ -1343,6 +1560,8 @@ export default function App() {
                             setSeasonalEvents={setSeasonalEvents}
                             currentOperator={currentOperator}
                             onNavigateTab={setActiveTab}
+                            onOpenHolidayReminder={setSelectedReminderEvent}
+                            businessType={businessType}
                           />
                         ))}
 
@@ -1377,8 +1596,32 @@ export default function App() {
   };
 
   return (
-    <AnimatePresence mode="wait" onExitComplete={() => window.scrollTo(0, 0)}>
-      {renderCurrentView()}
-    </AnimatePresence>
+    <>
+      <AnimatePresence mode="wait" onExitComplete={() => window.scrollTo(0, 0)}>
+        {renderCurrentView()}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedReminderMeta && (
+          <HolidayReminderModal
+            key={selectedReminderMeta.id}
+            isOpen={Boolean(selectedReminderMeta)}
+            onClose={() => setSelectedReminderEvent(null)}
+            reminder={selectedReminderMeta}
+            referenceData={holidayReferenceData}
+            favoriteMenuQuotas={favoriteMenuQuotas}
+            onNavigateInventory={() => setActiveTab('inventory')}
+          />
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <NotificationProvider>
+      <AppContent />
+    </NotificationProvider>
   );
 }

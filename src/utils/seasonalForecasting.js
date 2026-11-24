@@ -1,7 +1,25 @@
 import { calculateDeductionInStorageUnit } from './stockValidator.js';
-import { cleanIngredientName, findMatchingIngredient, calculateMenuCogs } from './cogsCalculator.js';
+import {
+  cleanIngredientName,
+  findMatchingIngredient,
+  calculateMenuCogs,
+  resolveIngredientMarketPrice,
+  resolveIngredientInitialPrice
+} from './cogsCalculator.js';
+import { parseLocalDate } from './inventoryStatus.js';
+
+export const HOLIDAY_REMINDER_WINDOW_DAYS = 14;
 
 export const DEFAULT_SEASONAL_EVENTS = [
+  {
+    id: 'EVT-IMLEK',
+    name: 'Tahun Baru Imlek',
+    category: 'holiday',
+    startDate: '2026-02-17',
+    endDate: '2026-02-18',
+    expectedLiftPct: 35,
+    notes: 'Persiapan bahan minuman & bingkisan keluarga menjelang Imlek'
+  },
   {
     id: 'EVT-RAMADAN',
     name: 'Ramadan & Buka Bersama',
@@ -18,7 +36,7 @@ export const DEFAULT_SEASONAL_EVENTS = [
     startDate: '2026-03-20',
     endDate: '2026-03-29',
     expectedLiftPct: 60,
-    notes: 'Puncak kunjungan keluarga & hampers take-away'
+    notes: 'Puncak kunjungan keluarga & supplier banyak libur saat lebaran'
   },
   {
     id: 'EVT-LIBUR-SEKOLAH',
@@ -28,6 +46,24 @@ export const DEFAULT_SEASONAL_EVENTS = [
     endDate: '2026-07-12',
     expectedLiftPct: 30,
     notes: 'Kenaikan trafik siang hari segmen keluarga & pelajar'
+  },
+  {
+    id: 'EVT-HUT-RI',
+    name: 'Hari Kemerdekaan RI (17 Agustus)',
+    category: 'holiday',
+    startDate: '2026-08-17',
+    endDate: '2026-08-18',
+    expectedLiftPct: 35,
+    notes: 'Promo spesial kemerdekaan & peningkatan order komunitas'
+  },
+  {
+    id: 'EVT-HARBOLNAS',
+    name: 'Libur & Promo Akhir Tahun (12.12)',
+    category: 'holiday',
+    startDate: '2026-12-08',
+    endDate: '2026-12-13',
+    expectedLiftPct: 40,
+    notes: 'Persiapan stok & update daftar harga sebelum pengiriman akhir tahun padat'
   },
   {
     id: 'EVT-NATARU',
@@ -367,7 +403,7 @@ export function computeSeasonalDemandForecast(
   const ingredientForecasts = (ingredients || []).map((ing) => {
     const currentStock = Number(ing.stock) || 0;
     const minLimit = Number(ing.minLimit ?? 5);
-    const unitPrice = Number(ing.unitPrice || 0);
+    const unitPrice = resolveIngredientMarketPrice(ing);
     const totalObservedUsage = usageMap.get(String(ing.id)) || 0;
 
     // Jika belum ada transaksi pada bahan ini, estimasikan baseline konservatif dari 15% buffer per hari
@@ -377,17 +413,16 @@ export function computeSeasonalDemandForecast(
         : Math.max(0.15, minLimit * 0.15);
 
     const projectedNeed = Number((baselineDailyUsage * horizonDays * liftMultiplier).toFixed(2));
-    const recommendedBuffer = Number(
-      Math.max(minLimit, projectedNeed * (seasonMode === 'peak' ? 0.35 : 0.2)).toFixed(2)
-    );
-    const targetStock = Number((projectedNeed + recommendedBuffer * 0.4).toFixed(2));
+    // Acuan Buffer Stock TETAP berbasis data riwayat historis (tidak diubah oleh event/hari besar)
+    const recommendedBuffer = Number(minLimit.toFixed(2));
+    const targetStock = Number((projectedNeed + recommendedBuffer).toFixed(2));
     const deficitQty = Number(Math.max(0, targetStock - currentStock).toFixed(2));
 
-    let bufferAction = 'Pertahankan Buffer';
+    let bufferAction = 'Stok & Buffer Aman';
     if (seasonMode === 'low' && currentStock > targetStock * 1.4) {
-      bufferAction = 'Kurangi Order (Low-Season)';
-    } else if (deficitQty > 0 || (seasonMode === 'peak' && recommendedBuffer > minLimit)) {
-      bufferAction = 'Naikkan Buffer & Restock';
+      bufferAction = 'Pantau Stok (Low-Season)';
+    } else if (deficitQty > 0 || seasonMode === 'peak') {
+      bufferAction = 'Siapkan Restock (Buffer Tetap)';
     }
 
     return {
@@ -400,6 +435,7 @@ export function computeSeasonalDemandForecast(
       baselineDailyUsage: Number(baselineDailyUsage.toFixed(2)),
       projectedNeed,
       recommendedBuffer,
+      bufferBasis: 'historical_fixed',
       deficitQty,
       restockBudgetEstimate: Math.round(deficitQty * unitPrice),
       bufferAction,
@@ -429,10 +465,10 @@ export function computeSeasonalDemandForecast(
     .slice(0, 6);
 
   const raiseBufferCount = ingredientForecasts.filter(
-    (f) => f.bufferAction === 'Naikkan Buffer & Restock'
+    (f) => f.bufferAction === 'Siapkan Restock (Buffer Tetap)'
   ).length;
   const reduceStockCount = ingredientForecasts.filter(
-    (f) => f.bufferAction === 'Kurangi Order (Low-Season)'
+    (f) => f.bufferAction === 'Pantau Stok (Low-Season)'
   ).length;
   const priorityRestockCost = ingredientForecasts.reduce(
     (sum, f) => sum + f.restockBudgetEstimate,
@@ -452,5 +488,292 @@ export function computeSeasonalDemandForecast(
       reduceStockCount,
       priorityRestockCost
     }
+  };
+}
+
+function parseQtyFromLogText(qtyLabel) {
+  const match = String(qtyLabel || '').match(/[-+]?\d+(?:[.,]\d+)?/);
+  if (!match) return 0;
+  return Math.abs(Number(match[0].replace(',', '.')) || 0);
+}
+
+/**
+ * Hitung daftar reminder H-14 sebelum hari besar/event terdaftar.
+ * Reminder aktif ketika 0 <= hari menuju startDate <= windowDays (default H-14).
+ */
+export function getUpcomingHolidayReminders(
+  seasonalEvents = DEFAULT_SEASONAL_EVENTS,
+  referenceDate = new Date(),
+  windowDays = HOLIDAY_REMINDER_WINDOW_DAYS
+) {
+  const today = new Date(
+    referenceDate.getFullYear(),
+    referenceDate.getMonth(),
+    referenceDate.getDate(),
+    0,
+    0,
+    0,
+    0
+  );
+
+  const enriched = (seasonalEvents || [])
+    .map((evt) => {
+      const startDt = parseLocalDate(evt?.startDate);
+      if (!startDt) return null;
+      const endDt = parseLocalDate(evt?.endDate) || startDt;
+      const daysUntilStart = Math.round((startDt.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      const isReminderActive = daysUntilStart >= 0 && daysUntilStart <= windowDays;
+      const isOngoing = daysUntilStart < 0 && today.getTime() <= endDt.getTime();
+      const triggerDate = new Date(startDt);
+      triggerDate.setDate(triggerDate.getDate() - windowDays);
+
+      const countdownBadge =
+        daysUntilStart === 0
+          ? 'Hari H'
+          : daysUntilStart > 0
+          ? `H-${daysUntilStart}`
+          : 'Berlangsung';
+
+      return {
+        ...evt,
+        daysUntilStart,
+        isReminderActive,
+        isOngoing,
+        triggerDateIso: `${triggerDate.getFullYear()}-${String(triggerDate.getMonth() + 1).padStart(
+          2,
+          '0'
+        )}-${String(triggerDate.getDate()).padStart(2, '0')}`,
+        countdownBadge,
+        headline:
+          daysUntilStart === 0
+            ? `Hari H: ${evt.name}`
+            : `H-${daysUntilStart} Menuju ${evt.name}`,
+        actionMessage:
+          'Harap update daftar harga bahan baku dan siapkan pembelian stok sebelum supplier libur atau harga naik menjelang hari besar.',
+        bufferNote:
+          'Acuan Stok Buffer Minimum tetap berbasis riwayat historis (tidak diubah otomatis).'
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.daysUntilStart - b.daysUntilStart);
+
+  return {
+    windowDays,
+    activeReminders: enriched.filter((e) => e.isReminderActive),
+    upcomingEvents: enriched.filter((e) => e.daysUntilStart >= 0),
+    allEventsWithStatus: enriched
+  };
+}
+
+/**
+ * Ambil referensi data riwayat pembelian & harga bahan baku dari momen hari besar tahun lalu
+ * (atau data historis serupa jika riwayat usaha belum genap 1 tahun).
+ */
+export function getHistoricalPurchaseReferenceForEvent(
+  event,
+  { stockMovements = [], stockLogs = [], priceHistory = [], ingredients = [] } = {}
+) {
+  const startDt = parseLocalDate(event?.startDate) || new Date();
+  const endDt = parseLocalDate(event?.endDate) || startDt;
+  const eventYear = startDt.getFullYear();
+  const referenceYear = eventYear - 1;
+
+  const lastYearWindowStart = new Date(
+    referenceYear,
+    startDt.getMonth(),
+    startDt.getDate() - 14,
+    0,
+    0,
+    0,
+    0
+  );
+  const lastYearWindowEnd = new Date(
+    referenceYear,
+    endDt.getMonth(),
+    endDt.getDate() + 3,
+    23,
+    59,
+    59,
+    999
+  );
+
+  const isInLastYearWindow = (ts) => {
+    const d = parseLocalDate(ts);
+    if (!d) return false;
+    return d.getTime() >= lastYearWindowStart.getTime() && d.getTime() <= lastYearWindowEnd.getTime();
+  };
+
+  // Kumpulkan semua catatan pembelian / barang masuk aktual
+  const allRestockMovements = (stockMovements || []).filter((mv) => {
+    const qty = Number(mv.qtyChange ?? mv.qty_change ?? 0);
+    const mType = mv.movementType || mv.movement_type || '';
+    return qty > 0 && mType !== 'RESTOCK_REVERSAL';
+  });
+
+  const allRestockLogs = (stockLogs || []).filter((log) => {
+    const t = String(log.type || '').toUpperCase();
+    return t.includes('MASUK') || t.includes('TRANSFER');
+  });
+
+  const lastYearMovements = allRestockMovements.filter((mv) =>
+    isInLastYearWindow(mv.createdAt || mv.created_at)
+  );
+  const lastYearLogs = allRestockLogs.filter((log) => isInLastYearWindow(log.timestamp));
+  const lastYearPrices = (priceHistory || []).filter((ph) =>
+    isInLastYearWindow(ph.changedAt || ph.changed_at)
+  );
+
+  let sourceScope = 'last_year_event';
+  let sourceLabel = `Riwayat Pembelian Momen Sama Tahun Lalu (${referenceYear})`;
+  let activeMovements = lastYearMovements;
+  let activeLogs = lastYearLogs;
+  let activePrices = lastYearPrices;
+
+  if (
+    lastYearMovements.length === 0 &&
+    lastYearLogs.length === 0 &&
+    lastYearPrices.length === 0
+  ) {
+    if (
+      allRestockMovements.length > 0 ||
+      allRestockLogs.length > 0 ||
+      (priceHistory || []).length > 0
+    ) {
+      sourceScope = 'recent_historical';
+      sourceLabel = 'Referensi Pembelian Historis Serupa (Data Usaha < 1 Tahun)';
+      activeMovements = allRestockMovements;
+      activeLogs = allRestockLogs;
+      activePrices = priceHistory || [];
+    } else {
+      sourceScope = 'baseline_catalog';
+      sourceLabel = 'Referensi Harga Awal & Stok Masuk Bahan Baku Saat Ini';
+    }
+  }
+
+  const refMap = new Map();
+  const findCatalogIngredient = (nameOrId) =>
+    (ingredients || []).find(
+      (i) =>
+        String(i.id) === String(nameOrId) ||
+        cleanIngredientName(i.name).toLowerCase() === cleanIngredientName(nameOrId).toLowerCase()
+    );
+
+  const ensureEntry = (rawName, ingId, unitFallback = 'pcs') => {
+    const matched = findCatalogIngredient(ingId || rawName);
+    const cleanName = cleanIngredientName(matched?.name || rawName || 'Bahan Baku');
+    const key = matched ? String(matched.id) : cleanName.toLowerCase();
+
+    if (!refMap.has(key)) {
+      const currentMarket = matched ? resolveIngredientMarketPrice(matched) : 0;
+      const initialPrice = matched ? resolveIngredientInitialPrice(matched) : 0;
+      refMap.set(key, {
+        ingredientKey: key,
+        ingredientId: matched?.id || ingId || null,
+        ingredientName: cleanName,
+        unit: matched?.unit || unitFallback || 'pcs',
+        totalPurchasedQty: 0,
+        purchaseCount: 0,
+        lastPurchaseDate: matched?.entryDate || null,
+        historicalPrice: initialPrice,
+        currentMarketPrice: currentMarket,
+        notes: []
+      });
+    }
+    return refMap.get(key);
+  };
+
+  activeMovements.forEach((mv) => {
+    const entry = ensureEntry(
+      mv.ingredientName || mv.ingredient_name,
+      mv.ingredientId || mv.ingredient_id,
+      mv.unit
+    );
+    const qty = Math.abs(Number(mv.qtyChange ?? mv.qty_change ?? 0));
+    entry.totalPurchasedQty = Number((entry.totalPurchasedQty + qty).toFixed(3));
+    entry.purchaseCount += 1;
+    const ts = mv.createdAt || mv.created_at;
+    if (ts && (!entry.lastPurchaseDate || new Date(ts) > new Date(entry.lastPurchaseDate))) {
+      entry.lastPurchaseDate = ts;
+    }
+    if (mv.reason && !entry.notes.includes(mv.reason)) {
+      entry.notes.push(mv.reason);
+    }
+  });
+
+  // Lengkapi dari stockLogs apabila belum ada record movement untuk item terkait
+  activeLogs.forEach((log) => {
+    const entry = ensureEntry(log.itemName, log.ingredientId);
+    if (entry.purchaseCount === 0) {
+      const qty = parseQtyFromLogText(log.qty);
+      entry.totalPurchasedQty = Number((entry.totalPurchasedQty + qty).toFixed(3));
+      entry.purchaseCount += 1;
+    }
+    if (
+      log.timestamp &&
+      (!entry.lastPurchaseDate || new Date(log.timestamp) > new Date(entry.lastPurchaseDate))
+    ) {
+      entry.lastPurchaseDate = log.timestamp;
+    }
+    if (log.note && !entry.notes.includes(log.note)) {
+      entry.notes.push(log.note);
+    }
+  });
+
+  activePrices.forEach((ph) => {
+    const entry = ensureEntry(
+      ph.ingredientName || ph.ingredient_name,
+      ph.ingredientId || ph.ingredient_id,
+      ph.unit
+    );
+    const histP = Number(ph.newPrice ?? ph.new_price ?? ph.oldPrice ?? ph.old_price ?? 0);
+    if (histP > 0) {
+      entry.historicalPrice = histP;
+    }
+    if (ph.notes && !entry.notes.includes(ph.notes)) {
+      entry.notes.push(ph.notes);
+    }
+  });
+
+  // Jika masih kosong (baseline_catalog), tampilkan bahan baku aktif sebagai referensi dasar
+  if (refMap.size === 0) {
+    (ingredients || []).slice(0, 8).forEach((ing) => {
+      const entry = ensureEntry(ing.name, ing.id, ing.unit);
+      entry.totalPurchasedQty = Number(ing.stock) || 0;
+      entry.purchaseCount = 1;
+      entry.notes.push('Stok & harga awal tercatat di gudang');
+    });
+  }
+
+  const items = Array.from(refMap.values())
+    .map((item) => {
+      const histPrice = Number(item.historicalPrice || 0);
+      const curPrice = Number(item.currentMarketPrice || 0);
+      const priceDiffPct =
+        histPrice > 0 && curPrice > 0
+          ? Number((((curPrice - histPrice) / histPrice) * 100).toFixed(1))
+          : 0;
+      return {
+        ...item,
+        priceDiffPct,
+        noteSummary: item.notes[0] || 'Pembelian stok bahan baku'
+      };
+    })
+    .sort((a, b) => b.totalPurchasedQty - a.totalPurchasedQty)
+    .slice(0, 10);
+
+  const rangeFormatter = (d) =>
+    d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  return {
+    event,
+    sourceScope,
+    sourceLabel,
+    eventYear,
+    referenceYear,
+    lastYearRangeLabel: `${rangeFormatter(lastYearWindowStart)} – ${rangeFormatter(
+      lastYearWindowEnd
+    )}`,
+    items,
+    totalRestockEvents: items.reduce((sum, i) => sum + i.purchaseCount, 0)
   };
 }

@@ -114,7 +114,7 @@ export default function StockInModal({ isOpen, onClose, onSubmit, stockInData, s
 
                 <div>
                   <label className="block text-[11px] font-bold text-[#52525B] mb-1.5">
-                    Harga Beli (Rp / {stockInData.unit || 'satuan'})
+                    Harga Beli Awal / Batch (Rp / {stockInData.unit || 'satuan'})
                   </label>
                   <input
                     type="number"
@@ -128,6 +128,21 @@ export default function StockInModal({ isOpen, onClose, onSubmit, stockInData, s
                 </div>
 
                 <div>
+                  <label className="block text-[11px] font-bold text-[#52525B] mb-1.5">
+                    Harga Pasar Terbaru (Opsional)
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    placeholder="Default = Harga Beli Awal"
+                    value={stockInData.marketPrice ?? ''}
+                    onChange={(e) => setStockInData({ ...stockInData, marketPrice: e.target.value })}
+                    className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-[#141414] placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all font-mono"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
                   <label className="block text-[11px] font-bold text-[#52525B] mb-1.5">Buffer Minimum (Alert)</label>
                   <input
                     type="number"
@@ -174,7 +189,7 @@ export default function StockInModal({ isOpen, onClose, onSubmit, stockInData, s
               </div>
 
               <p className="text-[11px] font-medium text-[#52525B] leading-relaxed">
-                * Harga beli akan otomatis dipakai untuk menghitung HPP (COGS) & margin profit menu terkait.
+                * Untuk item baru, Harga Pasar Terbaru default mengikuti Harga Beli Awal bila dikosongkan dan dipakai menghitung HPP (COGS). Untuk restock barang lama, Harga Beli Awal tetap tersimpan.
               </p>
             </div>
           </div>

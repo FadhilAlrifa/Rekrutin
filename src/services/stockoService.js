@@ -2,15 +2,17 @@ import { supabase, supabaseAdminAuth } from './supabaseClient.js';
 import { DEFAULT_SEASONAL_EVENTS } from '../utils/seasonalForecasting.js';
 
 const PRICE_MAP_STORAGE_KEY = 'stocko_ingredient_prices_v1';
+const INITIAL_PRICE_MAP_STORAGE_KEY = 'stocko_ingredient_initial_prices_v1';
 const PRICE_HISTORY_STORAGE_KEY = 'stocko_ingredient_price_history_v1';
 const MERCHANT_SETTINGS_STORAGE_KEY = 'stocko_merchant_settings_v1';
 const ORDERS_STORAGE_KEY = 'stocko_orders_v1';
 const AUDIT_LOGS_STORAGE_KEY = 'stocko_audit_logs_v1';
 const STOCK_MOVEMENTS_STORAGE_KEY = 'stocko_stock_movements_v1';
-const SEASONAL_EVENTS_STORAGE_KEY = 'stocko_seasonal_events_v1';
+const SEASONAL_EVENTS_STORAGE_KEY = 'stocko_seasonal_events_v2';
 const TX_META_STORAGE_KEY = 'stocko_tx_metadata_v1';
 const RETAIL_PRODUCTS_META_KEY = 'stocko_retail_products_meta_v1';
 const RETAIL_PRICE_HISTORY_KEY = 'stocko_retail_price_history_v1';
+const DAILY_SALES_HISTORY_KEY = 'stocko_daily_sales_history_v1';
 const unavailableTablesSet = new Set();
 const inFlightTableQueries = new Map();
 
@@ -134,16 +136,35 @@ export async function fetchIngredients() {
   }
 
   const localPriceMap = readLocalJson(PRICE_MAP_STORAGE_KEY, {});
+  const localInitialMap = readLocalJson(INITIAL_PRICE_MAP_STORAGE_KEY, {});
 
   return data.map(item => {
+    const dbMarketPrice =
+      item.current_market_price !== undefined && item.current_market_price !== null
+        ? Number(item.current_market_price)
+        : null;
     const dbUnitPrice =
       item.unit_price !== undefined && item.unit_price !== null
         ? Number(item.unit_price)
         : null;
-    const resolvedPrice =
-      dbUnitPrice !== null && dbUnitPrice > 0
+    const resolvedMarketPrice =
+      dbMarketPrice !== null && dbMarketPrice > 0
+        ? dbMarketPrice
+        : dbUnitPrice !== null && dbUnitPrice > 0
         ? dbUnitPrice
         : Number(localPriceMap[String(item.id)] ?? 0);
+
+    const dbInitialPrice =
+      item.initial_purchase_price !== undefined && item.initial_purchase_price !== null
+        ? Number(item.initial_purchase_price)
+        : null;
+    const cachedInitial = Number(localInitialMap[String(item.id)] ?? 0);
+    const resolvedInitialPrice =
+      dbInitialPrice !== null && dbInitialPrice > 0
+        ? dbInitialPrice
+        : cachedInitial > 0
+        ? cachedInitial
+        : resolvedMarketPrice;
 
     return {
       id: item.id,
@@ -151,7 +172,9 @@ export async function fetchIngredients() {
       stock: item.stock,
       unit: item.unit,
       minLimit: item.min_stock_threshold ?? item.min_limit ?? 5,
-      unitPrice: resolvedPrice,
+      unitPrice: resolvedMarketPrice,
+      currentMarketPrice: resolvedMarketPrice,
+      initialPurchasePrice: resolvedInitialPrice,
       expiryDate: item.expiry_date || item.expiryDate || '',
       entryDate: item.entry_date || item.entryDate || ''
     };
@@ -727,12 +750,32 @@ export async function fetchPriceHistory() {
   };
 }
 
-export async function updateIngredientPrice({ ingredient, newPrice, notes = 'Pembaruan harga pasar' }) {
+export async function updateIngredientPrice({
+  ingredient,
+  newPrice,
+  initialPrice,
+  notes = 'Pembaruan harga pasar'
+}) {
   if (!ingredient) return { success: false, message: 'Bahan baku tidak ditemukan.' };
 
   const cleanName = String(ingredient.name || '').split(' | ')[0].trim();
-  const oldPrice = Number(ingredient.unitPrice ?? ingredient.unit_price ?? 0);
+  const oldPrice = Number(
+    ingredient.currentMarketPrice ?? ingredient.unitPrice ?? ingredient.unit_price ?? 0
+  );
   const parsedNewPrice = Math.max(0, Number(newPrice) || 0);
+
+  const existingInitial = Number(
+    ingredient.initialPurchasePrice ?? ingredient.initial_purchase_price ?? 0
+  );
+  const resolvedInitialPrice =
+    initialPrice !== undefined && initialPrice !== null && initialPrice !== ''
+      ? Math.max(0, Number(initialPrice) || 0)
+      : existingInitial > 0
+      ? existingInitial
+      : oldPrice > 0
+      ? oldPrice
+      : parsedNewPrice;
+
   const changePct =
     oldPrice > 0
       ? Number((((parsedNewPrice - oldPrice) / oldPrice) * 100).toFixed(1))
@@ -757,6 +800,10 @@ export async function updateIngredientPrice({ ingredient, newPrice, notes = 'Pem
   localMap[String(ingredient.id)] = parsedNewPrice;
   writeLocalJson(PRICE_MAP_STORAGE_KEY, localMap);
 
+  const localInitialMap = readLocalJson(INITIAL_PRICE_MAP_STORAGE_KEY, {});
+  localInitialMap[String(ingredient.id)] = resolvedInitialPrice;
+  writeLocalJson(INITIAL_PRICE_MAP_STORAGE_KEY, localInitialMap);
+
   const localHistory = readLocalJson(PRICE_HISTORY_STORAGE_KEY, []);
   const nextLocalHistory = [historyEntry, ...localHistory].slice(0, 60);
   writeLocalJson(PRICE_HISTORY_STORAGE_KEY, nextLocalHistory);
@@ -764,12 +811,26 @@ export async function updateIngredientPrice({ ingredient, newPrice, notes = 'Pem
   // Coba tulis ke kolom & tabel PostgreSQL/Supabase
   let persistedInDb = false;
   if (!isTableKnownUnavailable('ingredients.unit_price')) {
-    const { error: ingErr } = await supabase
+    const splitPayload = {
+      unit_price: parsedNewPrice,
+      current_market_price: parsedNewPrice,
+      initial_purchase_price: resolvedInitialPrice
+    };
+    const useSplitCols = !isTableKnownUnavailable('ingredients.price_split');
+    let ingRes = await supabase
       .from('ingredients')
-      .update({ unit_price: parsedNewPrice })
+      .update(useSplitCols ? splitPayload : { unit_price: parsedNewPrice })
       .eq('id', ingredient.id);
 
-    if (ingErr) {
+    if (ingRes.error && useSplitCols) {
+      markTableUnavailable('ingredients.price_split');
+      ingRes = await supabase
+        .from('ingredients')
+        .update({ unit_price: parsedNewPrice })
+        .eq('id', ingredient.id);
+    }
+
+    if (ingRes.error) {
       markTableUnavailable('ingredients.unit_price');
     } else {
       const histRes = await runOptionalTableWrite('ingredient_price_history', () =>
@@ -794,12 +855,41 @@ export async function updateIngredientPrice({ ingredient, newPrice, notes = 'Pem
   return {
     success: true,
     persistedInDb,
-    entry: historyEntry
+    entry: historyEntry,
+    initialPurchasePrice: resolvedInitialPrice,
+    currentMarketPrice: parsedNewPrice
   };
 }
 
+export async function saveIngredientInitialPrice(ingredientId, initialPrice, currentMarketPrice = null) {
+  if (!ingredientId) return;
+  const parsedInitial = Math.max(0, Number(initialPrice) || 0);
+  const localInitialMap = readLocalJson(INITIAL_PRICE_MAP_STORAGE_KEY, {});
+  localInitialMap[String(ingredientId)] = parsedInitial;
+  writeLocalJson(INITIAL_PRICE_MAP_STORAGE_KEY, localInitialMap);
+
+  const payload = { initial_purchase_price: parsedInitial };
+  if (currentMarketPrice !== null && currentMarketPrice !== undefined) {
+    const parsedMarket = Math.max(0, Number(currentMarketPrice) || 0);
+    payload.current_market_price = parsedMarket;
+    payload.unit_price = parsedMarket;
+    const localMap = readLocalJson(PRICE_MAP_STORAGE_KEY, {});
+    localMap[String(ingredientId)] = parsedMarket;
+    writeLocalJson(PRICE_MAP_STORAGE_KEY, localMap);
+  }
+
+  if (!isTableKnownUnavailable('ingredients.price_split')) {
+    const { error } = await supabase.from('ingredients').update(payload).eq('id', ingredientId);
+    if (error) {
+      markTableUnavailable('ingredients.price_split');
+    }
+  }
+}
+
 export async function seedMarketPricesForMissing(ingredients = []) {
-  const missing = ingredients.filter(i => !(Number(i.unitPrice) > 0));
+  const missing = ingredients.filter(
+    i => !(Number(i.currentMarketPrice ?? i.unitPrice) > 0)
+  );
   if (missing.length === 0) return { updated: [...ingredients], entries: [] };
 
   const updated = [...ingredients];
@@ -810,12 +900,18 @@ export async function seedMarketPricesForMissing(ingredients = []) {
     const res = await updateIngredientPrice({
       ingredient: ing,
       newPrice: suggested,
+      initialPrice: Number(ing.initialPurchasePrice || 0) > 0 ? ing.initialPurchasePrice : suggested,
       notes: 'Inisialisasi harga referensi pasar'
     });
     if (res.success) {
       const idx = updated.findIndex(x => String(x.id) === String(ing.id));
       if (idx >= 0) {
-        updated[idx] = { ...updated[idx], unitPrice: suggested };
+        updated[idx] = {
+          ...updated[idx],
+          unitPrice: suggested,
+          currentMarketPrice: suggested,
+          initialPurchasePrice: res.initialPurchasePrice
+        };
       }
       entries.push(res.entry);
     }
@@ -1253,4 +1349,60 @@ export async function deleteSeasonalEvent(eventId) {
     supabase.from('seasonal_events').delete().eq('id', eventId)
   );
   return next;
+}
+
+export async function fetchDailySalesHistory() {
+  const res = await runOptionalTableRead('daily_sales_history', () =>
+    supabase
+      .from('daily_sales_history')
+      .select('*')
+      .order('sales_date', { ascending: false })
+      .limit(400)
+  );
+
+  if (res && !res.error && Array.isArray(res.data)) {
+    const mapped = res.data.map((row) => ({
+      salesDate: row.sales_date,
+      menuId: row.menu_id,
+      menuName: row.menu_name,
+      category: row.category || 'Umum',
+      quantitySold: Number(row.quantity_sold) || 0,
+      totalRevenue: Number(row.total_revenue) || 0,
+      estimatedProfit: Number(row.estimated_profit) || 0,
+      transactionsCount: Number(row.transactions_count) || 0,
+      holidayLabel: row.holiday_label || '',
+      isHoliday: Boolean(row.is_holiday)
+    }));
+    writeLocalJson(DAILY_SALES_HISTORY_KEY, mapped);
+    return mapped;
+  }
+
+  return readLocalJson(DAILY_SALES_HISTORY_KEY, []);
+}
+
+export async function syncDailySalesHistoryEntries(entries = [], outlet = 'Semua Cabang (Terpusat)') {
+  if (!Array.isArray(entries) || entries.length === 0) return;
+
+  writeLocalJson(DAILY_SALES_HISTORY_KEY, entries.slice(0, 400));
+
+  const payload = entries.slice(0, 200).map((e) => ({
+    sales_date: e.salesDate,
+    menu_id: String(e.menuId || e.menuName || '').toLowerCase(),
+    menu_name: e.menuName,
+    category: e.category || 'Umum',
+    quantity_sold: Number(e.quantitySold) || 0,
+    total_revenue: Math.round(Number(e.totalRevenue) || 0),
+    estimated_profit: Math.round(Number(e.estimatedProfit) || 0),
+    transactions_count: Number(e.transactionsCount) || 1,
+    holiday_label: e.holidayLabel || '',
+    is_holiday: Boolean(e.isHoliday),
+    outlet,
+    updated_at: new Date().toISOString()
+  }));
+
+  await runOptionalTableWrite('daily_sales_history', () =>
+    supabase.from('daily_sales_history').upsert(payload, {
+      onConflict: 'sales_date,menu_id'
+    })
+  );
 }

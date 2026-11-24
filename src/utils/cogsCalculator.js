@@ -21,12 +21,84 @@ export function findMatchingIngredient(recipeItem, ingredients = []) {
 }
 
 /**
- * Hitung biaya (Rp) satu komponen resep berdasarkan unitPrice bahan baku di gudang.
+ * Ambil harga aktif bahan baku (memprioritaskan currentMarketPrice lalu fallback ke unitPrice).
+ */
+export function resolveIngredientMarketPrice(ingredient) {
+  if (!ingredient) return 0;
+  return Math.max(
+    0,
+    Number(
+      ingredient.currentMarketPrice ??
+        ingredient.current_market_price ??
+        ingredient.unitPrice ??
+        ingredient.unit_price ??
+        0
+    ) || 0
+  );
+}
+
+/**
+ * Ambil harga beli awal bahan baku (fallback ke harga aktif jika belum diset terpisah).
+ */
+export function resolveIngredientInitialPrice(ingredient) {
+  if (!ingredient) return 0;
+  const rawInitial = Number(
+    ingredient.initialPurchasePrice ?? ingredient.initial_purchase_price ?? 0
+  );
+  if (rawInitial > 0) return rawInitial;
+  return resolveIngredientMarketPrice(ingredient);
+}
+
+/**
+ * Bandingkan Harga Beli Awal vs Harga Pasar Terbaru untuk indikator owner di tabel/modal.
+ */
+export function computeIngredientPriceComparison(ingredient, overrideMarketPrice = null) {
+  const initialPrice = resolveIngredientInitialPrice(ingredient);
+  const marketPrice =
+    overrideMarketPrice !== null
+      ? Math.max(0, Number(overrideMarketPrice) || 0)
+      : resolveIngredientMarketPrice(ingredient);
+  const diffAmount = Math.round(marketPrice - initialPrice);
+  const diffPct =
+    initialPrice > 0
+      ? Number((((marketPrice - initialPrice) / initialPrice) * 100).toFixed(1))
+      : marketPrice > 0
+      ? 100
+      : 0;
+
+  let trend = 'flat';
+  if (diffAmount > 0) trend = 'up';
+  else if (diffAmount < 0) trend = 'down';
+
+  const absPctLabel = Math.abs(diffPct).toLocaleString('id-ID', {
+    maximumFractionDigits: 1
+  });
+
+  let formattedDiff = 'Sama dengan awal';
+  if (diffAmount > 0) {
+    formattedDiff = `+Rp ${diffAmount.toLocaleString('id-ID')} (+${absPctLabel}%)`;
+  } else if (diffAmount < 0) {
+    formattedDiff = `-Rp ${Math.abs(diffAmount).toLocaleString('id-ID')} (-${absPctLabel}%)`;
+  }
+
+  return {
+    initialPrice,
+    marketPrice,
+    diffAmount,
+    diffPct,
+    trend,
+    hasPrice: initialPrice > 0 || marketPrice > 0,
+    formattedDiff
+  };
+}
+
+/**
+ * Hitung biaya (Rp) satu komponen resep berdasarkan Harga Pasar Terbaru bahan baku di gudang.
  * Menangani konversi satuan lintas unit (mis. gram/ml terhadap kg/liter).
  */
 export function calculateRecipeItemCost(recipeItem, ingredient) {
   if (!recipeItem || !ingredient) return 0;
-  const unitPrice = Number(ingredient.unitPrice ?? ingredient.unit_price ?? 0);
+  const unitPrice = resolveIngredientMarketPrice(ingredient);
   if (unitPrice <= 0) return 0;
 
   const neededQty = Number(recipeItem.qty) || 0;
@@ -135,7 +207,7 @@ export function calculateMenuCogs(product, ingredients = [], businessType = 'fnb
   recipe.forEach((rc) => {
     if (!rc?.name) return;
     const ing = findMatchingIngredient(rc, ingredients);
-    const unitPrice = Number(ing?.unitPrice ?? ing?.unit_price ?? 0);
+    const unitPrice = resolveIngredientMarketPrice(ing);
     const itemCost = ing ? calculateRecipeItemCost(rc, ing) : 0;
 
     if (!ing || unitPrice <= 0) {
@@ -182,7 +254,13 @@ export function analyzeIngredientPriceImpact(ingredient, newPrice, products = []
 
   const updatedIngredients = allIngredients.map((ing) =>
     String(ing.id) === String(ingredient.id)
-      ? { ...ing, unitPrice: parsedNewPrice, unit_price: parsedNewPrice }
+      ? {
+          ...ing,
+          unitPrice: parsedNewPrice,
+          unit_price: parsedNewPrice,
+          currentMarketPrice: parsedNewPrice,
+          current_market_price: parsedNewPrice
+        }
       : ing
   );
 

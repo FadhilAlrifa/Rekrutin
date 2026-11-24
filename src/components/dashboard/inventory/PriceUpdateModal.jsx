@@ -3,7 +3,9 @@ import { motion } from 'framer-motion';
 import { X, TrendingUp, TrendingDown, Check, AlertTriangle, Calculator } from 'lucide-react';
 import {
   cleanIngredientName,
-  analyzeIngredientPriceImpact
+  analyzeIngredientPriceImpact,
+  computeIngredientPriceComparison,
+  resolveIngredientMarketPrice
 } from '../../../utils/cogsCalculator';
 
 export default function PriceUpdateModal({
@@ -14,18 +16,19 @@ export default function PriceUpdateModal({
   products = [],
   onSavePrice
 }) {
+  const previousMarketPrice = resolveIngredientMarketPrice(ingredient);
   const [newPrice, setNewPrice] = useState(() =>
-    ingredient ? String(ingredient.unitPrice || '') : ''
+    ingredient ? String(previousMarketPrice || '') : ''
   );
   const [notes, setNotes] = useState('Penyesuaian harga pasar');
   const [isSaving, setIsSaving] = useState(false);
 
-  const oldPrice = Number(ingredient?.unitPrice ?? 0);
   const parsedNew = Math.max(0, Number(newPrice) || 0);
+  const vsInitial = computeIngredientPriceComparison(ingredient, parsedNew);
 
-  const changePct =
-    oldPrice > 0
-      ? Number((((parsedNew - oldPrice) / oldPrice) * 100).toFixed(1))
+  const changeVsPrevPct =
+    previousMarketPrice > 0
+      ? Number((((parsedNew - previousMarketPrice) / previousMarketPrice) * 100).toFixed(1))
       : parsedNew > 0
       ? 100
       : 0;
@@ -94,42 +97,66 @@ export default function PriceUpdateModal({
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="overflow-y-auto p-6 space-y-5 flex-1">
-            {/* Perbandingan Harga Lama vs Baru */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-[#FAFAFA] border border-zinc-200 rounded-2xl p-4">
+            {/* Perbandingan Harga Beli Awal vs Harga Pasar Terbaru */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="bg-[#FAFAFA] border border-[#E5E5E5] rounded-2xl p-4">
                 <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#52525B] block">
-                  Harga Lama / {ingredient.unit}
+                  Harga Beli Awal
                 </span>
-                <p className="font-mono text-lg font-extrabold text-[#141414] mt-1">
-                  Rp {oldPrice.toLocaleString('id-ID')}
+                <p className="font-mono text-base font-extrabold text-[#141414] mt-1">
+                  Rp {vsInitial.initialPrice.toLocaleString('id-ID')}
                 </p>
+                <span className="text-[10px] font-medium text-[#52525B] block mt-0.5">
+                  Baseline / {ingredient.unit}
+                </span>
               </div>
 
-              <div className="bg-[#FAFAFA] border border-zinc-200 rounded-2xl p-4 flex flex-col justify-between">
+              <div className="bg-[#FAFAFA] border border-[#E5E5E5] rounded-2xl p-4">
                 <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#52525B] block">
-                  Perubahan Pasar
+                  Harga Pasar Sebelumnya
                 </span>
-                <div className="flex items-center gap-2 mt-1">
-                  {changePct > 0 ? (
-                    <span className="inline-flex items-center gap-1 font-mono text-sm font-extrabold text-red-600">
-                      <TrendingUp size={15} /> +{changePct}%
+                <p className="font-mono text-base font-extrabold text-[#141414] mt-1">
+                  Rp {previousMarketPrice.toLocaleString('id-ID')}
+                </p>
+                <span className="text-[10px] font-mono text-[#52525B] block mt-0.5">
+                  {changeVsPrevPct > 0
+                    ? `+${changeVsPrevPct}% dari sebelumnya`
+                    : changeVsPrevPct < 0
+                    ? `${changeVsPrevPct}% dari sebelumnya`
+                    : 'Belum berubah'}
+                </span>
+              </div>
+
+              <div className="bg-[#FAFAFA] border border-[#E5E5E5] rounded-2xl p-4 flex flex-col justify-between">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#52525B] block">
+                  Selisih vs Harga Awal
+                </span>
+                <div className="mt-1">
+                  {vsInitial.trend === 'up' ? (
+                    <span className="inline-flex items-center gap-1 font-mono text-xs font-extrabold text-red-600">
+                      <TrendingUp size={14} /> {vsInitial.formattedDiff}
                     </span>
-                  ) : changePct < 0 ? (
-                    <span className="inline-flex items-center gap-1 font-mono text-sm font-extrabold text-emerald-700">
-                      <TrendingDown size={15} /> {changePct}%
+                  ) : vsInitial.trend === 'down' ? (
+                    <span className="inline-flex items-center gap-1 font-mono text-xs font-extrabold text-emerald-700">
+                      <TrendingDown size={14} /> {vsInitial.formattedDiff}
                     </span>
                   ) : (
-                    <span className="font-mono text-sm font-bold text-[#52525B]">0% (Tetap)</span>
+                    <span className="font-mono text-xs font-bold text-[#52525B]">
+                      Sama dengan awal
+                    </span>
                   )}
                 </div>
+                <span className="text-[10px] font-medium text-[#52525B] block mt-0.5">
+                  Harga Awal tetap tersimpan
+                </span>
               </div>
             </div>
 
-            {/* Input Harga Baru & Catatan */}
+            {/* Input Harga Pasar Terbaru & Catatan */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-[11px] font-bold text-[#52525B] mb-1.5">
-                  Harga Beli Terbaru (Rp / {ingredient.unit})
+                  Harga Pasar Terbaru (Rp / {ingredient.unit})
                 </label>
                 <input
                   type="number"

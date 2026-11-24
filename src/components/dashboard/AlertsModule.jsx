@@ -11,6 +11,7 @@ import {
   List,
   ArrowUpDown
 } from 'lucide-react';
+import { getExpiryDays, checkExpiryStatus } from '../../utils/inventoryStatus';
 
 export default function AlertsModule({ ingredients = [], setActiveTab }) {
   const [filterType, setFilterType] = useState('all'); // 'all' | 'expired' | 'stock' | 'fefo'
@@ -18,26 +19,12 @@ export default function AlertsModule({ ingredients = [], setActiveTab }) {
   const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'table'
   const [sortBy, setSortBy] = useState('severity'); // 'severity' | 'name'
 
-  const getExpiryDays = (dateString) => {
-    if (!dateString) return null;
-    const expDate = new Date(dateString);
-    const today = new Date();
-    return Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
-  };
-
-  const getExpiryStatus = (diffDays) => {
-    if (diffDays === null) return 'aman';
-    if (diffDays < 0) return 'expired';
-    if (diffDays <= 30) return 'hampir';
-    return 'aman';
-  };
-
   // Enrich & filter bermasalah dengan skor urgensi
   const enrichedAlerts = useMemo(() => {
     return ingredients
       .map((ing) => {
         const diffDays = getExpiryDays(ing.expiryDate);
-        const expStatus = getExpiryStatus(diffDays);
+        const expStatus = checkExpiryStatus(ing.expiryDate);
         const isExpired = expStatus === 'expired';
         const isNearExp = expStatus === 'hampir';
         const isLowStock = Number(ing.stock) <= Number(ing.minLimit);

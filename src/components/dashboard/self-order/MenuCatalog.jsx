@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Minus, Plus, Search, AlertCircle, LayoutGrid, Coffee, Utensils, Croissant, Cake } from 'lucide-react';
 import { checkMenuStockAvailability } from '../../../utils/stockValidator';
+import { useNotify } from '../../common/NotificationContext';
 
 export default function MenuCatalog({ products = [], ingredients = [], cart = [], updateQuantity }) {
+  const { showAlert } = useNotify();
   const [activeCategory, setActiveCategory] = useState('Semua');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -26,7 +28,11 @@ export default function MenuCatalog({ products = [], ingredients = [], cart = []
 
   const handleAddClick = (menu, isAvailable, stockCheck) => {
     if (!isAvailable) {
-      alert(`Menu ${menu.name} tidak dapat ditambahkan karena ${stockCheck.message.toLowerCase()} di gudang.`);
+      showAlert({
+        title: 'Menu Tidak Tersedia',
+        message: `Menu ${menu.name} tidak dapat ditambahkan karena ${stockCheck.message.toLowerCase()} di gudang.`,
+        variant: 'warning'
+      });
       return;
     }
 
@@ -35,7 +41,11 @@ export default function MenuCatalog({ products = [], ingredients = [], cart = []
     
     const stockCheckNext = checkMenuStockAvailability(menu, ingredients, currentQty);
     if (!stockCheckNext.isAvailable) {
-      alert(`Stok bahan baku untuk ${menu.name} sudah habis!`);
+      showAlert({
+        title: 'Stok Bahan Habis',
+        message: `Stok bahan baku untuk ${menu.name} sudah habis!`,
+        variant: 'warning'
+      });
       return;
     }
 

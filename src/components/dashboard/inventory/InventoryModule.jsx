@@ -20,6 +20,9 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../../services/supabaseClient';
 import { cleanIngredientName } from '../../../utils/cogsCalculator';
+import { saveIngredientInitialPrice } from '../../../services/stockoService';
+import { checkExpiryStatus, evaluateIngredientStatus } from '../../../utils/inventoryStatus';
+import { useNotify } from '../../common/NotificationContext';
 
 // Impor komponen terpisah
 import InventoryTable from './InventoryTable';
@@ -40,8 +43,11 @@ export default function InventoryModule({
   onAddStockLog,
   onRecordAudit,
   currentOperator,
-  onUpgradePlan
+  onUpgradePlan,
+  holidayReminders = [],
+  onOpenHolidayReminder
 }) {
+  const { showAlert, showConfirm, showToast } = useNotify();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('Semua');
   const [logTab, setLogTab] = useState('mutations'); // 'mutations' | 'prices'
@@ -57,6 +63,7 @@ export default function InventoryModule({
     addedQty: '',
     unit: 'pcs',
     unitPrice: '',
+    marketPrice: '',
     minLimit: '5',
     newExpiryDate: '',
     entryDate: todayDate
@@ -73,21 +80,14 @@ export default function InventoryModule({
   const [editingItem, setEditingItem] = useState(null);
   const [priceModalItem, setPriceModalItem] = useState(null);
 
-  const checkExpiryStatus = (dateString) => {
-    if (!dateString) return 'aman';
-    const expDate = new Date(dateString);
-    const today = new Date();
-    const diffDays = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0) return 'expired';
-    if (diffDays <= 30) return 'hampir';
-    return 'aman';
-  };
-
   const handleStockInSubmit = async (e) => {
     e.preventDefault();
     if (!stockInData.name || !stockInData.addedQty) {
-      alert('Nama barang dan jumlah stok wajib diisi!');
+      await showAlert({
+        title: 'Data Barang Belum Lengkap',
+        message: 'Nama barang dan jumlah stok masuk wajib diisi sebelum menyimpan.',
+        variant: 'warning'
+      });
       return;
     }
 
@@ -95,9 +95,13 @@ export default function InventoryModule({
     const trimmedName = finalName.toLowerCase();
     const qtyToAdd = parseFloat(stockInData.addedQty);
     const incomingEntryDate = stockInData.entryDate || todayDate;
-    const incomingUnitPrice =
+    const incomingBatchPrice =
       stockInData.unitPrice !== '' && stockInData.unitPrice !== undefined
-        ? Number(stockInData.unitPrice)
+        ? Math.max(0, Number(stockInData.unitPrice))
+        : null;
+    const incomingMarketPrice =
+      stockInData.marketPrice !== '' && stockInData.marketPrice !== undefined
+        ? Math.max(0, Number(stockInData.marketPrice))
         : null;
 
     const existingIndex = ingredients.findIndex(
@@ -108,6 +112,17 @@ export default function InventoryModule({
       const targetItem = ingredients[existingIndex];
       const newTotalStock = Number((Number(targetItem.stock) + qtyToAdd).toFixed(3));
       const targetExpiry = stockInData.newExpiryDate || targetItem.expiryDate;
+      const nextMarketPrice =
+        incomingMarketPrice !== null ? incomingMarketPrice : incomingBatchPrice;
+      const currentStoredMarket = Number(
+        targetItem.currentMarketPrice ?? targetItem.unitPrice ?? 0
+      );
+      const preservedInitial =
+        Number(targetItem.initialPurchasePrice ?? 0) > 0
+          ? Number(targetItem.initialPurchasePrice)
+          : currentStoredMarket > 0
+          ? currentStoredMarket
+          : nextMarketPrice || 0;
 
       const { error } = await supabase
         .from('ingredients')
@@ -119,9 +134,16 @@ export default function InventoryModule({
         .eq('id', targetItem.id);
 
       if (error) {
-        alert('Gagal memperbarui stok di database: ' + error.message);
+        await showAlert({
+          title: 'Gagal Memperbarui Stok',
+          message: `Gagal memperbarui stok di database: ${error.message}`,
+          variant: 'danger'
+        });
         return;
       }
+
+      const resolvedUpdatedMarket =
+        nextMarketPrice !== null ? nextMarketPrice : currentStoredMarket;
 
       const updatedIngredients = [...ingredients];
       updatedIngredients[existingIndex] = {
@@ -129,19 +151,22 @@ export default function InventoryModule({
         stock: newTotalStock,
         expiryDate: targetExpiry,
         entryDate: incomingEntryDate,
-        unitPrice: incomingUnitPrice !== null ? incomingUnitPrice : targetItem.unitPrice
+        initialPurchasePrice: preservedInitial,
+        currentMarketPrice: resolvedUpdatedMarket,
+        unitPrice: resolvedUpdatedMarket
       };
       setIngredients(updatedIngredients);
 
       if (
-        incomingUnitPrice !== null &&
-        incomingUnitPrice !== Number(targetItem.unitPrice || 0) &&
+        nextMarketPrice !== null &&
+        nextMarketPrice !== currentStoredMarket &&
         onUpdateIngredientPrice
       ) {
         await onUpdateIngredientPrice({
-          ingredient: targetItem,
-          newPrice: incomingUnitPrice,
-          notes: 'Update harga saat barang masuk'
+          ingredient: { ...targetItem, initialPurchasePrice: preservedInitial },
+          newPrice: nextMarketPrice,
+          initialPrice: preservedInitial,
+          notes: 'Update harga pasar saat barang masuk'
         });
       }
 
@@ -172,7 +197,16 @@ export default function InventoryModule({
         unit: targetItem.unit
       });
     } else {
-      const newRecord = {
+      const resolvedInitialPrice =
+        incomingBatchPrice !== null
+          ? incomingBatchPrice
+          : incomingMarketPrice !== null
+          ? incomingMarketPrice
+          : 0;
+      const resolvedMarketPrice =
+        incomingMarketPrice !== null ? incomingMarketPrice : resolvedInitialPrice;
+
+      const baseRecord = {
         name: finalName,
         stock: qtyToAdd,
         unit: stockInData.unit,
@@ -181,10 +215,25 @@ export default function InventoryModule({
         entry_date: incomingEntryDate
       };
 
-      const { data, error } = await supabase.from('ingredients').insert([newRecord]).select();
+      const extendedRecord = {
+        ...baseRecord,
+        unit_price: resolvedMarketPrice,
+        initial_purchase_price: resolvedInitialPrice,
+        current_market_price: resolvedMarketPrice
+      };
+
+      let insertRes = await supabase.from('ingredients').insert([extendedRecord]).select();
+      if (insertRes.error) {
+        insertRes = await supabase.from('ingredients').insert([baseRecord]).select();
+      }
+      const { data, error } = insertRes;
 
       if (error) {
-        alert('Gagal menambahkan barang baru ke database: ' + error.message);
+        await showAlert({
+          title: 'Gagal Menambahkan Barang',
+          message: `Gagal menambahkan barang baru ke database: ${error.message}`,
+          variant: 'danger'
+        });
         return;
       }
 
@@ -195,18 +244,23 @@ export default function InventoryModule({
           stock: data[0].stock,
           unit: data[0].unit,
           minLimit: data[0].min_stock_threshold ?? data[0].min_limit,
-          unitPrice: incomingUnitPrice || 0,
+          unitPrice: resolvedMarketPrice,
+          currentMarketPrice: resolvedMarketPrice,
+          initialPurchasePrice: resolvedInitialPrice,
           expiryDate: data[0].expiry_date,
           entryDate: data[0].entry_date
         };
         setIngredients([insertedItem, ...ingredients]);
 
-        if (incomingUnitPrice && incomingUnitPrice > 0 && onUpdateIngredientPrice) {
+        if (resolvedMarketPrice > 0 && onUpdateIngredientPrice) {
           await onUpdateIngredientPrice({
             ingredient: insertedItem,
-            newPrice: incomingUnitPrice,
+            newPrice: resolvedMarketPrice,
+            initialPrice: resolvedInitialPrice,
             notes: 'Harga beli awal bahan baru'
           });
+        } else if (resolvedInitialPrice > 0) {
+          await saveIngredientInitialPrice(insertedItem.id, resolvedInitialPrice, resolvedMarketPrice);
         }
 
         onAddStockLog?.({
@@ -238,6 +292,12 @@ export default function InventoryModule({
       }
     }
 
+    showToast({
+      title: 'Stok barang masuk tercatat',
+      message: `${stockInData.name.trim()} (+${qtyToAdd} ${stockInData.unit}) berhasil disimpan.`,
+      variant: 'success'
+    });
+
     setIsStockInModalOpen(false);
     setStockInData({
       name: '',
@@ -245,6 +305,7 @@ export default function InventoryModule({
       addedQty: '',
       unit: 'pcs',
       unitPrice: '',
+      marketPrice: '',
       minLimit: '5',
       newExpiryDate: '',
       entryDate: todayDate
@@ -265,7 +326,11 @@ export default function InventoryModule({
       .eq('id', targetIng.id);
 
     if (error) {
-      alert('Gagal sinkronisasi Central Kitchen: ' + error.message);
+      await showAlert({
+        title: 'Gagal Sinkronisasi Central Kitchen',
+        message: error.message,
+        variant: 'danger'
+      });
       return;
     }
 
@@ -302,6 +367,12 @@ export default function InventoryModule({
       stockerName: currentOperator?.name || 'Petugas Gudang'
     });
 
+    showToast({
+      title: 'Transfer Central Kitchen berhasil',
+      message: `${cleanName} (+${addAmount} ${targetIng.unit}) dikirim ke ${ckTransfer.targetOutlet}.`,
+      variant: 'success'
+    });
+
     setIsCentralKitchenOpen(false);
     setCkTransfer({
       ingredientId: '',
@@ -313,11 +384,16 @@ export default function InventoryModule({
 
   const handleOpenEdit = (item) => {
     const nameParts = (item.name || '').split(' | ');
+    const marketPrice = Number(item.currentMarketPrice ?? item.unitPrice ?? 0);
+    const initialPrice = Number(item.initialPurchasePrice ?? marketPrice);
     setEditingItem({
       ...item,
       nameOnly: nameParts[0],
       category: nameParts[1] || 'Bahan Minuman',
       originalStock: item.stock,
+      initialPurchasePrice: initialPrice,
+      currentMarketPrice: marketPrice,
+      unitPrice: marketPrice,
       adjustmentReason: ''
     });
     setIsEditModalOpen(true);
@@ -329,7 +405,14 @@ export default function InventoryModule({
 
     const finalName = `${editingItem.nameOnly.trim()} | ${editingItem.category}`;
     const prevIng = ingredients.find((i) => String(i.id) === String(editingItem.id));
-    const parsedPrice = Number(editingItem.unitPrice || 0);
+    const parsedMarketPrice = Math.max(
+      0,
+      Number(editingItem.currentMarketPrice ?? editingItem.unitPrice ?? 0)
+    );
+    const parsedInitialPrice = Math.max(
+      0,
+      Number(editingItem.initialPurchasePrice ?? prevIng?.initialPurchasePrice ?? parsedMarketPrice)
+    );
 
     const { error } = await supabase
       .from('ingredients')
@@ -344,9 +427,15 @@ export default function InventoryModule({
       .eq('id', editingItem.id);
 
     if (error) {
-      alert('Gagal mengedit barang: ' + error.message);
+      await showAlert({
+        title: 'Gagal Memperbarui Barang',
+        message: `Gagal mengedit barang: ${error.message}`,
+        variant: 'danger'
+      });
       return;
     }
+
+    await saveIngredientInitialPrice(editingItem.id, parsedInitialPrice, parsedMarketPrice);
 
     setIngredients((prev) =>
       prev.map((ing) =>
@@ -356,7 +445,9 @@ export default function InventoryModule({
               name: finalName,
               stock: parseFloat(editingItem.stock),
               minLimit: parseFloat(editingItem.minLimit),
-              unitPrice: parsedPrice
+              initialPurchasePrice: parsedInitialPrice,
+              currentMarketPrice: parsedMarketPrice,
+              unitPrice: parsedMarketPrice
             }
           : ing
       )
@@ -393,13 +484,21 @@ export default function InventoryModule({
       });
     }
 
-    if (prevIng && parsedPrice !== Number(prevIng.unitPrice || 0) && onUpdateIngredientPrice) {
+    const prevMarketPrice = Number(prevIng?.currentMarketPrice ?? prevIng?.unitPrice ?? 0);
+    if (prevIng && parsedMarketPrice !== prevMarketPrice && onUpdateIngredientPrice) {
       await onUpdateIngredientPrice({
-        ingredient: prevIng,
-        newPrice: parsedPrice,
+        ingredient: { ...prevIng, initialPurchasePrice: parsedInitialPrice },
+        newPrice: parsedMarketPrice,
+        initialPrice: parsedInitialPrice,
         notes: 'Diperbarui dari form edit bahan'
       });
     }
+
+    showToast({
+      title: 'Data bahan baku diperbarui',
+      message: `${editingItem.nameOnly.trim()} berhasil disimpan.`,
+      variant: 'success'
+    });
 
     setIsEditModalOpen(false);
     setEditingItem(null);
@@ -407,13 +506,24 @@ export default function InventoryModule({
 
   const handleDeleteIngredient = async (id, name) => {
     const cleanName = cleanIngredientName(name);
-    if (!window.confirm(`Apakah Anda yakin ingin menghapus "${cleanName}" dari gudang?`)) return;
+    const confirmed = await showConfirm({
+      title: 'Hapus Bahan Baku?',
+      message: `Apakah Anda yakin ingin menghapus "${cleanName}" dari gudang? Rekam jejak audit sebelumnya akan tetap tersimpan.`,
+      variant: 'danger',
+      confirmText: 'Ya, Hapus Bahan',
+      cancelText: 'Batal'
+    });
+    if (!confirmed) return;
 
     const target = ingredients.find((ing) => ing.id === id);
     const { error } = await supabase.from('ingredients').delete().eq('id', id);
 
     if (error) {
-      alert('Gagal menghapus data: ' + error.message);
+      await showAlert({
+        title: 'Gagal Menghapus Data',
+        message: error.message,
+        variant: 'danger'
+      });
       return;
     }
 
@@ -436,31 +546,33 @@ export default function InventoryModule({
     }
 
     setIngredients((prev) => prev.filter((ing) => ing.id !== id));
+    showToast({
+      title: 'Bahan baku dihapus',
+      message: `"${cleanName}" telah dihapus dari daftar gudang.`,
+      variant: 'info'
+    });
   };
 
-  const lowStockCount = ingredients.filter((i) => Number(i.stock) <= Number(i.minLimit)).length;
+  const lowStockCount = ingredients.filter((i) => evaluateIngredientStatus(i).isBelowMin).length;
   const nearExpiryCount = ingredients.filter((i) => {
-    const expStatus = checkExpiryStatus(i.expiryDate);
-    const isLowStock = Number(i.stock) <= Number(i.minLimit);
-    return !isLowStock && (expStatus === 'hampir' || expStatus === 'expired');
+    const status = evaluateIngredientStatus(i);
+    return status.isExpired || status.isNearExpiry;
   }).length;
-  const missingPriceCount = ingredients.filter((i) => !(Number(i.unitPrice) > 0)).length;
+  const missingPriceCount = ingredients.filter(
+    (i) => !(Number(i.currentMarketPrice ?? i.unitPrice) > 0)
+  ).length;
 
   const filteredIngredients = ingredients.filter((i) => {
     const matchSearch = i.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const expStatus = checkExpiryStatus(i.expiryDate);
-    const isLowStock = Number(i.stock) <= Number(i.minLimit);
+    const status = evaluateIngredientStatus(i);
 
-    if (activeTab === 'Kritis') return matchSearch && isLowStock;
-    if (activeTab === 'Hampir Exp') return matchSearch && !isLowStock && (expStatus === 'hampir' || expStatus === 'expired');
-    if (activeTab === 'Aman') return matchSearch && !isLowStock && expStatus === 'aman';
+    if (activeTab === 'Kritis') return matchSearch && status.isBelowMin;
+    if (activeTab === 'Hampir Exp') return matchSearch && (status.isExpired || status.isNearExpiry);
+    if (activeTab === 'Aman') return matchSearch && status.isHealthy;
     return matchSearch;
   });
 
-  const healthyCount = ingredients.filter((i) => {
-    const expStatus = checkExpiryStatus(i.expiryDate);
-    return Number(i.stock) > Number(i.minLimit) && expStatus === 'aman';
-  }).length;
+  const healthyCount = ingredients.filter((i) => evaluateIngredientStatus(i).isHealthy).length;
 
   const tabs = [
     { name: 'Semua', icon: LayoutGrid },
@@ -493,6 +605,18 @@ export default function InventoryModule({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          {holidayReminders.length > 0 && onOpenHolidayReminder && (
+            <button
+              type="button"
+              onClick={() => onOpenHolidayReminder(holidayReminders[0])}
+              className="bg-[#FEF3C7] hover:bg-[#FDE68A] border border-[#F59E0B] text-[#141414] font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-sm cursor-pointer flex items-center gap-1.5 transition-all"
+            >
+              <History size={14} className="text-[#B45309]" />
+              <span>
+                Referensi {holidayReminders[0].countdownBadge}: {holidayReminders[0].name}
+              </span>
+            </button>
+          )}
           {missingPriceCount > 0 && onBatchFillMarketPrices && (
             <button
               type="button"

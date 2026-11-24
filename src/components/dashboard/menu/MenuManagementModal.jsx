@@ -4,6 +4,7 @@ import { Plus, Search, LayoutGrid, Coffee, Utensils, Croissant, Cake, History, T
 import { supabase } from '../../../services/supabaseClient';
 import { syncMenuRecipesToDb, saveProductWithRetailFields } from '../../../services/stockoService';
 import { calculateMenuCogs } from '../../../utils/cogsCalculator';
+import { useNotify } from '../../common/NotificationContext';
 import MenuCard from './MenuCard';
 import MenuFormModal from './MenuFormModal';
 
@@ -19,6 +20,7 @@ export default function MenuManagementModule({
   currentOperator,
   onUpgradePlan
 }) {
+  const { showAlert, showConfirm, showToast } = useNotify();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('Semua');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -126,20 +128,41 @@ export default function MenuManagementModule({
 
   const handleDelete = async (id) => {
     const label = isRetail ? 'produk' : 'menu';
-    if (confirm(`Yakin ingin menghapus ${label} ini dari sistem?`)) {
-      const { error } = await supabase.from('products').delete().eq('id', id);
-      if (error) {
-        alert(`Gagal menghapus ${label}: ` + error.message);
-        return;
-      }
-      setProducts(products.filter((p) => p.id !== id));
+    const targetProd = products.find((p) => p.id === id);
+    const confirmed = await showConfirm({
+      title: `Hapus ${isRetail ? 'Produk' : 'Menu'}?`,
+      message: `Yakin ingin menghapus ${label} "${targetProd?.name || 'terpilih'}" dari sistem? Tindakan ini tidak dapat dibatalkan.`,
+      variant: 'danger',
+      confirmText: `Ya, Hapus ${isRetail ? 'Produk' : 'Menu'}`,
+      cancelText: 'Batal'
+    });
+    if (!confirmed) return;
+
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error) {
+      await showAlert({
+        title: `Gagal Menghapus ${isRetail ? 'Produk' : 'Menu'}`,
+        message: error.message,
+        variant: 'danger'
+      });
+      return;
     }
+    setProducts(products.filter((p) => p.id !== id));
+    showToast({
+      title: `${isRetail ? 'Produk' : 'Menu'} dihapus`,
+      message: `"${targetProd?.name || label}" berhasil dihapus dari katalog.`,
+      variant: 'info'
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name || !formData.price) {
-      alert('Mohon isi nama dan harga jual produk.');
+      await showAlert({
+        title: 'Form Belum Lengkap',
+        message: 'Mohon isi nama dan harga jual produk terlebih dahulu.',
+        variant: 'warning'
+      });
       return;
     }
 
@@ -159,7 +182,11 @@ export default function MenuManagementModule({
     });
 
     if (!res.success) {
-      alert(res.message || 'Gagal menyimpan produk.');
+      await showAlert({
+        title: 'Gagal Menyimpan Produk',
+        message: res.message || 'Terjadi kesalahan saat menyimpan data produk.',
+        variant: 'danger'
+      });
       return;
     }
 
@@ -227,6 +254,14 @@ export default function MenuManagementModule({
         reason: res.priceHistoryEntry.notes
       });
     }
+
+    showToast({
+      title: editingProduct
+        ? `${isRetail ? 'Produk' : 'Menu'} diperbarui`
+        : `${isRetail ? 'Produk' : 'Menu'} baru ditambahkan`,
+      message: `${savedProd.name} berhasil disimpan ke katalog.`,
+      variant: 'success'
+    });
 
     setIsModalOpen(false);
   };

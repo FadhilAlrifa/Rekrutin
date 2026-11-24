@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingCart, CheckCircle2, MessageSquare, Store, AlertCircle, X } from 'lucide-react';
+import { useNotify } from '../components/common/NotificationContext';
 
 export default function PosView({ products, onCheckout }) {
+  const { showAlert } = useNotify();
   const [cart, setCart] = useState([]);
   const [noteModalItem, setNoteModalItem] = useState(null);
   const [customNote, setCustomNote] = useState('');
@@ -15,7 +17,11 @@ export default function PosView({ products, onCheckout }) {
     
     // Cek apakah stok mencukupi
     if (existing && existing.qty >= product.stock) {
-      alert(`Stok ${product.name} tidak mencukupi! Sisa stok: ${product.stock}`);
+      showAlert({
+        title: 'Stok Tidak Mencukupi',
+        message: `Stok ${product.name} tidak mencukupi! Sisa stok: ${product.stock}`,
+        variant: 'warning'
+      });
       return;
     }
     
@@ -35,7 +41,11 @@ export default function PosView({ products, onCheckout }) {
         // Mencegah minus atau melebihi stok
         if (newQty <= 0) return null; // Hapus item jika qty 0
         if (newQty > item.stock) {
-          alert(`Maksimal stok ${item.name} adalah ${item.stock}`);
+          showAlert({
+            title: 'Batas Maksimal Stok',
+            message: `Maksimal stok ${item.name} adalah ${item.stock}`,
+            variant: 'warning'
+          });
           return item;
         }
         

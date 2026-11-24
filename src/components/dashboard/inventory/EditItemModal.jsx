@@ -1,8 +1,14 @@
 import { motion } from 'framer-motion';
-import { X, Edit3, Calendar, Package, Check } from 'lucide-react';
+import { X, Edit3, Calendar, Package, Check, TrendingUp, TrendingDown } from 'lucide-react';
+import { computeIngredientPriceComparison } from '../../../utils/cogsCalculator';
 
 export default function EditItemModal({ isOpen, onClose, onSubmit, editingItem, setEditingItem }) {
   if (!isOpen || !editingItem) return null;
+
+  const priceComparison = computeIngredientPriceComparison({
+    initialPurchasePrice: editingItem.initialPurchasePrice ?? 0,
+    currentMarketPrice: editingItem.currentMarketPrice ?? editingItem.unitPrice ?? 0
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
@@ -111,19 +117,60 @@ export default function EditItemModal({ isOpen, onClose, onSubmit, editingItem, 
 
                 <div>
                   <label className="block text-[11px] font-bold text-[#52525B] mb-1.5">
-                    Harga Beli (Rp / {editingItem.unit || 'satuan'})
+                    Harga Beli Awal (Rp / {editingItem.unit || 'satuan'})
                   </label>
                   <input
                     type="number"
                     step="any"
                     min="0"
-                    value={editingItem.unitPrice ?? 0}
-                    onChange={(e) => setEditingItem({ ...editingItem, unitPrice: e.target.value })}
+                    value={editingItem.initialPurchasePrice ?? 0}
+                    onChange={(e) =>
+                      setEditingItem({ ...editingItem, initialPurchasePrice: e.target.value })
+                    }
                     className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-[#141414] placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all font-mono"
                   />
                 </div>
 
                 <div>
+                  <label className="block text-[11px] font-bold text-[#52525B] mb-1.5">
+                    Harga Pasar Terbaru / HPP (Rp / {editingItem.unit || 'satuan'})
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={editingItem.currentMarketPrice ?? editingItem.unitPrice ?? 0}
+                    onChange={(e) =>
+                      setEditingItem({
+                        ...editingItem,
+                        currentMarketPrice: e.target.value,
+                        unitPrice: e.target.value
+                      })
+                    }
+                    className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-[#141414] placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all font-mono"
+                  />
+                </div>
+
+                <div className="sm:col-span-2 bg-[#FAFAFA] border border-[#E5E5E5] rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#52525B]">
+                    Selisih Harga Pasar vs Awal
+                  </span>
+                  {priceComparison.trend === 'up' ? (
+                    <span className="inline-flex items-center gap-1 font-mono text-xs font-extrabold text-red-600">
+                      <TrendingUp size={13} /> {priceComparison.formattedDiff}
+                    </span>
+                  ) : priceComparison.trend === 'down' ? (
+                    <span className="inline-flex items-center gap-1 font-mono text-xs font-extrabold text-emerald-700">
+                      <TrendingDown size={13} /> {priceComparison.formattedDiff}
+                    </span>
+                  ) : (
+                    <span className="font-mono text-xs font-bold text-[#52525B]">
+                      Sama dengan awal
+                    </span>
+                  )}
+                </div>
+
+                <div className="sm:col-span-2">
                   <label className="block text-[11px] font-bold text-[#52525B] mb-1.5">Buffer Minimum (Alert)</label>
                   <input
                     type="number"

@@ -1,7 +1,9 @@
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
+import { useNotify } from '../../common/NotificationContext';
 
 export default function WelcomeScreen({ tableNumber, setTableNumber, onNext }) {
+  const { showAlert } = useNotify();
   return (
     <motion.div 
       initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}
@@ -35,7 +37,14 @@ export default function WelcomeScreen({ tableNumber, setTableNumber, onNext }) {
           </div>
 
           <button 
-            onClick={() => { if(tableNumber) onNext(); else alert("Mohon masukkan nomor meja Anda."); }}
+            onClick={() => {
+              if (tableNumber) onNext();
+              else showAlert({
+                title: 'Nomor Meja Diperlukan',
+                message: 'Mohon masukkan nomor meja Anda terlebih dahulu sebelum melihat katalog menu.',
+                variant: 'warning'
+              });
+            }}
             className="w-full bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] font-extrabold py-4 rounded-xl text-sm flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-95 transition-all"
           >
             Lihat Menu <ArrowRight size={18} />

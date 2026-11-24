@@ -1,18 +1,38 @@
 import { motion } from 'framer-motion';
-import { Clock, ShieldCheck, AlertTriangle, Edit3, Trash2, CalendarDays, Package, Tag } from 'lucide-react';
+import {
+  Clock,
+  ShieldCheck,
+  AlertTriangle,
+  AlertOctagon,
+  Edit3,
+  Trash2,
+  CalendarDays,
+  Package,
+  Tag,
+  TrendingUp,
+  TrendingDown
+} from 'lucide-react';
+import {
+  evaluateIngredientStatus,
+  parseLocalDate,
+  checkExpiryStatus as defaultCheckExpiryStatus
+} from '../../../utils/inventoryStatus';
+import { computeIngredientPriceComparison } from '../../../utils/cogsCalculator';
 
 export default function InventoryTable({
   activeSub,
   filteredProducts = [],
   filteredIngredients = [],
-  checkExpiryStatus,
+  checkExpiryStatus = defaultCheckExpiryStatus,
   handleOpenEdit,
   handleDeleteIngredient,
   handleOpenPriceModal
 }) {
   const formatTanggal = (dateString) => {
     if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString('id-ID', {
+    const parsed = parseLocalDate(dateString);
+    if (!parsed) return dateString;
+    return parsed.toLocaleDateString('id-ID', {
       day: 'numeric',
       month: 'short',
       year: 'numeric'
@@ -86,7 +106,7 @@ export default function InventoryTable({
           <tr className="border-b border-zinc-200 font-mono text-[10px] font-bold uppercase tracking-wider text-[#52525B]">
             <th className="pb-3 px-3 md:px-4">Nama Barang Gudang</th>
             <th className="pb-3 px-3 md:px-4">Stok & Buffer</th>
-            <th className="pb-3 px-3 md:px-4">Harga Beli</th>
+            <th className="pb-3 px-3 md:px-4">Harga Pasar & Awal</th>
             <th className="pb-3 px-3 md:px-4">Tgl. Masuk</th>
             <th className="pb-3 px-3 md:px-4">Kedaluwarsa</th>
             <th className="pb-3 px-3 md:px-4">Status</th>
@@ -99,14 +119,19 @@ export default function InventoryTable({
             const ingName = nameParts[0];
             const ingCategory = nameParts[1] || 'Bahan Umum';
 
-            const isBelowMin = Number(ing.stock) <= Number(ing.minLimit);
-            const expiryStatus = checkExpiryStatus(ing.expiryDate);
+            const {
+              diffDays,
+              isExpired,
+              isNearExpiry,
+              isBelowMin,
+              isHealthy
+            } = evaluateIngredientStatus(ing);
             const ratioCap = Math.max(Number(ing.minLimit) * 3 || 10, Number(ing.stock) || 1);
             const stockPct = Math.min(100, Math.max(6, Math.round((Number(ing.stock) / ratioCap) * 100)));
 
             let rowColor = 'hover:bg-[#FAFAFA]';
-            if (expiryStatus === 'expired' || isBelowMin) rowColor = 'bg-red-50/40 hover:bg-red-50/70';
-            else if (expiryStatus === 'hampir') rowColor = 'bg-[#FEF3C7]/35 hover:bg-[#FEF3C7]/60';
+            if (isExpired || isBelowMin) rowColor = 'bg-red-50/40 hover:bg-red-50/70';
+            else if (isNearExpiry) rowColor = 'bg-[#FEF3C7]/35 hover:bg-[#FEF3C7]/60';
 
             return (
               <motion.tr
@@ -135,7 +160,11 @@ export default function InventoryTable({
                       <div
                         style={{ width: `${stockPct}%` }}
                         className={`h-full rounded-full ${
-                          isBelowMin ? 'bg-red-600' : expiryStatus === 'hampir' ? 'bg-[#F59E0B]' : 'bg-emerald-600'
+                          isExpired || isBelowMin
+                            ? 'bg-red-600'
+                            : isNearExpiry
+                            ? 'bg-[#F59E0B]'
+                            : 'bg-emerald-600'
                         }`}
                       />
                     </div>
@@ -144,20 +173,46 @@ export default function InventoryTable({
                 </td>
 
                 <td className="py-3.5 px-3 md:px-4 whitespace-nowrap">
-                  {Number(ing.unitPrice) > 0 ? (
-                    <div>
-                      <span className="font-mono font-bold text-[#141414] text-xs">
-                        Rp {Number(ing.unitPrice).toLocaleString('id-ID')}
-                      </span>
-                      <span className="text-[10px] text-[#52525B] block font-mono">
-                        per {ing.unit}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="font-mono text-[10px] font-bold text-[#B45309] bg-[#FEF3C7] border border-[#FDE68A] px-2 py-0.5 rounded-md">
-                      Belum diset
-                    </span>
-                  )}
+                  {(() => {
+                    const priceInfo = computeIngredientPriceComparison(ing);
+                    if (!priceInfo.hasPrice) {
+                      return (
+                        <span className="font-mono text-[10px] font-bold text-[#B45309] bg-[#FEF3C7] border border-[#FDE68A] px-2 py-0.5 rounded-md">
+                          Belum diset
+                        </span>
+                      );
+                    }
+                    return (
+                      <div className="space-y-1">
+                        <div className="flex items-baseline gap-1">
+                          <span className="font-mono font-extrabold text-[#141414] text-xs">
+                            Rp {priceInfo.marketPrice.toLocaleString('id-ID')}
+                          </span>
+                          <span className="text-[10px] text-[#52525B] font-mono">
+                            / {ing.unit}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[10px] font-mono font-medium text-[#52525B]">
+                            Awal: Rp {priceInfo.initialPrice.toLocaleString('id-ID')}
+                          </span>
+                          {priceInfo.trend === 'up' ? (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200 font-mono text-[9px] font-bold">
+                              <TrendingUp size={10} /> {priceInfo.formattedDiff}
+                            </span>
+                          ) : priceInfo.trend === 'down' ? (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono text-[9px] font-bold">
+                              <TrendingDown size={10} /> {priceInfo.formattedDiff}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-[#FAFAFA] text-[#52525B] border border-[#E5E5E5] font-mono text-[9px] font-semibold">
+                              Sama dengan awal
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </td>
 
                 <td className="py-3.5 px-3 md:px-4 text-[#52525B] whitespace-nowrap">
@@ -169,27 +224,63 @@ export default function InventoryTable({
 
                 <td className="py-3.5 px-3 md:px-4 text-[#52525B] whitespace-nowrap">
                   <div className="flex items-center gap-1.5">
-                    <Clock size={14} className={expiryStatus === 'aman' ? 'text-zinc-400 shrink-0' : 'text-red-600 shrink-0'} />
-                    <span className={expiryStatus !== 'aman' ? 'font-bold text-red-600' : ''}>
+                    <Clock
+                      size={14}
+                      className={
+                        isExpired
+                          ? 'text-red-600 shrink-0'
+                          : isNearExpiry
+                          ? 'text-[#D97706] shrink-0'
+                          : 'text-zinc-400 shrink-0'
+                      }
+                    />
+                    <span
+                      className={
+                        isExpired
+                          ? 'font-bold text-red-600'
+                          : isNearExpiry
+                          ? 'font-bold text-[#B45309]'
+                          : ''
+                      }
+                    >
                       {formatTanggal(ing.expiryDate)}
                     </span>
+                    {isExpired && diffDays !== null && (
+                      <span className="font-mono text-[10px] font-bold text-red-600">
+                        (Lewat {Math.abs(diffDays)} hr)
+                      </span>
+                    )}
+                    {isNearExpiry && diffDays !== null && (
+                      <span className="font-mono text-[10px] font-bold text-[#B45309]">
+                        ({diffDays === 0 ? 'Hari ini' : `H-${diffDays}`})
+                      </span>
+                    )}
                   </div>
                 </td>
 
                 <td className="py-3.5 px-3 md:px-4 whitespace-nowrap">
-                  {isBelowMin ? (
-                    <span className="bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-md font-mono text-[10px] font-bold inline-flex items-center gap-1">
-                      <AlertTriangle size={12} /> Restock
-                    </span>
-                  ) : expiryStatus === 'hampir' ? (
-                    <span className="bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] px-2.5 py-1 rounded-md font-mono text-[10px] font-bold whitespace-nowrap">
-                      Hampir Exp
-                    </span>
-                  ) : (
-                    <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-md font-mono text-[10px] font-bold inline-flex items-center gap-1 whitespace-nowrap">
-                      <ShieldCheck size={12} /> Aman
-                    </span>
-                  )}
+                  <div className="flex flex-wrap items-center gap-1">
+                    {isExpired && (
+                      <span className="bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-md font-mono text-[10px] font-bold inline-flex items-center gap-1 whitespace-nowrap">
+                        <AlertOctagon size={12} /> Expired
+                      </span>
+                    )}
+                    {isBelowMin && (
+                      <span className="bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-md font-mono text-[10px] font-bold inline-flex items-center gap-1 whitespace-nowrap">
+                        <AlertTriangle size={12} /> Restock
+                      </span>
+                    )}
+                    {isNearExpiry && (
+                      <span className="bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] px-2.5 py-1 rounded-md font-mono text-[10px] font-bold inline-flex items-center gap-1 whitespace-nowrap">
+                        <Clock size={12} /> Hampir Exp
+                      </span>
+                    )}
+                    {isHealthy && (
+                      <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-md font-mono text-[10px] font-bold inline-flex items-center gap-1 whitespace-nowrap">
+                        <ShieldCheck size={12} /> Aman
+                      </span>
+                    )}
+                  </div>
                 </td>
 
                 <td className="py-3.5 px-3 md:px-4 text-right space-x-1.5 whitespace-nowrap">

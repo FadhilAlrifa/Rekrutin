@@ -10,18 +10,23 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   AlertTriangle,
-  CheckCircle2
+  CheckCircle2,
+  CalendarClock,
+  History
 } from 'lucide-react';
 import {
   fetchTransactions,
+  fetchDailySalesHistory,
   createSeasonalEvent,
   deleteSeasonalEvent
 } from '../../../services/stockoService';
 import {
   aggregatePeriodAnalytics,
   analyzeSeasonalPerformance,
-  computeSeasonalDemandForecast
+  computeSeasonalDemandForecast,
+  getUpcomingHolidayReminders
 } from '../../../utils/seasonalForecasting';
+import DailySalesHistoryPanel from './DailySalesHistoryPanel';
 
 export default function SeasonalAnalyticsModule({
   products = [],
@@ -30,10 +35,13 @@ export default function SeasonalAnalyticsModule({
   seasonalEvents = [],
   setSeasonalEvents,
   currentOperator,
-  onNavigateTab
+  onNavigateTab,
+  onOpenHolidayReminder,
+  businessType = 'fnb'
 }) {
   const [isLoading, setIsLoading] = useState(true);
   const [transactions, setTransactions] = useState([]);
+  const [persistedDailyRows, setPersistedDailyRows] = useState([]);
   const [granularity, setGranularity] = useState('daily'); // 'daily' | 'weekly' | 'monthly' | 'yearly'
   const [selectedEventId, setSelectedEventId] = useState(seasonalEvents[0]?.id || 'EVT-RAMADAN');
   const [horizonDays, setHorizonDays] = useState(14);
@@ -51,9 +59,10 @@ export default function SeasonalAnalyticsModule({
 
   useEffect(() => {
     let active = true;
-    fetchTransactions().then((data) => {
+    Promise.all([fetchTransactions(), fetchDailySalesHistory()]).then(([txData, dailyRows]) => {
       if (active) {
-        setTransactions(data || []);
+        setTransactions(txData || []);
+        setPersistedDailyRows(Array.isArray(dailyRows) ? dailyRows : []);
         setIsLoading(false);
       }
     });
@@ -67,10 +76,15 @@ export default function SeasonalAnalyticsModule({
     [transactions, stockMovements, granularity, products, ingredients]
   );
 
-  const seasonalComparisons = useMemo(
-    () => analyzeSeasonalPerformance(transactions, seasonalEvents),
-    [transactions, seasonalEvents]
-  );
+  const seasonalComparisons = useMemo(() => {
+    const comparisons = analyzeSeasonalPerformance(transactions, seasonalEvents);
+    const { allEventsWithStatus } = getUpcomingHolidayReminders(seasonalEvents);
+    const statusMap = new Map(allEventsWithStatus.map((e) => [String(e.id), e]));
+    return comparisons.map((c) => ({
+      ...c,
+      reminderMeta: statusMap.get(String(c.id)) || null
+    }));
+  }, [transactions, seasonalEvents]);
 
   const forecast = useMemo(
     () =>
@@ -207,13 +221,13 @@ export default function SeasonalAnalyticsModule({
 
         <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-sm">
           <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#52525B]">
-            Saran Kenaikan Buffer
+            Persiapan Stok Event
           </p>
           <p className="text-2xl font-extrabold font-mono text-[#B45309] mt-1.5">
             {forecast.summary.raiseBufferCount} Bahan
           </p>
           <p className="text-[11px] text-[#52525B] font-medium mt-1">
-            Estimasi belanja restock: Rp {forecast.summary.priorityRestockCost.toLocaleString('id-ID')}
+            Buffer tetap berbasis riwayat • Belanja: Rp {forecast.summary.priorityRestockCost.toLocaleString('id-ID')}
           </p>
         </div>
 
@@ -415,6 +429,11 @@ export default function SeasonalAnalyticsModule({
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-extrabold text-[#141414]">{evt.name}</span>
+                        {evt.reminderMeta?.isReminderActive && (
+                          <span className="inline-flex items-center gap-1 font-mono text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-[#F59E0B] text-[#141414]">
+                            <CalendarClock size={10} /> {evt.reminderMeta.countdownBadge} Reminder
+                          </span>
+                        )}
                         <span
                           className={`font-mono text-[10px] font-bold px-2 py-0.5 rounded-md border inline-flex items-center gap-0.5 ${
                             evt.effectiveLiftPct >= 0
@@ -432,6 +451,9 @@ export default function SeasonalAnalyticsModule({
                       </div>
                       <p className="font-mono text-[10px] text-[#52525B] mt-1">
                         {evt.startDate} s.d. {evt.endDate}
+                        {evt.reminderMeta?.triggerDateIso && !evt.reminderMeta.isReminderActive && evt.reminderMeta.daysUntilStart > 14
+                          ? ` • Reminder H-14 mulai ${evt.reminderMeta.triggerDateIso}`
+                          : ''}
                       </p>
                       <p className="text-[11px] text-[#52525B] mt-1">
                         Baseline: Rp {evt.baselineDailyRevenue.toLocaleString('id-ID')}/hr →{' '}
@@ -440,6 +462,18 @@ export default function SeasonalAnalyticsModule({
                         </span>
                         {evt.hasActualData ? ' (Aktual)' : ' (Proyeksi)'}
                       </p>
+                      {onOpenHolidayReminder && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenHolidayReminder(evt);
+                          }}
+                          className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white hover:bg-[#FEF3C7] border border-[#E5E5E5] hover:border-[#F59E0B] text-[10px] font-bold text-[#141414] cursor-pointer transition-colors"
+                        >
+                          <History size={11} className="text-[#D97706]" /> Referensi Pembelian Tahun Lalu
+                        </button>
+                      )}
                     </div>
                     <button
                       type="button"
@@ -508,14 +542,14 @@ export default function SeasonalAnalyticsModule({
                   <th className="py-2.5 px-2">Bahan Baku</th>
                   <th className="py-2.5 px-2">Stok / Min</th>
                   <th className="py-2.5 px-2">Kebutuhan {horizonDays}h</th>
-                  <th className="py-2.5 px-2">Buffer Saran</th>
+                  <th className="py-2.5 px-2">Buffer Historis</th>
                   <th className="py-2.5 px-2">Rekomendasi Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 text-xs">
                 {forecast.ingredientForecasts.map((item) => {
-                  const isRaise = item.bufferAction === 'Naikkan Buffer & Restock';
-                  const isLow = item.bufferAction === 'Kurangi Order (Low-Season)';
+                  const isRaise = item.bufferAction === 'Siapkan Restock (Buffer Tetap)';
+                  const isLow = item.bufferAction === 'Pantau Stok (Low-Season)';
                   return (
                     <tr key={item.ingredientId} className="hover:bg-[#FAFAFA]">
                       <td className="py-3 px-2 font-bold text-[#141414]">
@@ -593,6 +627,17 @@ export default function SeasonalAnalyticsModule({
           </div>
         </div>
       </div>
+
+      {/* Riwayat Penjualan Harian & Kuota Menu Favorit untuk Acuan Persiapan Event */}
+      <DailySalesHistoryPanel
+        transactions={transactions}
+        products={products}
+        ingredients={ingredients}
+        seasonalEvents={seasonalEvents}
+        persistedDailyRows={persistedDailyRows}
+        businessType={businessType}
+        compactTitle
+      />
     </div>
   );
 }

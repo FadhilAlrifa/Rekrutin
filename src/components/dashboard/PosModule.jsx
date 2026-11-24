@@ -7,7 +7,7 @@ import { OrderModificationModal, OrderCancelModal, CashierShiftModal } from './p
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingCart, CheckCircle2, MessageSquare, 
-  Search, Trash2, Plus, Minus, CreditCard, Wallet, QrCode, AlertTriangle, ShieldAlert, Sparkles, ChefHat, SlidersHorizontal, UserCheck 
+  Search, Trash2, Plus, Minus, CreditCard, Wallet, QrCode, AlertTriangle, ShieldAlert, Sparkles, ChefHat, SlidersHorizontal, UserCheck, X 
 } from 'lucide-react';
 
 export default function PosModule({
@@ -999,18 +999,57 @@ export default function PosModule({
       <AnimatePresence>
         {stockAlertModal.isOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setStockAlertModal({ ...stockAlertModal, isOpen: false })} className="absolute inset-0 bg-zinc-950/40 cursor-pointer"></motion.div>
-            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }} className="relative w-full max-w-sm bg-white rounded-2xl p-6 shadow-xl border border-zinc-200 text-center space-y-4">
-              <div className="w-14 h-14 bg-red-50 text-red-500 rounded-2xl mx-auto flex items-center justify-center border border-red-100">
-                <ShieldAlert size={28} />
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setStockAlertModal({ ...stockAlertModal, isOpen: false })}
+              className="absolute inset-0 bg-[#141414]/40 backdrop-blur-[4px] cursor-pointer"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 14 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 30, mass: 0.85 }}
+              className="relative w-full max-w-[420px] bg-white rounded-3xl border border-[#E5E5E5] shadow-[0_24px_64px_-16px_rgba(20,20,20,0.22)] overflow-hidden"
+            >
+              <div className="h-1.5 w-full bg-red-600" />
+              <div className="px-6 pt-5 pb-3 flex items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border font-mono text-[10px] font-bold uppercase tracking-wider bg-red-50 text-red-700 border-red-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
+                  Validasi Stok
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setStockAlertModal({ ...stockAlertModal, isOpen: false })}
+                  aria-label="Tutup peringatan stok"
+                  className="w-8 h-8 rounded-full bg-[#FAFAFA] hover:bg-zinc-200/70 border border-[#E5E5E5] text-zinc-500 hover:text-[#141414] flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X size={15} />
+                </button>
               </div>
-              <div className="space-y-1.5">
-                <h3 className="font-bold text-zinc-900 text-base">{stockAlertModal.title}</h3>
-                <p className="text-xs text-zinc-600 font-medium leading-relaxed">{stockAlertModal.message}</p>
+              <div className="px-6 pt-2 pb-5 flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 border border-red-200 ring-4 ring-red-50/80 flex items-center justify-center shrink-0">
+                  <ShieldAlert size={22} />
+                </div>
+                <div className="min-w-0 pt-0.5">
+                  <h3 className="text-[17px] font-extrabold text-[#141414] tracking-tight leading-snug">
+                    {stockAlertModal.title}
+                  </h3>
+                  <p className="text-[13px] text-[#52525B] font-medium leading-relaxed mt-1.5">
+                    {stockAlertModal.message}
+                  </p>
+                </div>
               </div>
-              <button onClick={() => setStockAlertModal({ ...stockAlertModal, isOpen: false })} className="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold py-3 rounded-xl text-xs cursor-pointer transition-colors">
-                Mengerti
-              </button>
+              <div className="px-6 py-4 bg-[#FAFAFA] border-t border-[#E5E5E5] flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={() => setStockAlertModal({ ...stockAlertModal, isOpen: false })}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] font-extrabold rounded-xl text-xs cursor-pointer shadow-sm active:scale-[0.98] transition-all"
+                >
+                  Mengerti
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
