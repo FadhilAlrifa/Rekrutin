@@ -495,6 +495,7 @@ function AppContent() {
       adminName: profile.role === 'superadmin' ? profile.fullName : 'Admin',
       businessName: user.user_metadata?.business_name || 'Usaha Utama',
       businessType: user.user_metadata?.business_type || 'fnb',
+      fnbServiceMode: user.user_metadata?.fnb_service_mode || 'dine_in_take_away',
       paymentFlow: user.user_metadata?.payment_flow || 'pay_first',
       subscriptionPlan: user.user_metadata?.subscription_plan || 'pro',
       forceReset: false
@@ -506,11 +507,19 @@ function AppContent() {
 
     const resolvedBusinessType =
       workspace?.businessType || user.user_metadata?.business_type || 'fnb';
+    const resolvedFnbServiceMode =
+      workspace?.fnbServiceMode || user.user_metadata?.fnb_service_mode || 'dine_in_take_away';
     const resolvedPaymentFlow =
       workspace?.paymentFlow || user.user_metadata?.payment_flow || 'pay_first';
+    const resolvedDefaultOrderChannel =
+      resolvedBusinessType === 'fnb' && resolvedFnbServiceMode === 'take_away_only'
+        ? 'take_away'
+        : workspace?.defaultOrderChannel || 'dine_in';
     setMerchantSettings((prev) => ({
       ...prev,
       businessType: resolvedBusinessType,
+      fnbServiceMode: resolvedFnbServiceMode,
+      defaultOrderChannel: resolvedDefaultOrderChannel,
       paymentFlow: resolvedPaymentFlow
     }));
 
@@ -827,7 +836,11 @@ function AppContent() {
     }
   }, [currentView, subscriptionPlan, isSimulationMode, products.length]);
 
-  const handleConfirmSimulation = async ({ businessType: nextBusinessType, paymentFlow: nextPaymentFlow }) => {
+  const handleConfirmSimulation = async ({
+    businessType: nextBusinessType,
+    fnbServiceMode: nextFnbServiceMode = 'dine_in_take_away',
+    paymentFlow: nextPaymentFlow
+  }) => {
     if (pendingSimulationPlan) {
       setSubscriptionPlan(pendingSimulationPlan);
     }
@@ -840,6 +853,8 @@ function AppContent() {
       setProducts(createSimulationFnbProducts());
       setIngredients(createSimulationFnbIngredients());
     }
+    const resolvedFnbMode =
+      nextBusinessType === 'fnb' ? nextFnbServiceMode || 'dine_in_take_away' : 'dine_in_take_away';
     const simAnalytics = createSimulationAnalyticsData(nextBusinessType);
     setTransactions(simAnalytics.transactions);
     setStockMovements(simAnalytics.stockMovements);
@@ -852,6 +867,11 @@ function AppContent() {
     const nextSettings = {
       ...merchantSettings,
       businessType: nextBusinessType,
+      fnbServiceMode: resolvedFnbMode,
+      defaultOrderChannel:
+        nextBusinessType === 'fnb' && resolvedFnbMode === 'take_away_only'
+          ? 'take_away'
+          : 'dine_in',
       paymentFlow: nextPaymentFlow
     };
     setMerchantSettings(nextSettings);
@@ -874,9 +894,13 @@ function AppContent() {
 
     showToast({
       title: 'Simulasi POS Siap Dicoba',
-      message: `Mode ${nextBusinessType === 'retail' ? 'Toko Ritel & Minimarket' : 'F&B / Kafe'} • ${
-        nextPaymentFlow === 'pay_later' ? 'Bayar Nanti (Open Bill)' : 'Bayar di Awal'
-      }.`,
+      message: `Mode ${
+        nextBusinessType === 'retail'
+          ? 'Toko Ritel & Minimarket'
+          : resolvedFnbMode === 'take_away_only'
+          ? 'F&B Khusus Take-Away'
+          : 'F&B Resto (Dine-In & Take-Away)'
+      } • ${nextPaymentFlow === 'pay_later' ? 'Bayar Nanti (Open Bill)' : 'Bayar di Awal'}.`,
       variant: 'success',
       duration: 5000
     });
@@ -974,6 +998,10 @@ function AppContent() {
     }
 
     const currentSubtotal = cartItems.reduce((sum, item) => sum + item.price * item.qty, 0);
+    const resolvedDefaultChannel =
+      businessType === 'fnb' && merchantSettings?.fnbServiceMode === 'take_away_only'
+        ? 'take_away'
+        : merchantSettings?.defaultOrderChannel || 'dine_in';
     let savedTxRows = null;
     if (isSimulationMode) {
       savedTxRows = [
@@ -984,7 +1012,7 @@ function AppContent() {
           table_number: tableNumber || 'Takeaway / Kasir',
           payment_method: paymentMethod,
           created_at: new Date().toISOString(),
-          order_channel: 'dine_in',
+          order_channel: resolvedDefaultChannel,
           payment_flow: 'pay_first',
           payment_status: 'paid',
           kitchen_status: 'served',
@@ -994,7 +1022,7 @@ function AppContent() {
       ];
     } else {
       savedTxRows = await saveTransaction(currentSubtotal, cartItems, tableNumber, paymentMethod, {
-        orderChannel: 'dine_in',
+        orderChannel: resolvedDefaultChannel,
         paymentFlow: 'pay_first',
         paymentStatus: 'paid',
         kitchenStatus: 'served',
@@ -1052,9 +1080,23 @@ function AppContent() {
       setStockLogs(simAnalytics.stockLogs);
     }
 
+    if (
+      saved?.businessType === 'fnb' &&
+      saved?.fnbServiceMode === 'take_away_only' &&
+      activeTab === 'self-order'
+    ) {
+      setActiveTab('pos');
+    }
+
     showToast({
       title: 'Pengaturan toko tersimpan',
-      message: `Jenis usaha aktif: ${saved?.businessType === 'retail' ? 'Toko Ritel & Minimarket' : 'F&B / Kafe'}.`,
+      message: `Jenis usaha aktif: ${
+        saved?.businessType === 'retail'
+          ? 'Toko Ritel & Minimarket'
+          : saved?.fnbServiceMode === 'take_away_only'
+          ? 'F&B Khusus Take-Away'
+          : 'F&B Resto (Dine-In & Take-Away)'
+      }.`,
       variant: 'success'
     });
   };
@@ -1532,6 +1574,7 @@ function AppContent() {
               onCompleteRegistration={async ({
                 subscriptionPlan: chosenPlan,
                 businessType: chosenBusinessType,
+                fnbServiceMode: chosenFnbServiceMode,
                 paymentFlow: chosenPaymentFlow,
                 username,
                 email,
@@ -1543,9 +1586,18 @@ function AppContent() {
                 setIsSimulationMode(false);
                 starterShowcaseAppliedRef.current = false;
                 if (chosenPlan) setSubscriptionPlan(chosenPlan);
+                const resolvedFnbMode =
+                  (chosenBusinessType || 'fnb') === 'fnb'
+                    ? chosenFnbServiceMode || 'dine_in_take_away'
+                    : 'dine_in_take_away';
                 setMerchantSettings((prev) => ({
                   ...prev,
                   businessType: chosenBusinessType || 'fnb',
+                  fnbServiceMode: resolvedFnbMode,
+                  defaultOrderChannel:
+                    (chosenBusinessType || 'fnb') === 'fnb' && resolvedFnbMode === 'take_away_only'
+                      ? 'take_away'
+                      : 'dine_in',
                   paymentFlow: chosenPaymentFlow || 'pay_first'
                 }));
                 setUserRole('superadmin');
@@ -1622,6 +1674,7 @@ function AppContent() {
                 lowStockCount={lowStockCount}
                 retailLowStockCount={retailLowStockCount}
                 businessType={businessType}
+                fnbServiceMode={merchantSettings?.fnbServiceMode || 'dine_in_take_away'}
                 userRole={userRole}
                 isSimulationMode={isSimulationMode}
                 canSwitchRole={isSimulationMode}
@@ -1969,7 +2022,27 @@ function AppContent() {
                       )}
 
                       {activeTab === 'self-order' &&
-                        (subscriptionPlan === 'starter' ? (
+                        (businessType === 'fnb' &&
+                        merchantSettings?.fnbServiceMode === 'take_away_only' ? (
+                          <div className="bg-white border border-[#E5E5E5] rounded-3xl p-8 max-w-xl mx-auto text-center space-y-4">
+                            <span className="inline-block font-mono text-[10px] font-bold uppercase tracking-wider bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] px-3 py-1 rounded-full">
+                              Mode Khusus Take-Away
+                            </span>
+                            <h2 className="text-xl font-extrabold text-[#141414]">
+                              QR Meja Tidak Digunakan pada Outlet Take-Away
+                            </h2>
+                            <p className="text-xs text-[#52525B] leading-relaxed">
+                              Usaha kamu disetel sebagai F&amp;B Khusus Take-Away tanpa meja makan di tempat. Semua pesanan dicatat langsung lewat Kasir (POS) dengan kanal Take-Away atau Closed Kitchen.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setActiveTab('pos')}
+                              className="bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] font-extrabold text-xs px-5 py-3 rounded-xl cursor-pointer transition-colors"
+                            >
+                              Kembali ke Kasir (POS)
+                            </button>
+                          </div>
+                        ) : subscriptionPlan === 'starter' ? (
                           renderStarterLockedFeature(
                             'Pesan Mandiri dari Meja (QR)',
                             'Di Paket Starter, pesanan hanya dicatat lewat kasir. Upgrade ke Paket Pro supaya pelanggan bisa scan QR dan pesan langsung dari meja.',
@@ -2169,6 +2242,7 @@ function AppContent() {
           setPendingSimulationPlan(null);
         }}
         initialBusinessType={merchantSettings?.businessType || 'fnb'}
+        initialFnbServiceMode={merchantSettings?.fnbServiceMode || 'dine_in_take_away'}
         initialPaymentFlow={merchantSettings?.paymentFlow || 'pay_first'}
         pendingPlan={pendingSimulationPlan}
         onConfirm={handleConfirmSimulation}

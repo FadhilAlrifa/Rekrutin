@@ -65,9 +65,12 @@ function createEmptyWorkspaceManifest({
   adminName = 'Admin',
   businessName = 'Usaha Utama',
   businessType = 'fnb',
+  fnbServiceMode = 'dine_in_take_away',
   paymentFlow = 'pay_first',
   subscriptionPlan = 'pro'
 }) {
+  const normalizedFnbMode =
+    businessType === 'fnb' ? fnbServiceMode || 'dine_in_take_away' : 'dine_in_take_away';
   return {
     companyId: String(companyId),
     adminId: String(adminId || companyId),
@@ -75,6 +78,7 @@ function createEmptyWorkspaceManifest({
     adminName: String(adminName || 'Admin').trim(),
     businessName: String(businessName || 'Usaha Utama').trim(),
     businessType: businessType || 'fnb',
+    fnbServiceMode: normalizedFnbMode,
     paymentFlow: paymentFlow || 'pay_first',
     subscriptionPlan: subscriptionPlan || 'pro',
     staffEmails: [],
@@ -119,21 +123,34 @@ function saveWorkspaceManifestLocal(manifest) {
 async function persistWorkspaceManifestToDb(manifest) {
   if (!manifest?.companyId) return;
   saveWorkspaceManifestLocal(manifest);
+  const resolvedDefaultChannel =
+    manifest.businessType === 'fnb' && manifest.fnbServiceMode === 'take_away_only'
+      ? 'take_away'
+      : manifest.defaultOrderChannel || 'dine_in';
+
   await runOptionalTableWrite('merchant_settings', async () => {
     const row = {
       id: `workspace:${manifest.companyId}`,
-      default_order_channel: 'dine_in',
+      default_order_channel: resolvedDefaultChannel,
       payment_flow: manifest.paymentFlow || 'pay_first',
       closed_kitchen_enabled: true,
       require_cashier_shift: true,
       updated_by: JSON.stringify(manifest),
       updated_at: new Date().toISOString()
     };
-    const res = await supabase
-      .from('merchant_settings')
-      .upsert({ ...row, business_type: manifest.businessType || 'fnb' });
+    const res = await supabase.from('merchant_settings').upsert({
+      ...row,
+      business_type: manifest.businessType || 'fnb',
+      fnb_service_mode: manifest.fnbServiceMode || 'dine_in_take_away'
+    });
     if (res.error && String(res.error.code) === 'PGRST204') {
-      return supabase.from('merchant_settings').upsert(row);
+      const fallbackWithType = await supabase
+        .from('merchant_settings')
+        .upsert({ ...row, business_type: manifest.businessType || 'fnb' });
+      if (fallbackWithType.error && String(fallbackWithType.error.code) === 'PGRST204') {
+        return supabase.from('merchant_settings').upsert(row);
+      }
+      return fallbackWithType;
     }
     return res;
   });
@@ -146,6 +163,7 @@ export async function fetchOrInitCompanyWorkspace({
   adminName = 'Admin',
   businessName = 'Usaha Utama',
   businessType = 'fnb',
+  fnbServiceMode = 'dine_in_take_away',
   paymentFlow = 'pay_first',
   subscriptionPlan = 'pro',
   forceReset = false
@@ -162,6 +180,7 @@ export async function fetchOrInitCompanyWorkspace({
       adminName,
       businessName,
       businessType,
+      fnbServiceMode,
       paymentFlow,
       subscriptionPlan
     });
@@ -185,6 +204,10 @@ export async function fetchOrInitCompanyWorkspace({
           ...createEmptyWorkspaceManifest({ companyId: cid }),
           ...parsed,
           businessType: res.data.business_type || parsed.businessType || businessType,
+          fnbServiceMode:
+            res.data.fnb_service_mode ||
+            parsed.fnbServiceMode ||
+            (res.data.default_order_channel === 'take_away' ? 'take_away_only' : fnbServiceMode),
           paymentFlow: res.data.payment_flow || parsed.paymentFlow || paymentFlow
         };
         saveWorkspaceManifestLocal(merged);
@@ -207,6 +230,7 @@ export async function fetchOrInitCompanyWorkspace({
     adminName,
     businessName,
     businessType,
+    fnbServiceMode,
     paymentFlow,
     subscriptionPlan
   });
@@ -1049,17 +1073,48 @@ export async function loginUser(identifier, password) {
   return { success: true, data };
 }
 
-export async function sendMagicLink(email) {
+export async function sendLoginOtp(email) {
+  const cleanEmail = String(email || '').trim().toLowerCase();
   const { data, error } = await supabase.auth.signInWithOtp({
-    email: email,
+    email: cleanEmail,
     options: {
-      emailRedirectTo: window.location.origin
+      shouldCreateUser: false
     }
   });
 
   if (error) {
-    console.error('Gagal mengirim Magic Link:', error.message);
-    return { success: false, message: error.message };
+    console.error('Gagal mengirim kode OTP login:', error.message);
+    const lower = String(error.message || '').toLowerCase();
+    return {
+      success: false,
+      message:
+        lower.includes('signups not allowed') || lower.includes('user not found')
+          ? 'Email admin belum terdaftar. Silakan daftar akun terlebih dahulu.'
+          : error.message
+    };
+  }
+  return { success: true, data };
+}
+
+export async function verifyLoginOtp(email, token) {
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const cleanToken = String(token || '').replace(/\s+/g, '');
+
+  const { data, error } = await supabase.auth.verifyOtp({
+    email: cleanEmail,
+    token: cleanToken,
+    type: 'email'
+  });
+
+  if (error) {
+    console.error('Gagal memverifikasi kode OTP login:', error.message);
+    const lower = String(error.message || '').toLowerCase();
+    return {
+      success: false,
+      message: lower.includes('expired')
+        ? 'Kode OTP sudah kedaluwarsa. Klik "Kirim Ulang Kode".'
+        : 'Kode OTP tidak cocok. Periksa kembali kode di email Anda.'
+    };
   }
   return { success: true, data };
 }
@@ -1459,6 +1514,7 @@ export async function recordStockMutationLog(entry) {
 
 export const DEFAULT_MERCHANT_SETTINGS = {
   businessType: 'fnb', // 'fnb' | 'retail'
+  fnbServiceMode: 'dine_in_take_away', // 'dine_in_take_away' | 'take_away_only'
   defaultOrderChannel: 'dine_in',
   paymentFlow: 'pay_first',
   closedKitchenEnabled: true,
@@ -1468,19 +1524,35 @@ export const DEFAULT_MERCHANT_SETTINGS = {
 export async function fetchMerchantSettings() {
   const manifest = getActiveWorkspaceManifest();
   if (manifest) {
+    const fnbServiceMode = manifest.fnbServiceMode || 'dine_in_take_away';
+    const isTakeAwayOnly =
+      (manifest.businessType || 'fnb') === 'fnb' && fnbServiceMode === 'take_away_only';
     return {
       ...DEFAULT_MERCHANT_SETTINGS,
       businessType: manifest.businessType || 'fnb',
+      fnbServiceMode,
+      defaultOrderChannel: isTakeAwayOnly
+        ? 'take_away'
+        : manifest.defaultOrderChannel || 'dine_in',
       paymentFlow: manifest.paymentFlow || 'pay_first'
     };
   }
   return readLocalJson(MERCHANT_SETTINGS_STORAGE_KEY, DEFAULT_MERCHANT_SETTINGS);
 }
 
-export async function saveMerchantSettings(settings, operatorName = 'Admin') {
-  const normalized = {
+export async function saveMerchantSettings(settings) {
+  const merged = {
     ...DEFAULT_MERCHANT_SETTINGS,
     ...settings
+  };
+  const isTakeAwayOnly =
+    merged.businessType === 'fnb' && merged.fnbServiceMode === 'take_away_only';
+  const normalized = {
+    ...merged,
+    defaultOrderChannel:
+      isTakeAwayOnly && merged.defaultOrderChannel === 'dine_in'
+        ? 'take_away'
+        : merged.defaultOrderChannel
   };
   writeLocalJson(MERCHANT_SETTINGS_STORAGE_KEY, normalized);
 
@@ -1489,6 +1561,8 @@ export async function saveMerchantSettings(settings, operatorName = 'Admin') {
     await updateWorkspaceManifest((m) => ({
       ...m,
       businessType: normalized.businessType,
+      fnbServiceMode: normalized.fnbServiceMode,
+      defaultOrderChannel: normalized.defaultOrderChannel,
       paymentFlow: normalized.paymentFlow
     }));
   }

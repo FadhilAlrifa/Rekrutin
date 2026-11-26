@@ -118,7 +118,7 @@ export default function CTA({ onOpenApp, onOpenRegister }) {
 
           <div className="pt-4 flex flex-wrap items-center justify-center gap-6 font-mono text-[11px] text-[#52525B]">
             <span className="flex items-center gap-1.5">
-              <CheckCircle2 size={14} className="text-emerald-600" /> Aktivasi Magic Link
+              <CheckCircle2 size={14} className="text-emerald-600" /> Aktivasi Kode OTP Email
             </span>
             <span className="flex items-center gap-1.5">
               <CheckCircle2 size={14} className="text-emerald-600" /> Simulasi Tanpa Login

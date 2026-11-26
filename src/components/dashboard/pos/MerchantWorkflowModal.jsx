@@ -104,6 +104,55 @@ export default function MerchantWorkflowModal({
                 </div>
               </div>
 
+              {/* 0B. Tipe Layanan F&B (Dine-In + Take-Away vs Khusus Take-Away) */}
+              {(draft.businessType || 'fnb') === 'fnb' && (
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-[#52525B] flex items-center gap-1.5">
+                    <UtensilsCrossed size={13} className="text-[#D97706]" /> Model Layanan F&amp;B
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {[
+                      {
+                        id: 'dine_in_take_away',
+                        title: 'Dine-In & Take-Away',
+                        desc: 'Resto/kafe dengan nomor meja, pesan mandiri QR Meja, dan bawa pulang.'
+                      },
+                      {
+                        id: 'take_away_only',
+                        title: 'Khusus Take-Away',
+                        desc: 'Counter / grab & go tanpa meja makan (seperti Komar, booth minuman, dll).'
+                      }
+                    ].map((svc) => {
+                      const active = (draft.fnbServiceMode || 'dine_in_take_away') === svc.id;
+                      return (
+                        <button
+                          key={svc.id}
+                          type="button"
+                          onClick={() =>
+                            setDraft({
+                              ...draft,
+                              fnbServiceMode: svc.id,
+                              defaultOrderChannel:
+                                svc.id === 'take_away_only' && draft.defaultOrderChannel === 'dine_in'
+                                  ? 'take_away'
+                                  : draft.defaultOrderChannel
+                            })
+                          }
+                          className={`text-left p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                            active
+                              ? 'bg-[#FEF3C7] border-[#F59E0B] shadow-sm'
+                              : 'bg-[#FAFAFA] border-zinc-200 hover:border-zinc-300'
+                          }`}
+                        >
+                          <p className="text-xs font-extrabold text-[#141414]">{svc.title}</p>
+                          <p className="text-[11px] text-[#52525B] mt-1 leading-snug">{svc.desc}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* 1. Payment Flow */}
               <div className="space-y-2">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-[#52525B] flex items-center gap-1.5">
@@ -147,9 +196,12 @@ export default function MerchantWorkflowModal({
                 <label className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#52525B] flex items-center gap-1.5">
                   <Store size={13} className="text-[#D97706]" /> Kanal Pesanan Default
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {[
-                    { id: 'dine_in', label: 'Dine-In' },
+                    ...((draft.businessType || 'fnb') === 'fnb' &&
+                    draft.fnbServiceMode === 'take_away_only'
+                      ? []
+                      : [{ id: 'dine_in', label: 'Dine-In' }]),
                     { id: 'take_away', label: 'Take-Away' },
                     { id: 'online_closed_kitchen', label: 'Closed Kitchen' }
                   ].map((ch) => (

@@ -16,20 +16,23 @@ export default function SimulationSetupModal({
   isOpen,
   onClose,
   initialBusinessType = 'fnb',
+  initialFnbServiceMode = 'dine_in_take_away',
   initialPaymentFlow = 'pay_first',
   pendingPlan = null,
   onConfirm
 }) {
   const [step, setStep] = useState(1);
   const [businessType, setBusinessType] = useState(initialBusinessType);
+  const [fnbServiceMode, setFnbServiceMode] = useState(initialFnbServiceMode);
   const [paymentFlow, setPaymentFlow] = useState(initialPaymentFlow);
 
   useEffect(() => {
     if (!isOpen) return;
     setStep(1);
     setBusinessType(initialBusinessType || 'fnb');
+    setFnbServiceMode(initialFnbServiceMode || 'dine_in_take_away');
     setPaymentFlow(initialPaymentFlow || 'pay_first');
-  }, [isOpen, initialBusinessType, initialPaymentFlow]);
+  }, [isOpen, initialBusinessType, initialFnbServiceMode, initialPaymentFlow]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -41,7 +44,11 @@ export default function SimulationSetupModal({
   }, [isOpen, onClose]);
 
   const handleConfirm = () => {
-    onConfirm?.({ businessType, paymentFlow });
+    onConfirm?.({
+      businessType,
+      fnbServiceMode: businessType === 'fnb' ? fnbServiceMode : 'dine_in_take_away',
+      paymentFlow
+    });
   };
 
   const planNames = {
@@ -178,8 +185,9 @@ export default function SimulationSetupModal({
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
                     transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-                    className="grid grid-cols-1 sm:grid-cols-2 gap-3.5"
+                    className="space-y-4"
                   >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     {step1Options.map((opt, idx) => {
                       const active = businessType === opt.id;
                       const Icon = opt.icon;
@@ -238,6 +246,51 @@ export default function SimulationSetupModal({
                         </motion.button>
                       );
                     })}
+                    </div>
+
+                    {businessType === 'fnb' && (
+                      <div className="bg-[#FAFAFA] border border-[#E5E5E5] rounded-2xl p-3.5 space-y-2">
+                        <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#52525B]">
+                          Model Layanan F&amp;B
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {[
+                            {
+                              id: 'dine_in_take_away',
+                              title: 'Dine-In & Take-Away',
+                              desc: 'Resto/kafe dengan meja & QR Meja'
+                            },
+                            {
+                              id: 'take_away_only',
+                              title: 'Khusus Take-Away',
+                              desc: 'Counter tanpa meja (seperti Komar)'
+                            }
+                          ].map((svc) => {
+                            const active = fnbServiceMode === svc.id;
+                            return (
+                              <button
+                                key={svc.id}
+                                type="button"
+                                onClick={() => {
+                                  setFnbServiceMode(svc.id);
+                                  if (svc.id === 'take_away_only') {
+                                    setPaymentFlow('pay_first');
+                                  }
+                                }}
+                                className={`text-left px-3.5 py-2.5 rounded-xl border transition-all cursor-pointer ${
+                                  active
+                                    ? 'bg-white border-[#F59E0B] ring-2 ring-[#F59E0B]/20'
+                                    : 'bg-white/70 border-[#E5E5E5] hover:border-zinc-300'
+                                }`}
+                              >
+                                <p className="text-xs font-extrabold text-[#141414]">{svc.title}</p>
+                                <p className="text-[11px] text-[#52525B] mt-0.5">{svc.desc}</p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </motion.div>
                 ) : (
                   <motion.div

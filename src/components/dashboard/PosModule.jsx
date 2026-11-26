@@ -52,6 +52,23 @@ export default function PosModule({
   const isStarter = subscriptionPlan === 'starter';
   const businessType = merchantSettings?.businessType || 'fnb';
   const isRetailBusiness = businessType === 'retail';
+  const isTakeAwayOnlyFnb =
+    !isRetailBusiness && merchantSettings?.fnbServiceMode === 'take_away_only';
+  const availableChannels = [
+    ...(isTakeAwayOnlyFnb ? [] : [{ id: 'dine_in', label: 'Dine-In' }]),
+    { id: 'take_away', label: 'Take-Away' },
+    ...(merchantSettings?.closedKitchenEnabled
+      ? [{ id: 'online_closed_kitchen', label: 'Closed Kitchen' }]
+      : [])
+  ];
+  const effectiveOrderChannel = availableChannels.some((ch) => ch.id === orderChannel)
+    ? orderChannel
+    : availableChannels[0]?.id || 'take_away';
+  const modeLabel = isRetailBusiness
+    ? 'Toko Ritel'
+    : isTakeAwayOnlyFnb
+    ? 'F&B Take-Away'
+    : 'F&B / Resto';
   const activeKitchenCount = orders.filter(
     (o) =>
       (o.kitchenStatus !== 'served' &&
@@ -310,12 +327,16 @@ export default function PosModule({
     if (isPayLaterMode) {
       const targetTable =
         tableLabel.trim() ||
-        (orderChannel === 'online_closed_kitchen' ? 'Online / Closed Kitchen' : 'Meja Open Bill');
+        (effectiveOrderChannel === 'online_closed_kitchen'
+          ? 'Online / Closed Kitchen'
+          : isTakeAwayOnlyFnb
+          ? 'Take-Away Open Bill'
+          : 'Meja Open Bill');
 
       if (onPlaceWorkflowOrder) {
         onPlaceWorkflowOrder({
           items: cart,
-          orderChannel,
+          orderChannel: effectiveOrderChannel,
           paymentFlow: 'pay_later',
           paymentMethod: 'open_bill',
           tableNumber: targetTable
@@ -378,15 +399,18 @@ export default function PosModule({
       return;
     }
 
-    const baseOutlet = subscriptionPlan === 'enterprise'
-      ? `Kasir (${activeOutlet.replace('Semua Cabang (Terpusat)', 'Cabang Utama - Makassar')})`
-      : 'Kasir Utama';
+    const baseOutlet =
+      subscriptionPlan === 'enterprise'
+        ? `Kasir (${activeOutlet.replace('Semua Cabang (Terpusat)', 'Cabang Utama - Makassar')})`
+        : isTakeAwayOnlyFnb
+        ? 'Take-Away Counter'
+        : 'Kasir Utama';
     const sourceLabel = tableLabel.trim() ? `${tableLabel.trim()} • ${baseOutlet}` : baseOutlet;
 
     const placedOrder = onPlaceWorkflowOrder
       ? onPlaceWorkflowOrder({
           items: cart,
-          orderChannel,
+          orderChannel: effectiveOrderChannel,
           paymentFlow: 'pay_first',
           paymentMethod: usedMethod,
           tableNumber: sourceLabel
@@ -405,7 +429,7 @@ export default function PosModule({
       total: totalPrice,
       paymentMethod: usedMethod,
       cashierName,
-      orderChannelLabel: ORDER_CHANNEL_LABELS[orderChannel] || 'Dine-In',
+      orderChannelLabel: ORDER_CHANNEL_LABELS[effectiveOrderChannel] || (isTakeAwayOnlyFnb ? 'Take-Away' : 'Dine-In'),
       outlet: sourceLabel,
       received: usedMethod === 'cash' ? received : totalPrice,
       change: kembalian,
@@ -481,7 +505,7 @@ export default function PosModule({
                     className="px-3 py-2 rounded-xl bg-white hover:bg-[#FAFAFA] border border-zinc-200 text-[#141414] text-[11px] font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                   >
                     <SlidersHorizontal size={13} className="text-[#D97706]" />
-                    {isRetailBusiness ? 'Toko Ritel' : 'F&B / Kafe'} • {isPayLaterMode ? 'Bayar Nanti' : 'Bayar di Awal'}
+                    {modeLabel} • {isPayLaterMode ? 'Bayar Nanti' : 'Bayar di Awal'}
                   </button>
                 </>
               ) : (
@@ -492,7 +516,7 @@ export default function PosModule({
                   </span>
 
                   <span className="px-3 py-2 rounded-xl bg-[#FAFAFA] border border-zinc-200 text-[#52525B] text-[11px] font-bold inline-flex items-center gap-1.5">
-                    {isRetailBusiness ? 'Toko Ritel' : 'F&B / Kafe'} • {isPayLaterMode ? 'Bayar Nanti' : 'Bayar di Awal'}
+                    {modeLabel} • {isPayLaterMode ? 'Bayar Nanti' : 'Bayar di Awal'}
                   </span>
                 </>
               )}
@@ -878,26 +902,28 @@ export default function PosModule({
               </div>
             )}
 
-            {/* Kanal Order & Nomor Meja */}
+            {/* Kanal Order & Nomor Meja / Antrean */}
             {!isStarter && (
               <div className="space-y-2 pt-1">
                 <p className="font-mono text-[10px] uppercase tracking-wider font-bold text-[#52525B]">
-                  Kanal &amp; Tujuan Order
+                  {isTakeAwayOnlyFnb ? 'Kanal Order Take-Away' : 'Kanal & Tujuan Order'}
                 </p>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {[
-                    { id: 'dine_in', label: 'Dine-In' },
-                    { id: 'take_away', label: 'Take-Away' },
-                    ...(merchantSettings?.closedKitchenEnabled
-                      ? [{ id: 'online_closed_kitchen', label: 'Closed Kitchen' }]
-                      : [])
-                  ].map((ch) => (
+                <div
+                  className={`grid gap-1.5 ${
+                    availableChannels.length === 1
+                      ? 'grid-cols-1'
+                      : availableChannels.length === 2
+                      ? 'grid-cols-2'
+                      : 'grid-cols-3'
+                  }`}
+                >
+                  {availableChannels.map((ch) => (
                     <button
                       key={ch.id}
                       type="button"
                       onClick={() => setOrderChannel(ch.id)}
                       className={`py-1.5 px-2 rounded-lg text-[10px] font-bold border cursor-pointer transition-all ${
-                        orderChannel === ch.id
+                        effectiveOrderChannel === ch.id
                           ? 'bg-[#141414] text-[#F59E0B] border-[#141414]'
                           : 'bg-[#FAFAFA] text-[#52525B] border-zinc-200 hover:text-[#141414]'
                       }`}
@@ -908,7 +934,11 @@ export default function PosModule({
                 </div>
                 <input
                   type="text"
-                  placeholder="No. Meja / Nama Pelanggan (Opsional)"
+                  placeholder={
+                    isTakeAwayOnlyFnb
+                      ? 'Nama Pelanggan / No. Antrean (Opsional)'
+                      : 'No. Meja / Nama Pelanggan (Opsional)'
+                  }
                   value={tableLabel}
                   onChange={(e) => setTableLabel(e.target.value)}
                   className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl px-3 py-2 text-xs font-semibold text-[#141414] focus:outline-none focus:border-[#F59E0B]"
