@@ -8,7 +8,7 @@ import { OrderModificationModal, OrderCancelModal, CashierShiftModal } from './p
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingCart, CheckCircle2, MessageSquare, 
-  Search, Trash2, Plus, Minus, CreditCard, Wallet, QrCode, AlertTriangle, ShieldAlert, Sparkles, ChefHat, SlidersHorizontal, UserCheck, X 
+  Search, Trash2, Plus, Minus, CreditCard, Wallet, QrCode, AlertTriangle, ShieldAlert, Sparkles, ChefHat, Receipt, SlidersHorizontal, UserCheck, X 
 } from 'lucide-react';
 
 export default function PosModule({
@@ -54,13 +54,20 @@ export default function PosModule({
   const isRetailBusiness = businessType === 'retail';
   const isTakeAwayOnlyFnb =
     !isRetailBusiness && merchantSettings?.fnbServiceMode === 'take_away_only';
-  const availableChannels = [
-    ...(isTakeAwayOnlyFnb ? [] : [{ id: 'dine_in', label: 'Dine-In' }]),
-    { id: 'take_away', label: 'Take-Away' },
-    ...(merchantSettings?.closedKitchenEnabled
-      ? [{ id: 'online_closed_kitchen', label: 'Online Order' }]
-      : [])
-  ];
+  const availableChannels = isRetailBusiness
+    ? [
+        { id: 'take_away', label: 'Belanja di Toko' },
+        ...(merchantSettings?.closedKitchenEnabled
+          ? [{ id: 'online_closed_kitchen', label: 'Online Order' }]
+          : [])
+      ]
+    : [
+        ...(isTakeAwayOnlyFnb ? [] : [{ id: 'dine_in', label: 'Dine-In' }]),
+        { id: 'take_away', label: 'Take-Away' },
+        ...(merchantSettings?.closedKitchenEnabled
+          ? [{ id: 'online_closed_kitchen', label: 'Online Order' }]
+          : [])
+      ];
   const effectiveOrderChannel = availableChannels.some((ch) => ch.id === orderChannel)
     ? orderChannel
     : availableChannels[0]?.id || 'take_away';
@@ -76,7 +83,7 @@ export default function PosModule({
         o.kitchenStatus !== 'cancelled_waste') ||
       (o.paymentStatus === 'unpaid' && o.kitchenStatus === 'served')
   ).length;
-  const isPayLaterMode = !isStarter && merchantSettings?.paymentFlow === 'pay_later';
+  const isPayLaterMode = !isStarter && !isRetailBusiness && merchantSettings?.paymentFlow === 'pay_later';
 
   const [stockAlertModal, setStockAlertModal] = useState({
     isOpen: false,
@@ -329,6 +336,8 @@ export default function PosModule({
         tableLabel.trim() ||
         (effectiveOrderChannel === 'online_closed_kitchen'
           ? 'Online Order'
+          : isRetailBusiness
+          ? 'Kasir Toko (Open Bill)'
           : isTakeAwayOnlyFnb
           ? 'Take-Away Open Bill'
           : 'Meja Open Bill');
@@ -402,6 +411,8 @@ export default function PosModule({
     const baseOutlet =
       subscriptionPlan === 'enterprise'
         ? `Kasir (${activeOutlet.replace('Semua Cabang (Terpusat)', 'Cabang Utama - Makassar')})`
+        : isRetailBusiness
+        ? 'Kasir'
         : isTakeAwayOnlyFnb
         ? 'Take-Away Counter'
         : 'Kasir Utama';
@@ -505,7 +516,9 @@ export default function PosModule({
                 >
                   <SlidersHorizontal size={13} className="text-[#D97706] shrink-0" />
                   <span>
-                    {modeLabel} • {isPayLaterMode ? 'Bayar Nanti' : 'Bayar di Awal'}
+                    {isRetailBusiness
+                      ? `${modeLabel} • Pembayaran Langsung`
+                      : `${modeLabel} • ${isPayLaterMode ? 'Bayar Nanti' : 'Bayar di Awal'}`}
                   </span>
                 </button>
               </>
@@ -517,7 +530,9 @@ export default function PosModule({
                 </span>
 
                 <span className="h-9 px-3 rounded-xl bg-[#FAFAFA] border border-zinc-200 text-[#52525B] text-[11px] font-bold inline-flex items-center gap-1.5 whitespace-nowrap">
-                  {modeLabel} • {isPayLaterMode ? 'Bayar Nanti' : 'Bayar di Awal'}
+                  {isRetailBusiness
+                    ? `${modeLabel} • Pembayaran Langsung`
+                    : `${modeLabel} • ${isPayLaterMode ? 'Bayar Nanti' : 'Bayar di Awal'}`}
                 </span>
               </>
             )}
@@ -543,8 +558,8 @@ export default function PosModule({
                     : 'text-[#52525B] hover:text-[#141414]'
                 }`}
               >
-                <ChefHat size={12} className="shrink-0" />
-                <span>Dapur &amp; Bill ({activeKitchenCount})</span>
+                {isRetailBusiness ? <Receipt size={12} className="shrink-0" /> : <ChefHat size={12} className="shrink-0" />}
+                <span>{isRetailBusiness ? `Order & Nota (${activeKitchenCount})` : `Dapur & Bill (${activeKitchenCount})`}</span>
               </button>
             </div>
           </div>
@@ -555,6 +570,7 @@ export default function PosModule({
         <KitchenOrdersDrawer
           orders={orders}
           merchantSettings={merchantSettings}
+          businessType={businessType}
           onTransitionStatus={onTransitionOrderKitchenStatus}
           onOpenModify={(order) => setModifyingOrder(order)}
           onOpenCancel={(order) => setCancellingOrder(order)}
@@ -567,7 +583,9 @@ export default function PosModule({
               total: order.totalAmount || 0,
               paymentMethod: order.paymentMethod || 'cash',
               cashierName: order.cashierName || currentOperator?.name || 'Kasir Aktif',
-              orderChannelLabel: ORDER_CHANNEL_LABELS[order.orderChannel] || 'Dine-In',
+              orderChannelLabel:
+                ORDER_CHANNEL_LABELS[order.orderChannel] ||
+                (isRetailBusiness ? 'Belanja di Toko' : 'Dine-In'),
               outlet: order.tableNumber || 'Kasir',
               received: order.totalAmount || 0,
               change: 0,
@@ -612,7 +630,7 @@ export default function PosModule({
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
           <input
             type="text"
-            placeholder="Cari menu pesanan..."
+            placeholder={isRetailBusiness ? 'Cari produk, SKU, atau varian...' : 'Cari menu pesanan...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-white border border-zinc-200 text-[#141414] text-[13px] rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all font-medium shadow-sm"
@@ -627,7 +645,9 @@ export default function PosModule({
         <div className="lg:col-span-7 xl:col-span-8">
           {filteredProducts.length === 0 ? (
             <div className="bg-white border border-zinc-200 rounded-2xl p-12 text-center text-[#52525B] text-xs font-medium space-y-2">
-              <p className="font-bold text-[#141414] text-sm">Menu tidak ditemukan</p>
+              <p className="font-bold text-[#141414] text-sm">
+                {isRetailBusiness ? 'Produk tidak ditemukan' : 'Menu tidak ditemukan'}
+              </p>
               <p>Coba gunakan kata kunci pencarian lain atau pilih kategori Semua.</p>
             </div>
           ) : (
@@ -675,36 +695,38 @@ export default function PosModule({
                           }}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out" 
                         />
-                        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
-                          <span className="bg-white/95 text-[#141414] px-2.5 py-1 rounded-md font-mono text-[10px] font-bold uppercase tracking-wide border border-zinc-200 shadow-sm">
-                            {normalizePosCategory(prod.category)}
-                          </span>
-                          {inCartQty > 0 && (
+                        {inCartQty > 0 && (
+                          <div className="absolute top-2.5 left-2.5">
                             <span className="bg-[#F59E0B] text-[#141414] px-2 py-1 rounded-md font-mono text-[10px] font-extrabold shadow-sm">
                               {inCartQty}x
                             </span>
-                          )}
-                        </div>
-                        <div className="absolute top-2.5 right-2.5">
-                          <span className={`px-2.5 py-1 rounded-md font-mono text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5 shadow-sm ${!isAvailable ? 'bg-red-600 text-white' : isLowStock ? 'bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]' : 'bg-[#141414]/90 text-white'}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${!isAvailable ? 'bg-white' : isLowStock ? 'bg-[#F59E0B]' : 'bg-emerald-400'}`}></span>
-                            {!isAvailable
-                              ? 'Habis'
-                              : isLowStock
-                              ? `Menipis • Sisa ${maxPortions}`
-                              : isStarter
-                              ? `Sisa: ${maxPortions} ${unitSuffix}`
-                              : maxPortions >= 999
-                              ? 'Tersedia'
-                              : isRetailBusiness || prod.productMode === 'retail'
-                              ? `Stok: ${maxPortions} ${unitSuffix}`
-                              : `Maks: ${maxPortions}`}
+                          </div>
+                        )}
+                        <div className="absolute top-2.5 right-2.5 max-w-[calc(100%-3.5rem)]">
+                          <span className={`px-2.5 py-1 rounded-md font-mono text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5 shadow-sm truncate ${!isAvailable ? 'bg-red-600 text-white' : isLowStock ? 'bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]' : 'bg-[#141414]/90 text-white'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${!isAvailable ? 'bg-white' : isLowStock ? 'bg-[#F59E0B]' : 'bg-emerald-400'}`}></span>
+                            <span className="truncate">
+                              {!isAvailable
+                                ? 'Habis'
+                                : isLowStock
+                                ? `Menipis • Sisa ${maxPortions}`
+                                : isStarter
+                                ? `Sisa: ${maxPortions} ${unitSuffix}`
+                                : maxPortions >= 999
+                                ? 'Tersedia'
+                                : isRetailBusiness || prod.productMode === 'retail'
+                                ? `Stok: ${maxPortions} ${unitSuffix}`
+                                : `Maks: ${maxPortions}`}
+                            </span>
                           </span>
                         </div>
                       </div>
 
                       <div className="p-4 flex flex-col justify-between space-y-3 flex-1 bg-white">
                         <div className="space-y-1">
+                          <span className="inline-block w-fit bg-zinc-100 text-[#52525B] px-2 py-0.5 rounded-md font-mono text-[10px] font-bold uppercase tracking-wide border border-zinc-200/80 mb-0.5">
+                            {normalizePosCategory(prod.category)}
+                          </span>
                           <h3 className="font-bold text-[#141414] text-sm leading-snug group-hover:text-[#D97706] transition-colors line-clamp-1">
                             {prod.name}
                           </h3>
@@ -779,7 +801,11 @@ export default function PosModule({
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-44 flex flex-col items-center justify-center text-[#52525B] space-y-2 text-center p-4">
                     <ShoppingCart size={28} className="text-zinc-300" />
                     <p className="text-xs font-semibold text-[#141414]">Keranjang masih kosong</p>
-                    <p className="text-[11px] text-[#52525B]">Pilih menu dari katalog di sebelah kiri untuk memulai pesanan.</p>
+                    <p className="text-[11px] text-[#52525B]">
+                      {isRetailBusiness
+                        ? 'Pilih produk dari katalog di sebelah kiri untuk memulai transaksi.'
+                        : 'Pilih menu dari katalog di sebelah kiri untuk memulai pesanan.'}
+                    </p>
                   </motion.div>
                 ) : (
                   cart.map(item => (
@@ -824,7 +850,7 @@ export default function PosModule({
                       </div>
                       <div className="flex justify-between items-center pt-2 border-t border-zinc-200/70 text-[11px]">
                         <span className="text-[#52525B] italic truncate max-w-[140px]">
-                          {item.note ? `* ${item.note}` : 'Tanpa catatan dapur'}
+                          {item.note ? `* ${item.note}` : isRetailBusiness ? 'Tanpa catatan item' : 'Tanpa catatan dapur'}
                         </span>
                         <div className="flex items-center gap-2.5">
                           <button 
@@ -908,7 +934,11 @@ export default function PosModule({
             {!isStarter && (
               <div className="space-y-2 pt-1">
                 <p className="font-mono text-[10px] uppercase tracking-wider font-bold text-[#52525B]">
-                  {isTakeAwayOnlyFnb ? 'Kanal Order Take-Away' : 'Kanal & Tujuan Order'}
+                  {isRetailBusiness
+                    ? 'Kanal Penjualan Toko'
+                    : isTakeAwayOnlyFnb
+                    ? 'Kanal Order Take-Away'
+                    : 'Kanal & Tujuan Order'}
                 </p>
                 <div
                   className={`grid gap-1.5 ${
@@ -937,7 +967,9 @@ export default function PosModule({
                 <input
                   type="text"
                   placeholder={
-                    isTakeAwayOnlyFnb
+                    isRetailBusiness
+                      ? 'Nama Pembeli / No. Antrean Kasir (Opsional)'
+                      : isTakeAwayOnlyFnb
                       ? 'Nama Pelanggan / No. Antrean (Opsional)'
                       : 'No. Meja / Nama Pelanggan (Opsional)'
                   }
@@ -1018,7 +1050,11 @@ export default function PosModule({
                 disabled={cart.length === 0} 
                 className="w-full bg-[#F59E0B] hover:bg-[#D97706] disabled:opacity-40 disabled:cursor-not-allowed text-[#141414] font-extrabold py-3.5 rounded-xl text-xs shadow-sm cursor-pointer transition-all active:scale-[0.98]"
               >
-                {isPayLaterMode ? 'Simpan Open Bill & Kirim ke Dapur' : 'Proses Pembayaran'}
+                {isPayLaterMode
+                  ? isRetailBusiness
+                    ? 'Simpan Bon / Tagihan (Pay Later)'
+                    : 'Simpan Open Bill & Kirim ke Dapur'
+                  : 'Proses Pembayaran'}
               </button>
             </div>
           </div>
@@ -1057,12 +1093,12 @@ export default function PosModule({
             <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }} className="relative w-full max-w-md bg-white rounded-2xl p-6 shadow-xl border border-zinc-200 space-y-4">
               <div className="flex justify-between items-center">
                 <h4 className="font-bold text-[#141414] text-base flex items-center gap-2">
-                  <MessageSquare size={18} className="text-[#D97706]" /> Catatan Dapur
+                  <MessageSquare size={18} className="text-[#D97706]" /> {isRetailBusiness ? 'Catatan Barang / Pembeli' : 'Catatan Dapur'}
                 </h4>
                 <span className="font-mono text-[11px] font-bold bg-[#FEF3C7] text-[#B45309] px-3 py-1 rounded-full border border-[#FDE68A]">{noteModalItem.name}</span>
               </div>
               <textarea 
-                placeholder="Contoh: Kurang manis, tanpa es batu..." 
+                placeholder={isRetailBusiness ? 'Contoh: Bungkus terpisah, titip ambil sore...' : 'Contoh: Kurang manis, tanpa es batu...'} 
                 value={customNote} 
                 onChange={(e) => setCustomNote(e.target.value)} 
                 rows={3} 
@@ -1383,6 +1419,7 @@ export default function PosModule({
           order={modifyingOrder}
           products={products}
           ingredients={ingredients}
+          businessType={businessType}
           onClose={() => setModifyingOrder(null)}
           onConfirm={(payload) => {
             onModifyOrder?.(payload);
@@ -1397,6 +1434,7 @@ export default function PosModule({
           key={`${cancellingOrder.id}-${cancellingOrder.kitchenStatus}`}
           order={cancellingOrder}
           ingredients={ingredients}
+          businessType={businessType}
           onClose={() => setCancellingOrder(null)}
           onConfirm={(payload) => {
             onCancelOrder?.(payload);

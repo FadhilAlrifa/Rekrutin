@@ -184,17 +184,25 @@ function AppContent() {
   };
 
   const handleRecordAudit = async (payload) => {
-    const auditRecord = await recordAuditLog({
+    const baseAudit = {
       userId: currentOperator?.id || 'operator-active',
       userName: currentOperator?.name || 'Admin Operasional',
       role: currentOperator?.role || userRole,
       outlet: resolvedOutletLabel,
       ...payload
-    });
+    };
+
+    const auditRecord = isSimulationMode
+      ? {
+          id: `SIM-AUD-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          createdAt: new Date().toISOString(),
+          ...baseAudit
+        }
+      : await recordAuditLog(baseAudit);
     setAuditLogs((prev) => [auditRecord, ...prev]);
 
     if (payload.movementType) {
-      const mov = await recordStockMovement({
+      const baseMov = {
         ingredientId: payload.entityId || null,
         ingredientName: payload.entityName || 'Bahan Baku',
         movementType: payload.movementType,
@@ -209,7 +217,14 @@ function AppContent() {
         role: currentOperator?.role || userRole,
         cashierName: payload.cashierName || '',
         reason: payload.reason || ''
-      });
+      };
+      const mov = isSimulationMode
+        ? {
+            id: `SIM-MOV-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            createdAt: new Date().toISOString(),
+            ...baseMov
+          }
+        : await recordStockMovement(baseMov);
       setStockMovements((prev) => [mov, ...prev]);
     }
   };
@@ -340,7 +355,9 @@ function AppContent() {
         note: fullReason
       };
       newLogs.push(logEntry);
-      recordStockMutationLog({ ...logEntry, ingredientId: cur.id });
+      if (!isSimulationMode && !String(cur.id).startsWith('SIM-')) {
+        recordStockMutationLog({ ...logEntry, ingredientId: cur.id });
+      }
 
       await handleRecordAudit({
         actionType,
@@ -407,7 +424,9 @@ function AppContent() {
         note: reason
       };
       newLogs.push(logEntry);
-      recordStockMutationLog({ ...logEntry, ingredientId: cur.id });
+      if (!isSimulationMode && !String(cur.id).startsWith('SIM-')) {
+        recordStockMutationLog({ ...logEntry, ingredientId: cur.id });
+      }
 
       await handleRecordAudit({
         actionType,
@@ -759,18 +778,34 @@ function AppContent() {
     (p) => Number(p.stock ?? 0) <= Number(p.minLimit ?? 3)
   );
   const retailLowStockCount = retailLowStockProducts.length;
-  const alertCount = ingredients.filter(
+  const retailExpiringProducts = products.filter(
+    (p) => (p.productMode === 'retail' || businessType === 'retail') && checkExpiryAlert(p.expiryDate)
+  );
+  const retailAlertIds = new Set([
+    ...retailLowStockProducts.map((p) => String(p.id)),
+    ...retailExpiringProducts.map((p) => String(p.id))
+  ]);
+  const ingredientAlertCount = ingredients.filter(
     (ing) => Number(ing.stock) <= Number(ing.minLimit ?? 5) || checkExpiryAlert(ing.expiryDate)
   ).length;
+  const alertCount =
+    businessType === 'retail'
+      ? retailAlertIds.size + ingredientAlertCount
+      : ingredientAlertCount;
 
   const buildStarterShowcaseProducts = (list = []) => {
     if (!Array.isArray(list) || list.length === 0) return list;
     const presetStocks = [15, 3, 0, 10];
-    return list.map((p, idx) => ({
-      ...p,
-      stock: presetStocks[idx] !== undefined ? presetStocks[idx] : 10,
-      minLimit: 3
-    }));
+    return list.map((p, idx) => {
+      if (p.productMode === 'retail' || businessType === 'retail') {
+        return p;
+      }
+      return {
+        ...p,
+        stock: presetStocks[idx] !== undefined ? presetStocks[idx] : 10,
+        minLimit: 3
+      };
+    });
   };
 
   const ensureStarterDemoQuotas = () => {
@@ -855,6 +890,8 @@ function AppContent() {
     }
     const resolvedFnbMode =
       nextBusinessType === 'fnb' ? nextFnbServiceMode || 'dine_in_take_away' : 'dine_in_take_away';
+    const resolvedPaymentFlow =
+      nextBusinessType === 'retail' ? 'pay_first' : nextPaymentFlow || 'pay_first';
     const simAnalytics = createSimulationAnalyticsData(nextBusinessType);
     setTransactions(simAnalytics.transactions);
     setStockMovements(simAnalytics.stockMovements);
@@ -869,10 +906,11 @@ function AppContent() {
       businessType: nextBusinessType,
       fnbServiceMode: resolvedFnbMode,
       defaultOrderChannel:
-        nextBusinessType === 'fnb' && resolvedFnbMode === 'take_away_only'
+        nextBusinessType === 'retail' ||
+        (nextBusinessType === 'fnb' && resolvedFnbMode === 'take_away_only')
           ? 'take_away'
           : 'dine_in',
-      paymentFlow: nextPaymentFlow
+      paymentFlow: resolvedPaymentFlow
     };
     setMerchantSettings(nextSettings);
 
@@ -894,13 +932,14 @@ function AppContent() {
 
     showToast({
       title: 'Simulasi POS Siap Dicoba',
-      message: `Mode ${
+      message:
         nextBusinessType === 'retail'
-          ? 'Toko Ritel & Minimarket'
-          : resolvedFnbMode === 'take_away_only'
-          ? 'F&B Khusus Take-Away'
-          : 'F&B Resto (Dine-In & Take-Away)'
-      } • ${nextPaymentFlow === 'pay_later' ? 'Bayar Nanti (Open Bill)' : 'Bayar di Awal'}.`,
+          ? 'Mode Toko Ritel & Minimarket • Pembayaran Langsung Kasir.'
+          : `Mode ${
+              resolvedFnbMode === 'take_away_only'
+                ? 'F&B Khusus Take-Away'
+                : 'F&B Resto (Dine-In & Take-Away)'
+            } • ${resolvedPaymentFlow === 'pay_later' ? 'Bayar Nanti (Open Bill)' : 'Bayar di Awal'}.`,
       variant: 'success',
       duration: 5000
     });
@@ -935,8 +974,12 @@ function AppContent() {
 
     if (nextRole === 'kasir' && !['pos', 'menu-management'].includes(activeTab)) {
       setActiveTab('pos');
-    } else if (nextRole === 'stocker' && !['inventory', 'alerts'].includes(activeTab)) {
-      setActiveTab('inventory');
+    } else if (nextRole === 'stocker') {
+      const allowedStockerTabs =
+        businessType === 'retail' ? ['menu-management', 'alerts'] : ['inventory', 'alerts'];
+      if (!allowedStockerTabs.includes(activeTab)) {
+        setActiveTab(allowedStockerTabs[0]);
+      }
     }
   };
 
@@ -1060,7 +1103,20 @@ function AppContent() {
 
   const handleSaveMerchantSettings = async (nextSettings) => {
     const prevBusinessType = merchantSettings?.businessType || 'fnb';
-    const saved = await saveMerchantSettings(nextSettings, currentOperator?.name || 'Owner');
+    const normalizedSettings =
+      (nextSettings?.businessType || 'fnb') === 'retail'
+        ? {
+            ...nextSettings,
+            paymentFlow: 'pay_first',
+            defaultOrderChannel:
+              nextSettings.defaultOrderChannel === 'dine_in'
+                ? 'take_away'
+                : nextSettings.defaultOrderChannel
+          }
+        : nextSettings;
+    const saved = isSimulationMode
+      ? normalizedSettings
+      : await saveMerchantSettings(normalizedSettings, currentOperator?.name || 'Owner');
     setMerchantSettings(saved);
 
     if (isSimulationMode && saved?.businessType && saved.businessType !== prevBusinessType) {
@@ -1078,11 +1134,12 @@ function AppContent() {
       setRetailPriceHistory(simAnalytics.retailPriceHistory);
       setAuditLogs(simAnalytics.auditLogs);
       setStockLogs(simAnalytics.stockLogs);
+      setOrders([]);
     }
 
     if (
-      saved?.businessType === 'fnb' &&
-      saved?.fnbServiceMode === 'take_away_only' &&
+      (saved?.businessType === 'retail' ||
+        (saved?.businessType === 'fnb' && saved?.fnbServiceMode === 'take_away_only')) &&
       activeTab === 'self-order'
     ) {
       setActiveTab('pos');
@@ -1112,12 +1169,13 @@ function AppContent() {
     const order = createOrderPayload({
       items,
       orderChannel,
-      paymentFlow,
+      paymentFlow: businessType === 'retail' ? 'pay_first' : paymentFlow,
       paymentMethod,
       tableNumber,
       operator: currentOperator,
       outlet: resolvedOutletLabel,
-      isClosedKitchenOrder
+      isClosedKitchenOrder,
+      businessType
     });
 
     // Untuk order langsung dari POS (Pay First atau Pay Later preparing), potong stok BOM saat masuk proses
@@ -1128,7 +1186,9 @@ function AppContent() {
 
     const finalOrder = { ...order, stockDeducted: shouldDeductNow };
     setOrders((prev) => [finalOrder, ...prev]);
-    createOrderRecord(finalOrder);
+    if (!isSimulationMode) {
+      createOrderRecord(finalOrder);
+    }
 
     if (shouldDeductNow) {
       const reqs = computeBomRequirementsForItems(items, ingredients);
@@ -1153,14 +1213,51 @@ function AppContent() {
     }
 
     if (finalOrder.paymentStatus === 'paid' && !isClosedKitchenOrder) {
-      saveTransaction(finalOrder.totalAmount, finalOrder.items, finalOrder.tableNumber, finalOrder.paymentMethod, {
-        orderChannel: finalOrder.orderChannel,
-        paymentFlow: finalOrder.paymentFlow,
-        paymentStatus: 'paid',
-        kitchenStatus: finalOrder.kitchenStatus,
-        cashierId: finalOrder.cashierId,
-        cashierName: finalOrder.cashierName
-      });
+      if (isSimulationMode) {
+        const simTx = {
+          id: `SIM-TX-${Date.now()}`,
+          total_amount: finalOrder.totalAmount,
+          items: finalOrder.items,
+          table_number: finalOrder.tableNumber,
+          payment_method: finalOrder.paymentMethod,
+          order_channel: finalOrder.orderChannel,
+          payment_flow: finalOrder.paymentFlow,
+          payment_status: 'paid',
+          kitchen_status: finalOrder.kitchenStatus,
+          cashier_id: finalOrder.cashierId,
+          cashier_name: finalOrder.cashierName,
+          created_at: finalOrder.createdAt || new Date().toISOString()
+        };
+        setTransactions((prev) => [simTx, ...prev]);
+      } else {
+        const savedTxRows = await saveTransaction(
+          finalOrder.totalAmount,
+          finalOrder.items,
+          finalOrder.tableNumber,
+          finalOrder.paymentMethod,
+          {
+            orderChannel: finalOrder.orderChannel,
+            paymentFlow: finalOrder.paymentFlow,
+            paymentStatus: 'paid',
+            kitchenStatus: finalOrder.kitchenStatus,
+            cashierId: finalOrder.cashierId,
+            cashierName: finalOrder.cashierName
+          }
+        );
+        if (Array.isArray(savedTxRows) && savedTxRows.length > 0) {
+          const nextTxList = [savedTxRows[0], ...transactions];
+          setTransactions(nextTxList);
+          const rebuiltDaily = buildDailySalesHistory({
+            transactions: nextTxList,
+            products,
+            ingredients,
+            seasonalEvents,
+            persistedDailyRows: dailySalesRows,
+            businessType
+          });
+          syncDailySalesHistoryEntries(rebuiltDaily.flatRows, resolvedOutletLabel);
+        }
+      }
     }
 
     return finalOrder;
@@ -1203,7 +1300,9 @@ function AppContent() {
     };
 
     setOrders((prev) => prev.map((o) => (o.id === order.id ? updated : o)));
-    await updateOrderRecord(updated);
+    if (!isSimulationMode) {
+      await updateOrderRecord(updated);
+    }
   };
 
   const handleModifyOrder = async ({ order, nextItems, reason, treatRemovedAsWaste }) => {
@@ -1213,11 +1312,14 @@ function AppContent() {
       reason,
       operator: currentOperator,
       ingredients,
-      treatRemovedAsWaste
+      treatRemovedAsWaste,
+      businessType
     });
 
     setOrders((prev) => prev.map((o) => (o.id === order.id ? updatedOrder : o)));
-    await updateOrderRecord(updatedOrder);
+    if (!isSimulationMode) {
+      await updateOrderRecord(updatedOrder);
+    }
 
     await handleRecordAudit({
       actionType: 'Order Modified',
@@ -1304,21 +1406,24 @@ function AppContent() {
     }
 
     if (addedWasteCost > 0) {
-      const mv = await recordStockMovement({
+      const baseWasteMov = {
         ingredientId: null,
         ingredientName: `Waste Nota Coret (${order.orderNumber})`,
         movementType: 'WASTE_LOSS',
         qtyChange: 0,
         beforeStock: 0,
         afterStock: 0,
-        unit: 'porsi',
+        unit: businessType === 'retail' ? 'pcs' : 'porsi',
         costImpact: addedWasteCost,
         orderId: order.id,
         userId: currentOperator?.id,
         userName: currentOperator?.name,
         role: currentOperator?.role,
         reason
-      });
+      };
+      const mv = isSimulationMode
+        ? { id: `SIM-MOV-${Date.now()}`, createdAt: new Date().toISOString(), ...baseWasteMov }
+        : await recordStockMovement(baseWasteMov);
       setStockMovements((prev) => [mv, ...prev]);
     }
   };
@@ -1329,11 +1434,14 @@ function AppContent() {
       condition,
       reason,
       operator: currentOperator,
-      ingredients
+      ingredients,
+      businessType
     });
 
     setOrders((prev) => prev.map((o) => (o.id === order.id ? updatedOrder : o)));
-    await updateOrderRecord(updatedOrder);
+    if (!isSimulationMode) {
+      await updateOrderRecord(updatedOrder);
+    }
 
     await handleRecordAudit({
       actionType: 'Order Void/Cancelled',
@@ -1386,7 +1494,7 @@ function AppContent() {
         isAddition: false
       });
     } else if (stockAction === 'keep_as_waste') {
-      const mv = await recordStockMovement({
+      const baseCancelMov = {
         ingredientId: null,
         ingredientName: `Waste Order ${order.orderNumber}`,
         movementType: 'WASTE_LOSS',
@@ -1400,20 +1508,25 @@ function AppContent() {
         userName: currentOperator?.name,
         role: currentOperator?.role,
         reason
-      });
+      };
+      const mv = isSimulationMode
+        ? { id: `SIM-MOV-${Date.now()}`, createdAt: new Date().toISOString(), ...baseCancelMov }
+        : await recordStockMovement(baseCancelMov);
       setStockMovements((prev) => [mv, ...prev]);
 
-      await saveTransaction(0, updatedOrder.items, updatedOrder.tableNumber, 'refund_waste', {
-        orderChannel: updatedOrder.orderChannel,
-        paymentFlow: updatedOrder.paymentFlow,
-        paymentStatus: updatedOrder.paymentStatus,
-        kitchenStatus: 'cancelled_waste',
-        cashierId: currentOperator?.id,
-        cashierName: currentOperator?.name || 'Kasir Aktif',
-        wasteCost,
-        cancelReason: reason,
-        revisionHistory: updatedOrder.revisionHistory
-      });
+      if (!isSimulationMode) {
+        await saveTransaction(0, updatedOrder.items, updatedOrder.tableNumber, 'refund_waste', {
+          orderChannel: updatedOrder.orderChannel,
+          paymentFlow: updatedOrder.paymentFlow,
+          paymentStatus: updatedOrder.paymentStatus,
+          kitchenStatus: 'cancelled_waste',
+          cashierId: currentOperator?.id,
+          cashierName: currentOperator?.name || 'Kasir Aktif',
+          wasteCost,
+          cancelReason: reason,
+          revisionHistory: updatedOrder.revisionHistory
+        });
+      }
     }
 
     showToast({
@@ -1438,17 +1551,53 @@ function AppContent() {
     };
 
     setOrders((prev) => prev.map((o) => (o.id === order.id ? updated : o)));
-    await updateOrderRecord(updated);
-
-    await saveTransaction(updated.totalAmount, updated.items, updated.tableNumber, method, {
-      orderChannel: updated.orderChannel,
-      paymentFlow: 'pay_later',
-      paymentStatus: 'paid',
-      kitchenStatus: updated.kitchenStatus,
-      cashierId: updated.cashierId,
-      cashierName: updated.cashierName,
-      revisionHistory: updated.revisionHistory
-    });
+    if (!isSimulationMode) {
+      await updateOrderRecord(updated);
+      const savedTxRows = await saveTransaction(
+        updated.totalAmount,
+        updated.items,
+        updated.tableNumber,
+        method,
+        {
+          orderChannel: updated.orderChannel,
+          paymentFlow: 'pay_later',
+          paymentStatus: 'paid',
+          kitchenStatus: updated.kitchenStatus,
+          cashierId: updated.cashierId,
+          cashierName: updated.cashierName,
+          revisionHistory: updated.revisionHistory
+        }
+      );
+      if (Array.isArray(savedTxRows) && savedTxRows.length > 0) {
+        const nextTxList = [savedTxRows[0], ...transactions];
+        setTransactions(nextTxList);
+        const rebuiltDaily = buildDailySalesHistory({
+          transactions: nextTxList,
+          products,
+          ingredients,
+          seasonalEvents,
+          persistedDailyRows: dailySalesRows,
+          businessType
+        });
+        syncDailySalesHistoryEntries(rebuiltDaily.flatRows, resolvedOutletLabel);
+      }
+    } else {
+      const simTx = {
+        id: `SIM-TX-BILL-${Date.now()}`,
+        total_amount: updated.totalAmount,
+        items: updated.items,
+        table_number: updated.tableNumber,
+        payment_method: method,
+        order_channel: updated.orderChannel,
+        payment_flow: 'pay_later',
+        payment_status: 'paid',
+        kitchen_status: updated.kitchenStatus,
+        cashier_id: updated.cashierId,
+        cashier_name: updated.cashierName,
+        created_at: new Date().toISOString()
+      };
+      setTransactions((prev) => [simTx, ...prev]);
+    }
   };
 
   const handleReceiveClosedKitchenDemo = () => {
@@ -2022,17 +2171,22 @@ function AppContent() {
                       )}
 
                       {activeTab === 'self-order' &&
+                        (businessType === 'retail' ||
                         (businessType === 'fnb' &&
-                        merchantSettings?.fnbServiceMode === 'take_away_only' ? (
+                          merchantSettings?.fnbServiceMode === 'take_away_only') ? (
                           <div className="bg-white border border-[#E5E5E5] rounded-3xl p-8 max-w-xl mx-auto text-center space-y-4">
                             <span className="inline-block font-mono text-[10px] font-bold uppercase tracking-wider bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] px-3 py-1 rounded-full">
-                              Mode Khusus Take-Away
+                              {businessType === 'retail' ? 'Mode Toko Ritel' : 'Mode Khusus Take-Away'}
                             </span>
                             <h2 className="text-xl font-extrabold text-[#141414]">
-                              QR Meja Tidak Digunakan pada Outlet Take-Away
+                              {businessType === 'retail'
+                                ? 'QR Meja Tidak Digunakan pada Toko Ritel'
+                                : 'QR Meja Tidak Digunakan pada Outlet Take-Away'}
                             </h2>
                             <p className="text-xs text-[#52525B] leading-relaxed">
-                              Usaha kamu disetel sebagai F&amp;B Khusus Take-Away tanpa meja makan di tempat. Semua pesanan dicatat langsung lewat Kasir (POS) dengan kanal Take-Away atau Online Order.
+                              {businessType === 'retail'
+                                ? 'Transaksi minimarket/ritel diproses langsung melalui Kasir (POS) atau Online Order.'
+                                : 'Usaha kamu disetel sebagai F&B Khusus Take-Away tanpa meja makan di tempat. Semua pesanan dicatat langsung lewat Kasir (POS) dengan kanal Take-Away atau Online Order.'}
                             </p>
                             <button
                               type="button"
@@ -2061,7 +2215,7 @@ function AppContent() {
                           />
                         ))}
 
-                      {activeTab === 'menu-management' && userRole !== 'stocker' && (
+                      {activeTab === 'menu-management' && (userRole !== 'stocker' || businessType === 'retail') && (
                         <MenuManagementModule
                           products={products}
                           setProducts={setProducts}
@@ -2124,7 +2278,12 @@ function AppContent() {
                             ]
                           )
                         ) : (
-                          <AlertsModule ingredients={ingredients} setActiveTab={setActiveTab} />
+                          <AlertsModule
+                            ingredients={ingredients}
+                            products={products}
+                            businessType={businessType}
+                            setActiveTab={setActiveTab}
+                          />
                         ))}
 
                       {activeTab === 'employees' && (

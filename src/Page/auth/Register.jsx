@@ -565,8 +565,10 @@ export default function Register({
 
     const effectiveFnbServiceMode =
       businessType === 'fnb' ? fnbServiceMode : 'dine_in_take_away';
+    const effectivePaymentFlow = businessType === 'retail' ? 'pay_first' : paymentFlow;
     const defaultOrderChannel =
-      businessType === 'fnb' && effectiveFnbServiceMode === 'take_away_only'
+      businessType === 'retail' ||
+      (businessType === 'fnb' && effectiveFnbServiceMode === 'take_away_only')
         ? 'take_away'
         : 'dine_in';
 
@@ -581,7 +583,7 @@ export default function Register({
         business_category: businessCategoryLabel,
         business_type: businessType,
         fnb_service_mode: effectiveFnbServiceMode,
-        payment_flow: paymentFlow,
+        payment_flow: effectivePaymentFlow,
         subscription_plan: selectedPlanId,
         payment_method: paymentMethod
       }
@@ -596,7 +598,7 @@ export default function Register({
       businessName: cleanBusiness,
       businessType,
       fnbServiceMode: effectiveFnbServiceMode,
-      paymentFlow,
+      paymentFlow: effectivePaymentFlow,
       subscriptionPlan: selectedPlanId,
       forceReset: true
     });
@@ -606,7 +608,7 @@ export default function Register({
         businessType,
         fnbServiceMode: effectiveFnbServiceMode,
         defaultOrderChannel,
-        paymentFlow
+        paymentFlow: effectivePaymentFlow
       },
       cleanUsername
     );
@@ -1193,8 +1195,8 @@ export default function Register({
                         {
                           id: 'retail',
                           title: 'Toko Ritel & Minimarket',
-                          desc: 'Mendukung SKU barang jadi, harga kulakan vs jual, serta pengurangan stok unit langsung.',
-                          badge: 'Mode SKU & Kulakan',
+                          desc: 'Mendukung SKU barang jadi, harga beli vs jual, serta pengurangan stok unit langsung.',
+                          badge: 'Mode SKU & Stok',
                           icon: ShoppingBag
                         }
                       ].map((opt) => {
@@ -1204,7 +1206,12 @@ export default function Register({
                           <button
                             key={opt.id}
                             type="button"
-                            onClick={() => setBusinessType(opt.id)}
+                            onClick={() => {
+                              setBusinessType(opt.id);
+                              if (opt.id === 'retail') {
+                                setPaymentFlow('pay_first');
+                              }
+                            }}
                             className={`text-left p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between gap-3 ${
                               active
                                 ? 'bg-[#FEF3C7]/45 border-[#F59E0B] shadow-sm'
@@ -1332,77 +1339,79 @@ export default function Register({
                     </div>
                   )}
 
-                  {/* Cara Bayar Pelanggan */}
-                  <div className="space-y-2">
-                    <label className="block text-xs font-bold text-[#141414]">
-                      Alur Pembayaran di Kasir
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {[
-                        {
-                          id: 'pay_first',
-                          title: 'Bayar di Awal (Pay First)',
-                          desc: 'Pelanggan membayar lunas di kasir saat memesan, lalu pesanan diproses.',
-                          badge: 'Kedai Kopi & Minimarket',
-                          icon: Wallet
-                        },
-                        {
-                          id: 'pay_later',
-                          title: 'Bayar Nanti / Open Bill (Pay Later)',
-                          desc: 'Pesanan masuk dapur dulu, bisa tambah/revisi item, dan dibayar saat selesai.',
-                          badge: 'Resto & Kafe Meja',
-                          icon: ReceiptText
-                        }
-                      ].map((opt) => {
-                        const active = paymentFlow === opt.id;
-                        const Icon = opt.icon;
-                        return (
-                          <button
-                            key={opt.id}
-                            type="button"
-                            onClick={() => setPaymentFlow(opt.id)}
-                            className={`text-left p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between gap-3 ${
-                              active
-                                ? 'bg-[#FEF3C7]/45 border-[#F59E0B] shadow-sm'
-                                : 'bg-[#FAFAFA] border-[#E5E5E5] hover:border-zinc-300'
-                            }`}
-                          >
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between gap-2">
-                                <div
-                                  className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                                    active
-                                      ? 'bg-[#141414] text-[#F59E0B]'
-                                      : 'bg-white border border-[#E5E5E5] text-[#D97706]'
-                                  }`}
-                                >
-                                  <Icon size={18} />
+                  {/* Cara Bayar Pelanggan (khusus F&B; toko ritel otomatis bayar di kasir) */}
+                  {businessType === 'fnb' && (
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-[#141414]">
+                        Alur Pembayaran di Kasir
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {[
+                          {
+                            id: 'pay_first',
+                            title: 'Bayar di Awal (Pay First)',
+                            desc: 'Pelanggan membayar lunas di kasir saat memesan, lalu pesanan diproses.',
+                            badge: 'Kedai Kopi & Counter',
+                            icon: Wallet
+                          },
+                          {
+                            id: 'pay_later',
+                            title: 'Bayar Nanti / Open Bill (Pay Later)',
+                            desc: 'Pesanan masuk dapur dulu, bisa tambah/revisi item, dan dibayar saat selesai.',
+                            badge: 'Resto & Kafe Meja',
+                            icon: ReceiptText
+                          }
+                        ].map((opt) => {
+                          const active = paymentFlow === opt.id;
+                          const Icon = opt.icon;
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => setPaymentFlow(opt.id)}
+                              className={`text-left p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between gap-3 ${
+                                active
+                                  ? 'bg-[#FEF3C7]/45 border-[#F59E0B] shadow-sm'
+                                  : 'bg-[#FAFAFA] border-[#E5E5E5] hover:border-zinc-300'
+                              }`}
+                            >
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div
+                                    className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                                      active
+                                        ? 'bg-[#141414] text-[#F59E0B]'
+                                        : 'bg-white border border-[#E5E5E5] text-[#D97706]'
+                                    }`}
+                                  >
+                                    <Icon size={18} />
+                                  </div>
+                                  <span
+                                    className={`w-5 h-5 rounded-full flex items-center justify-center border ${
+                                      active
+                                        ? 'bg-[#F59E0B] border-[#F59E0B] text-[#141414]'
+                                        : 'bg-white border-zinc-300 text-transparent'
+                                    }`}
+                                  >
+                                    <Check size={12} strokeWidth={3} />
+                                  </span>
                                 </div>
-                                <span
-                                  className={`w-5 h-5 rounded-full flex items-center justify-center border ${
-                                    active
-                                      ? 'bg-[#F59E0B] border-[#F59E0B] text-[#141414]'
-                                      : 'bg-white border-zinc-300 text-transparent'
-                                  }`}
-                                >
-                                  <Check size={12} strokeWidth={3} />
-                                </span>
+                                <h4 className="text-xs sm:text-sm font-extrabold text-[#141414]">
+                                  {opt.title}
+                                </h4>
+                                <p className="text-[11px] text-[#52525B] font-medium leading-relaxed">
+                                  {opt.desc}
+                                </p>
                               </div>
-                              <h4 className="text-xs sm:text-sm font-extrabold text-[#141414]">
-                                {opt.title}
-                              </h4>
-                              <p className="text-[11px] text-[#52525B] font-medium leading-relaxed">
-                                {opt.desc}
-                              </p>
-                            </div>
-                            <span className="inline-block w-fit font-mono text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-white border border-[#E5E5E5] text-[#52525B]">
-                              {opt.badge}
-                            </span>
-                          </button>
-                        );
-                      })}
+                              <span className="inline-block w-fit font-mono text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-white border border-[#E5E5E5] text-[#52525B]">
+                                {opt.badge}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="pt-2 flex items-center justify-between gap-3">
                     <button

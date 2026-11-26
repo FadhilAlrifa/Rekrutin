@@ -356,14 +356,14 @@ export default function MenuManagementModule({
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-[#141414]">
             {isRetail
-              ? 'Kelola Produk Ritel & Kulakan'
+              ? 'Kelola Produk & Stok Ritel'
               : subscriptionPlan === 'starter'
               ? 'Kelola Menu Dasar'
               : 'Kelola Menu, Resep & Modal'}
           </h1>
           <p className="text-[#52525B] text-[13px] font-medium mt-1">
             {isRetail
-              ? 'Atur nama barang, varian, jumlah stok, harga kulakan, dan keuntungan per produk.'
+              ? 'Atur nama barang, varian, jumlah stok, harga beli, dan keuntungan per produk.'
               : subscriptionPlan === 'starter'
               ? 'Atur daftar menu dan harga jual untuk kasir dasar.'
               : 'Atur daftar menu, takaran resep bahan baku, dan lihat keuntungan kotor per porsi.'}
@@ -397,7 +397,7 @@ export default function MenuManagementModule({
             </span>
             <p className="text-2xl font-extrabold font-mono text-[#141414] mt-1">{cogsSummary.avgMargin}%</p>
             <span className="text-[11px] font-medium text-[#52525B] block mt-0.5">
-              {isRetail ? 'Harga Jual vs Harga Kulakan terbaru' : 'Berdasarkan harga bahan baku terbaru'}
+              {isRetail ? 'Harga Jual vs Harga Beli terbaru' : 'Berdasarkan harga bahan baku terbaru'}
             </span>
           </div>
           <div className="bg-white border border-zinc-200 rounded-2xl p-4">
@@ -477,7 +477,7 @@ export default function MenuManagementModule({
         </div>
       )}
 
-      {/* Riwayat Perubahan Harga Kulakan Supplier (Khusus Mode Ritel) */}
+      {/* Riwayat Perubahan Harga Beli Supplier (Khusus Mode Ritel) */}
       {isRetail && (
         <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between gap-2 border-b border-zinc-100 pb-3.5">
@@ -487,7 +487,7 @@ export default function MenuManagementModule({
               </div>
               <div>
                 <h3 className="text-sm font-extrabold text-[#141414]">
-                  Riwayat Perubahan Harga Kulakan Supplier
+                  Riwayat Perubahan Harga Beli Supplier
                 </h3>
                 <p className="text-[11px] text-[#52525B] font-medium">
                   Log otomatis setiap perubahan harga beli SKU ritel untuk memantau tren margin.
@@ -498,7 +498,7 @@ export default function MenuManagementModule({
 
           {retailPriceHistory.length === 0 ? (
             <p className="text-xs text-[#52525B] text-center py-6 font-medium">
-              Belum ada perubahan harga kulakan produk ritel yang tercatat.
+              Belum ada perubahan harga beli produk ritel yang tercatat.
             </p>
           ) : (
             <div className="overflow-x-auto">

@@ -207,7 +207,7 @@ export default function MenuEngineeringMatrix({
                 <th className="pb-3 px-3">{isRetail ? 'Produk / SKU' : 'Menu'}</th>
                 <th className="pb-3 px-3">Klasifikasi</th>
                 <th className="pb-3 px-3 text-center">Terjual</th>
-                <th className="pb-3 px-3 text-right">{isRetail ? 'Kulakan / Unit' : 'HPP / Porsi'}</th>
+                <th className="pb-3 px-3 text-right">{isRetail ? 'Harga Beli / Unit' : 'HPP / Porsi'}</th>
                 <th className="pb-3 px-3 text-right">Harga Jual</th>
                 <th className="pb-3 px-3 text-center">Margin</th>
                 <th className="pb-3 px-3 text-right">Total Laba Bersih</th>

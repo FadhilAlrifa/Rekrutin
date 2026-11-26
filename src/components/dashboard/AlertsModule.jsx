@@ -13,15 +13,37 @@ import {
 } from 'lucide-react';
 import { getExpiryDays, checkExpiryStatus } from '../../utils/inventoryStatus';
 
-export default function AlertsModule({ ingredients = [], setActiveTab }) {
+export default function AlertsModule({
+  ingredients = [],
+  products = [],
+  businessType = 'fnb',
+  setActiveTab
+}) {
+  const isRetail = businessType === 'retail';
   const [filterType, setFilterType] = useState('all'); // 'all' | 'expired' | 'stock' | 'fefo'
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'table'
   const [sortBy, setSortBy] = useState('severity'); // 'severity' | 'name'
 
-  // Enrich & filter bermasalah dengan skor urgensi
+  // Enrich & filter item bermasalah (bahan gudang untuk F&B + produk toko untuk Ritel) dengan skor urgensi
   const enrichedAlerts = useMemo(() => {
-    return ingredients
+    const sourceItems = isRetail
+      ? [
+          ...(products || []).map((p) => ({
+            ...p,
+            id: p.id,
+            name: `${p.name} | ${p.category || 'Produk Ritel'}`,
+            stock: Number(p.stock ?? 0),
+            minLimit: Number(p.minLimit ?? p.min_stock_threshold ?? 5),
+            unit: p.unit || 'pcs',
+            expiryDate: p.expiryDate || '',
+            sourceType: 'product'
+          })),
+          ...(ingredients || []).map((ing) => ({ ...ing, sourceType: 'ingredient' }))
+        ]
+      : ingredients || [];
+
+    return sourceItems
       .map((ing) => {
         const diffDays = getExpiryDays(ing.expiryDate);
         const expStatus = checkExpiryStatus(ing.expiryDate);
@@ -33,8 +55,8 @@ export default function AlertsModule({ ingredients = [], setActiveTab }) {
         if (!hasIssue) return null;
 
         const parts = (ing.name || '').split(' | ');
-        const cleanName = parts[0] || 'Bahan Baku';
-        const categoryName = parts[1] || 'Bahan Umum';
+        const cleanName = parts[0] || (isRetail ? 'Produk Toko' : 'Bahan Baku');
+        const categoryName = parts[1] || (isRetail ? 'Produk Ritel' : 'Bahan Umum');
 
         // Skor prioritas untuk sorting otomatis (makin tinggi = makin mendesak)
         let severityScore = 0;
@@ -60,7 +82,7 @@ export default function AlertsModule({ ingredients = [], setActiveTab }) {
         };
       })
       .filter(Boolean);
-  }, [ingredients]);
+  }, [ingredients, products, isRetail]);
 
   const expiredCount = enrichedAlerts.filter((a) => a.isExpired).length;
   const lowStockCount = enrichedAlerts.filter((a) => a.isLowStock).length;
@@ -88,7 +110,7 @@ export default function AlertsModule({ ingredients = [], setActiveTab }) {
   }, [enrichedAlerts, filterType, searchQuery, sortBy]);
 
   const handleOpenInventory = () => {
-    setActiveTab?.('inventory');
+    setActiveTab?.(isRetail ? 'menu-management' : 'inventory');
   };
 
   const summaryTiles = [
@@ -151,10 +173,12 @@ export default function AlertsModule({ ingredients = [], setActiveTab }) {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 pb-5 border-b border-zinc-200">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-[#141414]">
-            Peringatan Bahan Gudang
+            {isRetail ? 'Peringatan Stok & Kedaluwarsa Produk' : 'Peringatan Bahan Gudang'}
           </h1>
           <p className="text-[#52525B] text-[13px] font-medium mt-1">
-            Pantau bahan baku yang stoknya menipis, mendekati kedaluwarsa, atau sudah lewat tanggal simpan.
+            {isRetail
+              ? 'Pantau produk minimarket/toko yang stoknya menipis, habis, atau mendekati tanggal kedaluwarsa.'
+              : 'Pantau bahan baku yang stoknya menipis, mendekati kedaluwarsa, atau sudah lewat tanggal simpan.'}
           </p>
         </div>
 
@@ -170,7 +194,7 @@ export default function AlertsModule({ ingredients = [], setActiveTab }) {
               onClick={handleOpenInventory}
               className="bg-[#141414] hover:bg-zinc-800 text-white text-xs font-bold px-4 py-2 rounded-xl inline-flex items-center gap-2 cursor-pointer transition-colors"
             >
-              <span>Kelola di Gudang</span>
+              <span>{isRetail ? 'Kelola Stok Produk' : 'Kelola di Gudang'}</span>
               <ArrowRight size={14} className="text-[#F59E0B]" />
             </button>
           )}

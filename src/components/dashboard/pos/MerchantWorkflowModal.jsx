@@ -12,7 +12,15 @@ export default function MerchantWorkflowModal({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave(draft);
+    const isRetailDraft = (draft?.businessType || 'fnb') === 'retail';
+    onSave({
+      ...draft,
+      paymentFlow: isRetailDraft ? 'pay_first' : draft.paymentFlow,
+      defaultOrderChannel:
+        isRetailDraft && draft.defaultOrderChannel === 'dine_in'
+          ? 'take_away'
+          : draft.defaultOrderChannel
+    });
     onClose();
   };
 
@@ -74,7 +82,7 @@ export default function MerchantWorkflowModal({
                     {
                       id: 'retail',
                       title: 'Toko Ritel & Minimarket',
-                      desc: 'Produk satuan atau varian, harga kulakan vs jual, potong stok otomatis per barang.',
+                      desc: 'Produk satuan atau varian, harga beli vs jual, potong stok otomatis per barang.',
                       icon: ShoppingBag
                     }
                   ].map((mode) => {
@@ -84,7 +92,21 @@ export default function MerchantWorkflowModal({
                       <button
                         key={mode.id}
                         type="button"
-                        onClick={() => setDraft({ ...draft, businessType: mode.id })}
+                        onClick={() =>
+                          setDraft({
+                            ...draft,
+                            businessType: mode.id,
+                            ...(mode.id === 'retail'
+                              ? {
+                                  paymentFlow: 'pay_first',
+                                  defaultOrderChannel:
+                                    draft.defaultOrderChannel === 'dine_in'
+                                      ? 'take_away'
+                                      : draft.defaultOrderChannel
+                                }
+                              : {})
+                          })
+                        }
                         className={`text-left p-3.5 rounded-2xl border transition-all cursor-pointer ${
                           active
                             ? 'bg-[#141414] text-white border-[#141414] shadow-sm'
@@ -153,43 +175,45 @@ export default function MerchantWorkflowModal({
                 </div>
               )}
 
-              {/* 1. Payment Flow */}
-              <div className="space-y-2">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-[#52525B] flex items-center gap-1.5">
-                  <Wallet size={13} className="text-[#D97706]" /> Cara Pembayaran Pelanggan
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {[
-                    {
-                      id: 'pay_first',
-                      title: 'Bayar di Awal (Pay First)',
-                      desc: 'Pelanggan bayar lunas dulu saat pesan, baru pesanan diproses.'
-                    },
-                    {
-                      id: 'pay_later',
-                      title: 'Bayar Nanti / Open Bill (Pay Later)',
-                      desc: 'Pesanan langsung dibuat, bisa tambah item lagi, lalu bayar di akhir.'
-                    }
-                  ].map((opt) => {
-                    const active = draft.paymentFlow === opt.id;
-                    return (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => setDraft({ ...draft, paymentFlow: opt.id })}
-                        className={`text-left p-3.5 rounded-2xl border transition-all cursor-pointer ${
-                          active
-                            ? 'bg-[#FEF3C7] border-[#F59E0B] shadow-sm'
-                            : 'bg-[#FAFAFA] border-zinc-200 hover:border-zinc-300'
-                        }`}
-                      >
-                        <p className="text-xs font-extrabold text-[#141414]">{opt.title}</p>
-                        <p className="text-[11px] text-[#52525B] mt-1 leading-snug">{opt.desc}</p>
-                      </button>
-                    );
-                  })}
+              {/* 1. Payment Flow (Hanya untuk F&B; ritel otomatis bayar langsung di kasir) */}
+              {(draft.businessType || 'fnb') === 'fnb' && (
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-[#52525B] flex items-center gap-1.5">
+                    <Wallet size={13} className="text-[#D97706]" /> Cara Pembayaran Pelanggan
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {[
+                      {
+                        id: 'pay_first',
+                        title: 'Bayar di Awal (Pay First)',
+                        desc: 'Pelanggan bayar lunas dulu saat pesan, baru pesanan diproses.'
+                      },
+                      {
+                        id: 'pay_later',
+                        title: 'Bayar Nanti / Open Bill (Pay Later)',
+                        desc: 'Pesanan langsung dibuat, bisa tambah item lagi, lalu bayar di akhir.'
+                      }
+                    ].map((opt) => {
+                      const active = draft.paymentFlow === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setDraft({ ...draft, paymentFlow: opt.id })}
+                          className={`text-left p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                            active
+                              ? 'bg-[#FEF3C7] border-[#F59E0B] shadow-sm'
+                              : 'bg-[#FAFAFA] border-zinc-200 hover:border-zinc-300'
+                          }`}
+                        >
+                          <p className="text-xs font-extrabold text-[#141414]">{opt.title}</p>
+                          <p className="text-[11px] text-[#52525B] mt-1 leading-snug">{opt.desc}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* 2. Default Order Channel */}
               <div className="space-y-2">
@@ -198,11 +222,12 @@ export default function MerchantWorkflowModal({
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {[
-                    ...((draft.businessType || 'fnb') === 'fnb' &&
-                    draft.fnbServiceMode === 'take_away_only'
+                    ...((draft.businessType || 'fnb') === 'retail' ||
+                    ((draft.businessType || 'fnb') === 'fnb' &&
+                      draft.fnbServiceMode === 'take_away_only')
                       ? []
                       : [{ id: 'dine_in', label: 'Dine-In' }]),
-                    { id: 'take_away', label: 'Take-Away' },
+                    { id: 'take_away', label: (draft.businessType || 'fnb') === 'retail' ? 'Belanja di Toko' : 'Take-Away' },
                     { id: 'online_closed_kitchen', label: 'Online Order' }
                   ].map((ch) => (
                     <button
@@ -231,7 +256,9 @@ export default function MerchantWorkflowModal({
                         Aktifkan Kanal Online Order
                       </p>
                       <p className="text-[11px] text-[#52525B]">
-                        Pesanan online masuk langsung ke antrean KDS dapur tanpa antre kasir tatap muka.
+                        {(draft.businessType || 'fnb') === 'retail'
+                          ? 'Pesanan online masuk ke daftar antrean untuk disiapkan kasir sebelum diambil.'
+                          : 'Pesanan online masuk langsung ke antrean KDS dapur tanpa antre kasir tatap muka.'}
                       </p>
                     </div>
                   </div>

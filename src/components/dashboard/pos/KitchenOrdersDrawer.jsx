@@ -9,17 +9,19 @@ import {
   Wallet,
   Globe,
   UserCheck,
-  Receipt
+  Receipt,
+  Package
 } from 'lucide-react';
 import {
   ORDER_CHANNEL_LABELS,
   PAYMENT_FLOW_LABELS,
-  KITCHEN_STATUS_META
+  getOrderStatusMeta
 } from '../../../utils/orderStateMachine';
 
 export default function KitchenOrdersDrawer({
   orders = [],
   merchantSettings,
+  businessType = 'fnb',
   onTransitionStatus,
   onOpenModify,
   onOpenCancel,
@@ -27,6 +29,7 @@ export default function KitchenOrdersDrawer({
   onReceiveClosedKitchenDemo,
   onViewReceipt
 }) {
+  const isRetail = businessType === 'retail';
   const [viewFilter, setViewFilter] = useState('active'); // 'active' | 'history'
 
   const activeOrders = orders.filter(
@@ -60,14 +63,16 @@ export default function KitchenOrdersDrawer({
       <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-[#141414] text-[#F59E0B] flex items-center justify-center shrink-0">
-            <ChefHat size={19} />
+            {isRetail ? <Receipt size={19} /> : <ChefHat size={19} />}
           </div>
           <div>
             <h2 className="text-sm font-extrabold text-[#141414]">
-              Antrean Dapur (KDS) &amp; Open Bill
+              {isRetail ? 'Antrean Online Order & Riwayat Nota' : 'Antrean Dapur (KDS) & Open Bill'}
             </h2>
             <p className="text-[11px] text-[#52525B] font-medium">
-              Kelola status masak, pembayaran Open Bill, Nota Coret, dan pembatalan (Kondisi A/B).
+              {isRetail
+                ? 'Siapkan pesanan online, cetak ulang struk, revisi nota barang, atau proses retur.'
+                : 'Kelola status masak, pembayaran Open Bill, Nota Coret, dan pembatalan (Kondisi A/B).'}
             </p>
           </div>
         </div>
@@ -113,22 +118,36 @@ export default function KitchenOrdersDrawer({
       {/* Grid Kartu Order */}
       {displayedOrders.length === 0 ? (
         <div className="bg-white border border-zinc-200 rounded-2xl p-12 text-center space-y-2">
-          <ChefHat size={32} className="mx-auto text-zinc-300" />
+          {isRetail ? (
+            <Receipt size={32} className="mx-auto text-zinc-300" />
+          ) : (
+            <ChefHat size={32} className="mx-auto text-zinc-300" />
+          )}
           <p className="text-sm font-bold text-[#141414]">
             {viewFilter === 'active'
-              ? 'Belum ada antrean dapur atau Open Bill aktif'
+              ? isRetail
+                ? 'Belum ada Online Order yang perlu disiapkan'
+                : 'Belum ada antrean dapur atau Open Bill aktif'
+              : isRetail
+              ? 'Belum ada riwayat nota / batal'
               : 'Belum ada riwayat order dapur / batal'}
           </p>
           <p className="text-xs text-[#52525B]">
-            Buat transaksi dari tab Katalog POS atau klik Terima Online Order.
+            {isRetail
+              ? 'Transaksi kasir langsung otomatis tercatat sebagai Selesai. Gunakan Terima Online Order jika ada pesanan online.'
+              : 'Buat transaksi dari tab Katalog POS atau klik Terima Online Order.'}
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {displayedOrders.map((order) => {
-            const kMeta = KITCHEN_STATUS_META[order.kitchenStatus] || KITCHEN_STATUS_META.queued;
+            const kMeta = getOrderStatusMeta(order.kitchenStatus, businessType);
             const isClosedOrCancelled =
               order.kitchenStatus === 'cancelled' || order.kitchenStatus === 'cancelled_waste';
+            const channelText =
+              isRetail && order.orderChannel === 'take_away'
+                ? 'Belanja di Toko'
+                : ORDER_CHANNEL_LABELS[order.orderChannel] || order.orderChannel;
 
             return (
               <div
@@ -158,7 +177,7 @@ export default function KitchenOrdersDrawer({
                           <Clock size={11} /> {formatTime(order.createdAt)}
                         </span>
                         <span>•</span>
-                        <span>{ORDER_CHANNEL_LABELS[order.orderChannel] || order.orderChannel}</span>
+                        <span>{channelText}</span>
                         <span>•</span>
                         <span>{order.tableNumber}</span>
                       </p>
@@ -222,7 +241,8 @@ export default function KitchenOrdersDrawer({
                   {/* Waste Cost Info jika Cancelled Waste */}
                   {order.kitchenStatus === 'cancelled_waste' && (
                     <div className="bg-red-50 border border-red-200 rounded-xl p-2.5 text-[11px] text-red-700 font-semibold">
-                      Kerugian Waste HPP Tercatat: <span className="font-mono font-extrabold">Rp {Number(order.wasteCost || 0).toLocaleString('id-ID')}</span>
+                      {isRetail ? 'Kerugian Barang Rusak / Retur:' : 'Kerugian Waste HPP Tercatat:'}{' '}
+                      <span className="font-mono font-extrabold">Rp {Number(order.wasteCost || 0).toLocaleString('id-ID')}</span>
                     </div>
                   )}
                 </div>
@@ -248,7 +268,8 @@ export default function KitchenOrdersDrawer({
                           onClick={() => onTransitionStatus(order, 'preparing')}
                           className="flex-1 px-3 py-2 rounded-xl bg-[#141414] hover:bg-zinc-800 text-[#F59E0B] text-[11px] font-extrabold inline-flex items-center justify-center gap-1 cursor-pointer"
                         >
-                          <Flame size={13} /> Mulai Masak
+                          {isRetail ? <Package size={13} /> : <Flame size={13} />}{' '}
+                          {isRetail ? 'Siapkan Barang' : 'Mulai Masak'}
                         </button>
                       )}
                       {order.kitchenStatus === 'preparing' && (
@@ -257,7 +278,7 @@ export default function KitchenOrdersDrawer({
                           onClick={() => onTransitionStatus(order, 'ready')}
                           className="flex-1 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold inline-flex items-center justify-center gap-1 cursor-pointer"
                         >
-                          <CheckCircle2 size={13} /> Siap Saji
+                          <CheckCircle2 size={13} /> {isRetail ? 'Siap Diambil' : 'Siap Saji'}
                         </button>
                       )}
                       {order.kitchenStatus === 'ready' && (
@@ -266,17 +287,27 @@ export default function KitchenOrdersDrawer({
                           onClick={() => onTransitionStatus(order, 'served')}
                           className="flex-1 px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-[11px] font-extrabold inline-flex items-center justify-center gap-1 cursor-pointer"
                         >
-                          <CheckCircle2 size={13} /> Selesai Saji
+                          <CheckCircle2 size={13} /> {isRetail ? 'Selesai / Diserahkan' : 'Selesai Saji'}
                         </button>
                       )}
 
-                      {order.paymentStatus === 'unpaid' && (
+                      {!isRetail && order.paymentStatus === 'unpaid' && (
                         <button
                           type="button"
                           onClick={() => onSettleOpenBill(order)}
                           className="flex-1 px-3 py-2 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] text-[11px] font-extrabold inline-flex items-center justify-center gap-1 cursor-pointer"
                         >
                           <Wallet size={13} /> Bayar Bill
+                        </button>
+                      )}
+
+                      {order.kitchenStatus === 'served' && (
+                        <button
+                          type="button"
+                          onClick={() => onViewReceipt(order)}
+                          className="flex-1 px-3 py-2 rounded-xl bg-[#FAFAFA] hover:bg-zinc-100 border border-zinc-200 text-[#141414] text-[11px] font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Receipt size={13} /> Lihat Nota
                         </button>
                       )}
 

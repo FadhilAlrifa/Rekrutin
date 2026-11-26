@@ -39,6 +39,38 @@ export const KITCHEN_STATUS_META = {
   }
 };
 
+export const RETAIL_ORDER_STATUS_META = {
+  queued: {
+    label: 'Online Order Masuk',
+    badgeClass: 'bg-[#FEF3C7] text-[#B45309] border-[#FDE68A]'
+  },
+  preparing: {
+    label: 'Disiapkan Kasir',
+    badgeClass: 'bg-sky-50 text-sky-700 border-sky-200'
+  },
+  ready: {
+    label: 'Siap Diambil',
+    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200'
+  },
+  served: {
+    label: 'Selesai',
+    badgeClass: 'bg-zinc-100 text-[#141414] border-zinc-200'
+  },
+  cancelled: {
+    label: 'Dibatalkan (Stok Utuh)',
+    badgeClass: 'bg-zinc-100 text-[#52525B] border-zinc-200'
+  },
+  cancelled_waste: {
+    label: 'Retur / Barang Rusak',
+    badgeClass: 'bg-red-50 text-red-700 border-red-200'
+  }
+};
+
+export function getOrderStatusMeta(status, businessType = 'fnb') {
+  const table = businessType === 'retail' ? RETAIL_ORDER_STATUS_META : KITCHEN_STATUS_META;
+  return table[status] || table.queued;
+}
+
 /**
  * Hitung kebutuhan bahan baku (dalam satuan gudang) untuk daftar item pesanan.
  */
@@ -109,11 +141,11 @@ export function computeRetailSkuRequirementsForItems(items = [], products = [], 
 /**
  * Hitung total kerugian HPP (waste_cost) dari daftar item pesanan.
  */
-export function calculateOrderItemsWasteCost(items = [], ingredients = []) {
+export function calculateOrderItemsWasteCost(items = [], ingredients = [], businessType = 'fnb') {
   return (items || []).reduce((sum, item) => {
     const qty = Number(item?.qty) || 0;
     if (qty <= 0) return sum;
-    const { cogs } = calculateMenuCogs(item, ingredients);
+    const { cogs } = calculateMenuCogs(item, ingredients, businessType);
     // Jika belum ada resep/harga bahan, gunakan estimasi konservatif 40% dari harga jual agar waste terpantau
     const unitCost = cogs > 0 ? cogs : Math.round((Number(item.price) || 0) * 0.4);
     return sum + unitCost * qty;
@@ -164,7 +196,8 @@ export function createOrderPayload({
   customerName = '',
   operator = { id: 'kasir-1', name: 'Kasir Aktif', role: 'kasir' },
   outlet = 'Cabang Utama - Makassar',
-  isClosedKitchenOrder = false
+  isClosedKitchenOrder = false,
+  businessType = 'fnb'
 }) {
   const totalAmount = items.reduce(
     (sum, item) => sum + (Number(item.price) || 0) * (Number(item.qty) || 0),
@@ -173,17 +206,24 @@ export function createOrderPayload({
   const now = new Date().toISOString();
   const orderNum = `ORD-${Date.now().toString().slice(-6)}`;
 
-  const resolvedChannel = isClosedKitchenOrder ? 'online_closed_kitchen' : orderChannel;
-  const isPayLater = paymentFlow === 'pay_later' && !isClosedKitchenOrder;
+  const isRetail = businessType === 'retail';
+  const resolvedChannel = isClosedKitchenOrder
+    ? 'online_closed_kitchen'
+    : isRetail && orderChannel === 'dine_in'
+    ? 'take_away'
+    : orderChannel;
+  const resolvedFlow = isRetail || isClosedKitchenOrder ? 'pay_first' : paymentFlow;
+  const isPayLater = resolvedFlow === 'pay_later' && !isClosedKitchenOrder;
+  const isDirectRetailSale = isRetail && !isClosedKitchenOrder;
 
   return {
     id: `ORD-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
     orderNumber: orderNum,
     orderChannel: resolvedChannel,
-    paymentFlow: isClosedKitchenOrder ? 'pay_first' : paymentFlow,
-    orderStatus: isPayLater ? 'open' : 'active',
+    paymentFlow: resolvedFlow,
+    orderStatus: isDirectRetailSale ? 'closed' : isPayLater ? 'open' : 'active',
     paymentStatus: isPayLater ? 'unpaid' : 'paid',
-    kitchenStatus: isPayLater ? 'preparing' : 'queued',
+    kitchenStatus: isDirectRetailSale ? 'served' : isPayLater ? 'preparing' : 'queued',
     paymentMethod: isPayLater ? 'open_bill' : paymentMethod,
     tableNumber:
       resolvedChannel === 'online_closed_kitchen'
@@ -218,7 +258,8 @@ export function resolveOrderCancellation({
   condition = 'before_cooking',
   reason = '',
   operator = { id: 'kasir-1', name: 'Kasir Aktif', role: 'kasir' },
-  ingredients = []
+  ingredients = [],
+  businessType = 'fnb'
 }) {
   const now = new Date().toISOString();
   const isAlreadyProcessed =
@@ -228,7 +269,7 @@ export function resolveOrderCancellation({
   const isPostProduction = isAlreadyProcessed || condition === 'after_cooking';
 
   const wasteCost = isPostProduction
-    ? calculateOrderItemsWasteCost(order.items, ingredients)
+    ? calculateOrderItemsWasteCost(order.items, ingredients, businessType)
     : 0;
 
   let stockAction;
@@ -286,7 +327,8 @@ export function resolveOrderModification({
   reason = '',
   operator = { id: 'kasir-1', name: 'Kasir Aktif', role: 'kasir' },
   ingredients = [],
-  treatRemovedAsWaste = false
+  treatRemovedAsWaste = false,
+  businessType = 'fnb'
 }) {
   const now = new Date().toISOString();
   const sanitizedNextItems = (nextItems || []).filter((i) => Number(i.qty) > 0);
@@ -327,7 +369,7 @@ export function resolveOrderModification({
         qty: Math.max(0, Number(r.oldQty) - Number(r.newQty))
       };
     });
-    addedWasteCost = calculateOrderItemsWasteCost(wasteItems, ingredients);
+    addedWasteCost = calculateOrderItemsWasteCost(wasteItems, ingredients, businessType);
   }
 
   const bomDeltas = computeBomDeltaBetweenItems(order.items, sanitizedNextItems, ingredients);

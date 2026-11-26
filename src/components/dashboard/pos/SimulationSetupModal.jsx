@@ -47,7 +47,7 @@ export default function SimulationSetupModal({
     onConfirm?.({
       businessType,
       fnbServiceMode: businessType === 'fnb' ? fnbServiceMode : 'dine_in_take_away',
-      paymentFlow
+      paymentFlow: businessType === 'retail' ? 'pay_first' : paymentFlow
     });
   };
 
@@ -118,7 +118,7 @@ export default function SimulationSetupModal({
             <div className="h-1.5 w-full bg-zinc-100 overflow-hidden">
               <motion.div
                 initial={false}
-                animate={{ width: step === 1 ? '50%' : '100%' }}
+                animate={{ width: businessType === 'retail' || step === 2 ? '100%' : '50%' }}
                 transition={{ type: 'spring', stiffness: 320, damping: 30 }}
                 className="h-full bg-[#F59E0B]"
               />
@@ -140,7 +140,7 @@ export default function SimulationSetupModal({
                   >
                     <div className="flex flex-wrap items-center gap-2 mb-1">
                       <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]">
-                        Langkah {step} dari 2
+                        {businessType === 'retail' ? 'Langkah 1 dari 1' : `Langkah ${step} dari 2`}
                       </span>
                       {pendingPlan && (
                         <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-zinc-100 text-[#141414] border border-zinc-200">
@@ -200,7 +200,12 @@ export default function SimulationSetupModal({
                           transition={{ duration: 0.25, delay: idx * 0.06 }}
                           whileHover={{ y: -2 }}
                           whileTap={{ scale: 0.98 }}
-                          onClick={() => setBusinessType(opt.id)}
+                          onClick={() => {
+                            setBusinessType(opt.id);
+                            if (opt.id === 'retail') {
+                              setPaymentFlow('pay_first');
+                            }
+                          }}
                           className={`text-left p-5 rounded-2xl border-2 transition-colors cursor-pointer flex flex-col justify-between gap-4 ${
                             active
                               ? 'bg-[#FEF3C7]/40 border-[#F59E0B] shadow-sm'
@@ -382,16 +387,29 @@ export default function SimulationSetupModal({
                   >
                     Batal
                   </button>
-                  <motion.button
-                    type="button"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.97 }}
-                    onClick={() => setStep(2)}
-                    className="px-6 py-3 rounded-xl bg-[#141414] hover:bg-zinc-800 text-white text-xs font-extrabold inline-flex items-center gap-2 cursor-pointer transition-colors"
-                  >
-                    <span>Lanjut Pilih Cara Bayar</span>
-                    <ArrowRight size={14} className="text-[#F59E0B]" />
-                  </motion.button>
+                  {businessType === 'retail' ? (
+                    <motion.button
+                      type="button"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={handleConfirm}
+                      className="px-6 py-3 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] text-xs font-extrabold inline-flex items-center gap-2 shadow-sm cursor-pointer transition-colors"
+                    >
+                      <span>Masuk ke Simulasi POS</span>
+                      <ArrowRight size={14} />
+                    </motion.button>
+                  ) : (
+                    <motion.button
+                      type="button"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => setStep(2)}
+                      className="px-6 py-3 rounded-xl bg-[#141414] hover:bg-zinc-800 text-white text-xs font-extrabold inline-flex items-center gap-2 cursor-pointer transition-colors"
+                    >
+                      <span>Lanjut Pilih Cara Bayar</span>
+                      <ArrowRight size={14} className="text-[#F59E0B]" />
+                    </motion.button>
+                  )}
                 </>
               ) : (
                 <>

@@ -189,7 +189,7 @@ export function calculateMenuCogs(product, ingredients = [], businessType = 'fnb
       breakdown: [
         {
           ingredientId: null,
-          name: `Kulakan ${product?.name || 'SKU'}`,
+          name: `Harga Beli ${product?.name || 'SKU'}`,
           qty: 1,
           unit: product?.unit || 'pcs',
           storageUnit: product?.unit || 'pcs',

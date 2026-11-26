@@ -156,7 +156,7 @@ export default function MenuFormModal({
     setFormData({ ...formData, recipe: updatedRecipe });
   };
 
-  // Live Kalkulasi COGS (HPP) / Harga Kulakan & Margin Profit saat admin mengetik
+  // Live Kalkulasi COGS (HPP) / Harga Beli & Margin Profit saat admin mengetik
   const liveCogs = calculateMenuCogs(
     {
       price: Number(formData.price) || 0,
@@ -209,7 +209,7 @@ export default function MenuFormModal({
                 {isStarter
                   ? 'Atur nama menu, harga jual, dan perkiraan jumlah porsi yang bisa dibuat (Paket Starter).'
                   : isRetailMode
-                  ? 'Atur nama barang, varian, jumlah stok, harga kulakan, dan keuntungan.'
+                  ? 'Atur nama barang, varian, jumlah stok, harga beli, dan keuntungan.'
                   : 'Atur takaran resep bahan baku dan pantau modal serta keuntungan per porsi.'}
               </p>
             </div>
@@ -394,14 +394,14 @@ export default function MenuFormModal({
               </div>
             </div>
 
-            {/* Bagian 2: Stok & Kulakan (Ritel) ATAU Komposisi Resep BOM (F&B) */}
+            {/* Bagian 2: Stok & Harga Beli (Ritel) ATAU Komposisi Resep BOM (F&B) */}
             {isRetailMode ? (
               <div className="space-y-4 pt-2 border-t border-zinc-100">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Layers size={14} className="text-[#D97706]" />
                     <span className="font-mono text-[10px] font-bold text-[#52525B] uppercase tracking-wider">
-                      Stok SKU, Varian &amp; Harga Kulakan Supplier
+                      Stok SKU, Varian &amp; Harga Beli Supplier
                     </span>
                   </div>
                   <span className="font-mono text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]">
@@ -487,7 +487,7 @@ export default function MenuFormModal({
 
                   <div>
                     <label className="block text-[11px] font-bold text-[#52525B] mb-1">
-                      Harga Kulakan / Beli (Rp) <span className="text-red-600">*</span>
+                      Harga Beli / Modal (Rp) <span className="text-red-600">*</span>
                     </label>
                     <input
                       type="number"
@@ -506,7 +506,7 @@ export default function MenuFormModal({
                   Number(formData.purchasePrice || 0) !== Number(editingProduct.purchasePrice || 0) && (
                     <div className="bg-[#FEF3C7]/60 border border-[#FDE68A] rounded-xl p-3 space-y-1.5">
                       <label className="block text-[11px] font-bold text-[#B45309]">
-                        Catatan Perubahan Harga Kulakan (Riwayat Harga Supplier)
+                        Catatan Perubahan Harga Beli (Riwayat Harga Supplier)
                       </label>
                       <input
                         type="text"
@@ -535,7 +535,7 @@ export default function MenuFormModal({
                   <div className="grid grid-cols-3 gap-2.5">
                     <div className="bg-white border border-zinc-200 rounded-xl p-3">
                       <span className="font-mono text-[9px] font-bold uppercase text-[#52525B] block">
-                        Harga Kulakan
+                        Harga Beli
                       </span>
                       <span className="font-mono text-sm font-extrabold text-[#141414]">
                         Rp {liveCogs.cogs.toLocaleString('id-ID')}

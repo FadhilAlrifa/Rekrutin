@@ -18,15 +18,17 @@ export function OrderModificationModal({
   order,
   products = [],
   ingredients = [],
+  businessType = 'fnb',
   onClose,
   onConfirm
 }) {
+  const isRetail = businessType === 'retail';
   const [draftItems, setDraftItems] = useState(() =>
     (order?.items || []).map((i) => ({ ...i }))
   );
   const [reason, setReason] = useState('');
   const [treatRemovedAsWaste, setTreatRemovedAsWaste] = useState(
-    () => order?.kitchenStatus === 'preparing' || order?.kitchenStatus === 'ready'
+    () => !isRetail && (order?.kitchenStatus === 'preparing' || order?.kitchenStatus === 'ready')
   );
   const [addProductId, setAddProductId] = useState('');
 
@@ -72,8 +74,8 @@ export function OrderModificationModal({
         removedItems.push({ ...oldItem, qty: Number(oldItem.qty) - newQty });
       }
     });
-    return calculateOrderItemsWasteCost(removedItems, ingredients);
-  }, [treatRemovedAsWaste, order, draftItems, ingredients]);
+    return calculateOrderItemsWasteCost(removedItems, ingredients, businessType);
+  }, [treatRemovedAsWaste, order, draftItems, ingredients, businessType]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -191,7 +193,7 @@ export function OrderModificationModal({
               onChange={(e) => setAddProductId(e.target.value)}
               className="flex-1 bg-[#FAFAFA] border border-zinc-200 rounded-xl px-3 py-2 text-xs font-bold text-[#141414]"
             >
-              <option value="">+ Tambah item menu susulan...</option>
+              <option value="">{isRetail ? '+ Tambah produk ritel susulan...' : '+ Tambah item menu susulan...'}</option>
               {products.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name} — Rp {Number(p.price).toLocaleString('id-ID')}
@@ -208,7 +210,7 @@ export function OrderModificationModal({
             </button>
           </div>
 
-          {(order.kitchenStatus === 'preparing' || order.kitchenStatus === 'ready') && (
+          {(isRetail || order.kitchenStatus === 'preparing' || order.kitchenStatus === 'ready') && (
             <label className="flex items-start gap-2.5 p-3 rounded-xl bg-[#FEF3C7] border border-[#FDE68A] cursor-pointer">
               <input
                 type="checkbox"
@@ -218,10 +220,16 @@ export function OrderModificationModal({
               />
               <div className="text-[11px] text-[#78350F]">
                 <span className="font-bold text-[#141414] block">
-                  Item yang dicoret sudah terlanjur diproses dapur
+                  {isRetail
+                    ? 'Barang yang dikurangi rusak / tidak layak jual kembali'
+                    : 'Item yang dicoret sudah terlanjur diproses dapur'}
                 </span>
-                Stok bahan yang sudah dipakai tetap terpotong sebagai waste
-                {wastePreview > 0 ? ` (Estimasi HPP Waste: Rp ${wastePreview.toLocaleString('id-ID')})` : ''}.
+                {isRetail
+                  ? 'Stok unit tidak dikembalikan ke rak dan dicatat sebagai kerugian barang rusak'
+                  : 'Stok bahan yang sudah dipakai tetap terpotong sebagai waste'}
+                {wastePreview > 0
+                  ? ` (${isRetail ? 'Estimasi Rugi Harga Beli' : 'Estimasi HPP Waste'}: Rp ${wastePreview.toLocaleString('id-ID')})`
+                  : ''}.
               </div>
             </label>
           )}
@@ -271,11 +279,13 @@ export function OrderModificationModal({
   );
 }
 
-export function OrderCancelModal({ order, ingredients = [], onClose, onConfirm }) {
+export function OrderCancelModal({ order, ingredients = [], businessType = 'fnb', onClose, onConfirm }) {
+  const isRetail = businessType === 'retail';
   const isAlreadyProcessed =
-    order?.kitchenStatus === 'preparing' ||
-    order?.kitchenStatus === 'ready' ||
-    order?.kitchenStatus === 'served';
+    !isRetail &&
+    (order?.kitchenStatus === 'preparing' ||
+      order?.kitchenStatus === 'ready' ||
+      order?.kitchenStatus === 'served');
   const [condition, setCondition] = useState(
     isAlreadyProcessed ? 'after_cooking' : 'before_cooking'
   );
@@ -283,20 +293,27 @@ export function OrderCancelModal({ order, ingredients = [], onClose, onConfirm }
   const effectiveCondition = isAlreadyProcessed ? 'after_cooking' : condition;
 
   const estimatedWasteCost = useMemo(
-    () => calculateOrderItemsWasteCost(order?.items || [], ingredients),
-    [order, ingredients]
+    () => calculateOrderItemsWasteCost(order?.items || [], ingredients, businessType),
+    [order, ingredients, businessType]
   );
 
   if (!order) return null;
 
-  const statusLabel =
-    order.kitchenStatus === 'ready'
-      ? 'Siap Saji'
+  const statusLabel = isRetail
+    ? order.kitchenStatus === 'ready'
+      ? 'Siap Diambil'
       : order.kitchenStatus === 'served'
-      ? 'Selesai Disajikan'
+      ? 'Selesai'
       : order.kitchenStatus === 'preparing'
-      ? 'Sedang Dimasak'
-      : 'Antrean Dapur';
+      ? 'Disiapkan Kasir'
+      : 'Online Order Masuk'
+    : order.kitchenStatus === 'ready'
+    ? 'Siap Saji'
+    : order.kitchenStatus === 'served'
+    ? 'Selesai Disajikan'
+    : order.kitchenStatus === 'preparing'
+    ? 'Sedang Dimasak'
+    : 'Antrean Dapur';
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -322,7 +339,9 @@ export function OrderCancelModal({ order, ingredients = [], onClose, onConfirm }
                 Batalkan Pesanan ({order.orderNumber})
               </h3>
               <p className="text-[11px] font-medium text-[#52525B]">
-                Pilih kondisi bahan dapur agar stok &amp; HPP tetap sinkron.
+                {isRetail
+                  ? 'Pilih kondisi barang agar stok rak & nilai kerugian tetap sinkron.'
+                  : 'Pilih kondisi bahan dapur agar stok & HPP tetap sinkron.'}
               </p>
             </div>
           </div>
@@ -354,12 +373,22 @@ export function OrderCancelModal({ order, ingredients = [], onClose, onConfirm }
                 }`}
               >
                 <p className="text-xs font-extrabold text-[#141414]">
-                  Kondisi A — Belum Masuk Proses Dapur (Queued)
+                  {isRetail
+                    ? 'Kondisi A — Barang Utuh / Kembali ke Rak'
+                    : 'Kondisi A — Belum Masuk Proses Dapur (Queued)'}
                 </p>
                 <p className="text-[11px] text-[#52525B] mt-1">
                   Status menjadi <span className="font-mono font-bold">cancelled</span>.{' '}
                   {order.paymentStatus === 'paid' ? 'Pembayaran dicatat refund. ' : ''}
-                  Stok bahan baku <strong>tidak dipotong / dikembalikan utuh</strong> (Waste Rp 0).
+                  {isRetail ? (
+                    <>
+                      Stok unit produk <strong>dikembalikan utuh ke rak</strong> (Rugi Rp 0).
+                    </>
+                  ) : (
+                    <>
+                      Stok bahan baku <strong>tidak dipotong / dikembalikan utuh</strong> (Waste Rp 0).
+                    </>
+                  )}
                 </p>
               </button>
             )}
@@ -376,12 +405,27 @@ export function OrderCancelModal({ order, ingredients = [], onClose, onConfirm }
               }`}
             >
               <p className="text-xs font-extrabold text-red-700">
-                Kondisi B — Sudah Diproses Dapur (Preparing / Ready)
+                {isRetail
+                  ? 'Kondisi B — Barang Rusak / Terbuka / Tidak Layak Jual'
+                  : 'Kondisi B — Sudah Diproses Dapur (Preparing / Ready)'}
               </p>
               <p className="text-[11px] text-[#52525B] mt-1">
                 Status menjadi <span className="font-mono font-bold">cancelled_waste</span>.{' '}
-                Tidak dihitung omzet bersih, namun stok bahan <strong>tetap terpotong sebagai kerugian</strong>{' '}
-                (<span className="font-mono font-bold text-red-700">Waste Cost: Rp {estimatedWasteCost.toLocaleString('id-ID')}</span>).
+                {isRetail ? (
+                  <>
+                    Tidak dihitung omzet bersih, namun stok tetap terpotong sebagai{' '}
+                    <strong>barang rusak / rugi</strong> (
+                    <span className="font-mono font-bold text-red-700">
+                      Nilai Harga Beli: Rp {estimatedWasteCost.toLocaleString('id-ID')}
+                    </span>
+                    ).
+                  </>
+                ) : (
+                  <>
+                    Tidak dihitung omzet bersih, namun stok bahan <strong>tetap terpotong sebagai kerugian</strong>{' '}
+                    (<span className="font-mono font-bold text-red-700">Waste Cost: Rp {estimatedWasteCost.toLocaleString('id-ID')}</span>).
+                  </>
+                )}
               </p>
             </button>
           </div>

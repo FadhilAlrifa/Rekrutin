@@ -751,7 +751,7 @@ export async function fetchRetailPurchasePriceHistory() {
         oldPrice: Number(row.old_price) || 0,
         newPrice: Number(row.new_price) || 0,
         changePct: Number(row.change_pct) || 0,
-        notes: row.notes || 'Pembaruan harga kulakan supplier',
+        notes: row.notes || 'Pembaruan harga beli supplier',
         changedBy: row.changed_by || 'Admin',
         changedAt: row.changed_at
       }));
@@ -768,7 +768,7 @@ export async function recordRetailPurchasePriceChange({
   product,
   oldPrice,
   newPrice,
-  notes = 'Pembaruan harga kulakan supplier',
+  notes = 'Pembaruan harga beli supplier',
   operatorName = 'Admin'
 }) {
   const parsedOld = Number(oldPrice) || 0;
@@ -789,7 +789,7 @@ export async function recordRetailPurchasePriceChange({
     oldPrice: parsedOld,
     newPrice: parsedNew,
     changePct,
-    notes: (notes || '').trim() || 'Pembaruan harga kulakan supplier',
+    notes: (notes || '').trim() || 'Pembaruan harga beli supplier',
     changedBy: operatorName,
     changedAt: new Date().toISOString()
   };
@@ -937,7 +937,7 @@ export async function saveProductWithRetailFields({
       product: productObj,
       oldPrice: oldPurchasePrice,
       newPrice: retailPayload.purchase_price,
-      notes: formData.priceChangeNote || (editingProduct ? 'Pembaruan harga kulakan' : 'Harga kulakan awal'),
+      notes: formData.priceChangeNote || (editingProduct ? 'Pembaruan harga beli' : 'Harga beli awal'),
       operatorName
     });
   }

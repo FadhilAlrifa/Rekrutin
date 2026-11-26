@@ -60,21 +60,20 @@ export default function MenuCard({
             }}
             className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
           />
-          <div className="absolute top-3 left-3">
-            <span className="bg-white/95 text-[#141414] border border-zinc-200 px-3 py-1 rounded-full font-mono text-[10px] font-bold tracking-wide shadow-sm flex items-center gap-1.5">
-              <Tag size={11} className="text-[#D97706]" /> {displayCategory}
+          <div className="absolute top-3 inset-x-3 flex items-center justify-between gap-2">
+            <span className="bg-white/95 text-[#141414] border border-zinc-200 px-3 py-1 rounded-full font-mono text-[10px] font-bold tracking-wide shadow-sm flex items-center gap-1.5 min-w-0">
+              <Tag size={11} className="text-[#D97706] shrink-0" />
+              <span className="truncate">{displayCategory}</span>
             </span>
-          </div>
-          {!isStarter && (cogsData.hasRecipe || isRetailItem) && (
-            <div className="absolute top-3 right-3">
+            {!isStarter && (cogsData.hasRecipe || isRetailItem) && (
               <span
-                className={`px-2.5 py-1 rounded-full font-mono text-[10px] font-bold border shadow-sm inline-flex items-center gap-1 ${cogsData.status.badgeClass}`}
+                className={`px-2.5 py-1 rounded-full font-mono text-[10px] font-bold border shadow-sm inline-flex items-center gap-1 shrink-0 ${cogsData.status.badgeClass}`}
               >
                 <span className={`w-1.5 h-1.5 rounded-full ${cogsData.status.dotClass}`} />
                 Margin {cogsData.grossMarginPct}%
               </span>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Informasi Utama */}
@@ -97,7 +96,7 @@ export default function MenuCard({
           <div className="mt-3 grid grid-cols-2 gap-2 px-1">
             <div className="bg-[#FAFAFA] border border-zinc-200 rounded-xl px-3 py-2">
               <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-[#52525B] flex items-center gap-1">
-                <Calculator size={10} className="text-[#D97706]" /> {isRetailItem ? 'Kulakan / Unit' : 'Modal / Porsi'}
+                <Calculator size={10} className="text-[#D97706]" /> {isRetailItem ? 'Harga Beli / Unit' : 'Modal / Porsi'}
               </span>
               <p className="font-mono text-xs font-extrabold text-[#141414] mt-0.5">
                 Rp {cogsData.cogs.toLocaleString('id-ID')}

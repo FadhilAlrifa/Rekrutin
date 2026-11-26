@@ -43,7 +43,7 @@ export default function DashboardNavbar({
       items: [
         {
           id: 'pos',
-          label: businessType === 'retail' ? 'Kasir Toko Ritel' : 'Kasir (POS)',
+          label: 'Kasir (POS)',
           icon: Store
         },
         {
@@ -54,7 +54,7 @@ export default function DashboardNavbar({
         },
         {
           id: 'menu-management',
-          label: businessType === 'retail' ? 'Daftar Produk & Kulakan' : 'Daftar Menu & Resep',
+          label: businessType === 'retail' ? 'Daftar Produk & Stok' : 'Daftar Menu & Resep',
           icon: UtensilsCrossed,
           count: businessType === 'retail' && !isStarter ? retailLowStockCount : 0
         }
@@ -72,7 +72,7 @@ export default function DashboardNavbar({
         },
         {
           id: 'alerts',
-          label: 'Peringatan Bahan',
+          label: businessType === 'retail' ? 'Peringatan Produk' : 'Peringatan Bahan',
           icon: Bell,
           count: isStarter ? 0 : alertCount,
           proOnly: true
@@ -119,10 +119,16 @@ export default function DashboardNavbar({
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
-        if (isTakeAwayOnlyFnb && item.id === 'self-order') return false;
+        if ((isTakeAwayOnlyFnb || businessType === 'retail') && item.id === 'self-order') {
+          return false;
+        }
         if (userRole === 'superadmin') return true;
         if (userRole === 'kasir') return ['pos', 'menu-management'].includes(item.id);
-        if (userRole === 'stocker') return ['inventory', 'alerts'].includes(item.id);
+        if (userRole === 'stocker') {
+          return businessType === 'retail'
+            ? ['menu-management', 'alerts'].includes(item.id)
+            : ['inventory', 'alerts'].includes(item.id);
+        }
         return false;
       })
     }))
