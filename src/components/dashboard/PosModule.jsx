@@ -463,9 +463,9 @@ export default function PosModule({
   return (
     <div className="space-y-6 pb-24 lg:pb-16">
       
-      {/* 1. Header POS Light Editorial */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 pb-5 border-b border-zinc-200">
-        <div>
+      {/* 1. Header POS Light Editorial (posisi kontrol terkunci stabil antara tab Katalog & Dapur) */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-5 border-b border-zinc-200">
+        <div className="min-w-0">
           {subscriptionPlan === 'enterprise' && (
             <div className="mb-2">
               <span className="text-[11px] font-bold text-[#52525B] bg-white border border-zinc-200 px-2.5 py-0.5 rounded-full">
@@ -481,85 +481,74 @@ export default function PosModule({
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-          {!isStarter && (
-            <div className="flex flex-wrap items-center gap-2">
-              {isSimulationMode ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setShiftModalOpen(true)}
-                    className={`px-3 py-2 rounded-xl text-[11px] font-bold border inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
-                      currentOperator?.shiftActive
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : 'bg-[#FEF3C7] text-[#B45309] border-[#FDE68A]'
-                    }`}
-                  >
-                    <UserCheck size={13} />
-                    {currentOperator?.name || 'Verifikasi Shift'}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setWorkflowModalOpen(true)}
-                    className="px-3 py-2 rounded-xl bg-white hover:bg-[#FAFAFA] border border-zinc-200 text-[#141414] text-[11px] font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
-                  >
-                    <SlidersHorizontal size={13} className="text-[#D97706]" />
-                    {modeLabel} • {isPayLaterMode ? 'Bayar Nanti' : 'Bayar di Awal'}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <span className="px-3 py-2 rounded-xl text-[11px] font-bold border bg-emerald-50 text-emerald-700 border-emerald-200 inline-flex items-center gap-1.5">
-                    <UserCheck size={13} />
-                    {currentOperator?.name || 'Petugas Aktif'}
-                  </span>
-
-                  <span className="px-3 py-2 rounded-xl bg-[#FAFAFA] border border-zinc-200 text-[#52525B] text-[11px] font-bold inline-flex items-center gap-1.5">
-                    {modeLabel} • {isPayLaterMode ? 'Bayar Nanti' : 'Bayar di Awal'}
-                  </span>
-                </>
-              )}
-
-              <div className="flex items-center bg-zinc-200/70 p-1 rounded-xl">
+        {!isStarter && (
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {isSimulationMode ? (
+              <>
                 <button
                   type="button"
-                  onClick={() => setPosView('catalog')}
-                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
-                    posView === 'catalog'
-                      ? 'bg-[#141414] text-[#F59E0B]'
-                      : 'text-[#52525B] hover:text-[#141414]'
+                  onClick={() => setShiftModalOpen(true)}
+                  className={`h-9 px-3 rounded-xl text-[11px] font-bold border inline-flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap ${
+                    currentOperator?.shiftActive
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-[#FEF3C7] text-[#B45309] border-[#FDE68A]'
                   }`}
                 >
-                  Katalog
+                  <UserCheck size={13} className="shrink-0" />
+                  <span>{currentOperator?.name || 'Verifikasi Shift'}</span>
                 </button>
+
                 <button
                   type="button"
-                  onClick={() => setPosView('kitchen')}
-                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer transition-all ${
-                    posView === 'kitchen'
-                      ? 'bg-[#141414] text-[#F59E0B]'
-                      : 'text-[#52525B] hover:text-[#141414]'
-                  }`}
+                  onClick={() => setWorkflowModalOpen(true)}
+                  className="h-9 px-3 rounded-xl bg-white hover:bg-[#FAFAFA] border border-zinc-200 text-[#141414] text-[11px] font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap"
                 >
-                  <ChefHat size={12} /> Dapur &amp; Bill ({activeKitchenCount})
+                  <SlidersHorizontal size={13} className="text-[#D97706] shrink-0" />
+                  <span>
+                    {modeLabel} • {isPayLaterMode ? 'Bayar Nanti' : 'Bayar di Awal'}
+                  </span>
                 </button>
-              </div>
+              </>
+            ) : (
+              <>
+                <span className="h-9 px-3 rounded-xl text-[11px] font-bold border bg-emerald-50 text-emerald-700 border-emerald-200 inline-flex items-center gap-1.5 whitespace-nowrap">
+                  <UserCheck size={13} className="shrink-0" />
+                  <span>{currentOperator?.name || 'Petugas Aktif'}</span>
+                </span>
+
+                <span className="h-9 px-3 rounded-xl bg-[#FAFAFA] border border-zinc-200 text-[#52525B] text-[11px] font-bold inline-flex items-center gap-1.5 whitespace-nowrap">
+                  {modeLabel} • {isPayLaterMode ? 'Bayar Nanti' : 'Bayar di Awal'}
+                </span>
+              </>
+            )}
+
+            <div className="h-9 flex items-center bg-zinc-200/70 p-1 rounded-xl shrink-0">
+              <button
+                type="button"
+                onClick={() => setPosView('catalog')}
+                className={`h-7 px-3 rounded-lg text-[11px] font-bold cursor-pointer transition-colors whitespace-nowrap ${
+                  posView === 'catalog'
+                    ? 'bg-[#141414] text-[#F59E0B]'
+                    : 'text-[#52525B] hover:text-[#141414]'
+                }`}
+              >
+                Katalog
+              </button>
+              <button
+                type="button"
+                onClick={() => setPosView('kitchen')}
+                className={`h-7 px-3 rounded-lg text-[11px] font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap tabular-nums ${
+                  posView === 'kitchen'
+                    ? 'bg-[#141414] text-[#F59E0B]'
+                    : 'text-[#52525B] hover:text-[#141414]'
+                }`}
+              >
+                <ChefHat size={12} className="shrink-0" />
+                <span>Dapur &amp; Bill ({activeKitchenCount})</span>
+              </button>
             </div>
-          )}
-
-          <div className={posView === 'catalog' ? 'relative w-full md:w-64' : 'hidden'}>
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
-          <input 
-            type="text" 
-            placeholder="Cari menu pesanan..." 
-            value={searchQuery} 
-            onChange={(e) => setSearchQuery(e.target.value)} 
-            className="w-full bg-white border border-zinc-200 text-[#141414] text-[13px] rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all font-medium shadow-sm" 
-          />
-        </div>
-      </div>
-
+          </div>
+        )}
       </div>
 
       {posView === 'kitchen' && !isStarter ? (
@@ -591,31 +580,44 @@ export default function PosModule({
         />
       ) : (
         <>
-          {/* 2. Sistem Filter Kategori */}
-      <div className="flex items-center p-1 bg-zinc-200/70 rounded-xl overflow-x-auto hide-scrollbar w-fit max-w-full">
-        {categories.map((cat, idx) => {
-          const isActive = activePosCategory === cat;
-          const catCount =
-            cat === 'Semua'
-              ? products.length
-              : products.filter((p) => normalizePosCategory(p.category) === cat).length;
-          return (
-            <button
-              key={idx}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap min-h-[36px] flex items-center gap-1.5 ${
-                isActive 
-                  ? 'bg-[#141414] text-white shadow-sm' 
-                  : 'text-[#52525B] hover:text-[#141414]'
-              }`}
-            >
-              <span>{cat}</span>
-              <span className={`font-mono text-[10px] ${isActive ? 'text-[#F59E0B]' : 'text-zinc-400'}`}>
-                {catCount}
-              </span>
-            </button>
-          );
-        })}
+          {/* 2. Toolbar Filter Kategori & Pencarian Menu */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center p-1 bg-zinc-200/70 rounded-xl overflow-x-auto hide-scrollbar w-fit max-w-full">
+          {categories.map((cat, idx) => {
+            const isActive = activePosCategory === cat;
+            const catCount =
+              cat === 'Semua'
+                ? products.length
+                : products.filter((p) => normalizePosCategory(p.category) === cat).length;
+            return (
+              <button
+                key={idx}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap min-h-[36px] flex items-center gap-1.5 ${
+                  isActive
+                    ? 'bg-[#141414] text-white shadow-sm'
+                    : 'text-[#52525B] hover:text-[#141414]'
+                }`}
+              >
+                <span>{cat}</span>
+                <span className={`font-mono text-[10px] tabular-nums ${isActive ? 'text-[#F59E0B]' : 'text-zinc-400'}`}>
+                  {catCount}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="relative w-full sm:w-64 shrink-0">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+          <input
+            type="text"
+            placeholder="Cari menu pesanan..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-white border border-zinc-200 text-[#141414] text-[13px] rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all font-medium shadow-sm"
+          />
+        </div>
       </div>
 
       {/* 3. Grid Menu dan Keranjang Penjualan */}
@@ -1377,6 +1379,7 @@ export default function PosModule({
       {/* MODAL NOTA CORET / REVISI ITEM */}
       {modifyingOrder && (
         <OrderModificationModal
+          key={`${modifyingOrder.id}-${modifyingOrder.kitchenStatus}`}
           order={modifyingOrder}
           products={products}
           ingredients={ingredients}
@@ -1391,6 +1394,7 @@ export default function PosModule({
       {/* MODAL PEMBATALAN ORDER (KONDISI A VS KONDISI B) */}
       {cancellingOrder && (
         <OrderCancelModal
+          key={`${cancellingOrder.id}-${cancellingOrder.kitchenStatus}`}
           order={cancellingOrder}
           ingredients={ingredients}
           onClose={() => setCancellingOrder(null)}

@@ -272,12 +272,15 @@ export function OrderModificationModal({
 }
 
 export function OrderCancelModal({ order, ingredients = [], onClose, onConfirm }) {
-  const isDefaultAfterCook =
-    order?.kitchenStatus === 'preparing' || order?.kitchenStatus === 'ready';
+  const isAlreadyProcessed =
+    order?.kitchenStatus === 'preparing' ||
+    order?.kitchenStatus === 'ready' ||
+    order?.kitchenStatus === 'served';
   const [condition, setCondition] = useState(
-    isDefaultAfterCook ? 'after_cooking' : 'before_cooking'
+    isAlreadyProcessed ? 'after_cooking' : 'before_cooking'
   );
   const [reason, setReason] = useState('');
+  const effectiveCondition = isAlreadyProcessed ? 'after_cooking' : condition;
 
   const estimatedWasteCost = useMemo(
     () => calculateOrderItemsWasteCost(order?.items || [], ingredients),
@@ -286,10 +289,19 @@ export function OrderCancelModal({ order, ingredients = [], onClose, onConfirm }
 
   if (!order) return null;
 
+  const statusLabel =
+    order.kitchenStatus === 'ready'
+      ? 'Siap Saji'
+      : order.kitchenStatus === 'served'
+      ? 'Selesai Disajikan'
+      : order.kitchenStatus === 'preparing'
+      ? 'Sedang Dimasak'
+      : 'Antrean Dapur';
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!reason.trim()) return;
-    onConfirm({ order, condition, reason: reason.trim() });
+    onConfirm({ order, condition: effectiveCondition, reason: reason.trim() });
   };
 
   return (
@@ -325,30 +337,40 @@ export function OrderCancelModal({ order, ingredients = [], onClose, onConfirm }
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div className="space-y-2.5">
-            <button
-              type="button"
-              onClick={() => setCondition('before_cooking')}
-              className={`w-full text-left p-3.5 rounded-2xl border transition-all cursor-pointer ${
-                condition === 'before_cooking'
-                  ? 'bg-[#FEF3C7] border-[#F59E0B]'
-                  : 'bg-[#FAFAFA] border-zinc-200 hover:border-zinc-300'
-              }`}
-            >
-              <p className="text-xs font-extrabold text-[#141414]">
-                Kondisi A — Belum Masuk Proses Dapur (Queued)
-              </p>
-              <p className="text-[11px] text-[#52525B] mt-1">
-                Status menjadi <span className="font-mono font-bold">cancelled</span>.{' '}
-                {order.paymentStatus === 'paid' ? 'Pembayaran dicatat refund. ' : ''}
-                Stok bahan baku <strong>tidak dipotong / dikembalikan utuh</strong> (Waste Rp 0).
-              </p>
-            </button>
+            {isAlreadyProcessed ? (
+              <div className="px-3.5 py-2.5 rounded-xl bg-[#FAFAFA] border border-[#E5E5E5] text-[11px] font-semibold text-[#52525B]">
+                Pesanan berstatus <span className="font-extrabold text-[#141414]">{statusLabel}</span>{' '}
+                (sudah diproses dapur), sehingga pembatalan otomatis masuk ke{' '}
+                <span className="font-bold text-red-700">Kondisi B</span>.
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setCondition('before_cooking')}
+                className={`w-full text-left p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                  effectiveCondition === 'before_cooking'
+                    ? 'bg-[#FEF3C7] border-[#F59E0B]'
+                    : 'bg-[#FAFAFA] border-zinc-200 hover:border-zinc-300'
+                }`}
+              >
+                <p className="text-xs font-extrabold text-[#141414]">
+                  Kondisi A — Belum Masuk Proses Dapur (Queued)
+                </p>
+                <p className="text-[11px] text-[#52525B] mt-1">
+                  Status menjadi <span className="font-mono font-bold">cancelled</span>.{' '}
+                  {order.paymentStatus === 'paid' ? 'Pembayaran dicatat refund. ' : ''}
+                  Stok bahan baku <strong>tidak dipotong / dikembalikan utuh</strong> (Waste Rp 0).
+                </p>
+              </button>
+            )}
 
             <button
               type="button"
-              onClick={() => setCondition('after_cooking')}
-              className={`w-full text-left p-3.5 rounded-2xl border transition-all cursor-pointer ${
-                condition === 'after_cooking'
+              onClick={() => !isAlreadyProcessed && setCondition('after_cooking')}
+              className={`w-full text-left p-3.5 rounded-2xl border transition-all ${
+                isAlreadyProcessed ? 'cursor-default' : 'cursor-pointer'
+              } ${
+                effectiveCondition === 'after_cooking'
                   ? 'bg-red-50 border-red-400'
                   : 'bg-[#FAFAFA] border-zinc-200 hover:border-zinc-300'
               }`}

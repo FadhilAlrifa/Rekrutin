@@ -221,7 +221,11 @@ export function resolveOrderCancellation({
   ingredients = []
 }) {
   const now = new Date().toISOString();
-  const isPostProduction = condition === 'after_cooking';
+  const isAlreadyProcessed =
+    order?.kitchenStatus === 'preparing' ||
+    order?.kitchenStatus === 'ready' ||
+    order?.kitchenStatus === 'served';
+  const isPostProduction = isAlreadyProcessed || condition === 'after_cooking';
 
   const wasteCost = isPostProduction
     ? calculateOrderItemsWasteCost(order.items, ingredients)
