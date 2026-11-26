@@ -15,8 +15,323 @@ const RETAIL_PRODUCTS_META_KEY = 'stocko_retail_products_meta_v1';
 const RETAIL_PRICE_HISTORY_KEY = 'stocko_retail_price_history_v1';
 const DAILY_SALES_HISTORY_KEY = 'stocko_daily_sales_history_v1';
 const INGREDIENT_BATCHES_KEY = 'stocko_ingredient_batches_v1';
+const ACTIVE_COMPANY_STORAGE_KEY = 'stocko_active_company_id_v1';
+const WORKSPACE_MANIFEST_PREFIX = 'stocko_workspace_manifest_v1:';
 const unavailableTablesSet = new Set();
 const inFlightTableQueries = new Map();
+let activeCompanyIdMemory = null;
+const workspaceManifestCache = new Map();
+
+export function getActiveCompanyId() {
+  if (activeCompanyIdMemory) return activeCompanyIdMemory;
+  try {
+    const stored = window.localStorage.getItem(ACTIVE_COMPANY_STORAGE_KEY);
+    if (stored) {
+      activeCompanyIdMemory = stored;
+      return stored;
+    }
+  } catch {
+    // Abaikan
+  }
+  return null;
+}
+
+export function setActiveCompanyId(companyId) {
+  const clean = companyId ? String(companyId).trim() : null;
+  activeCompanyIdMemory = clean;
+  try {
+    if (clean) {
+      window.localStorage.setItem(ACTIVE_COMPANY_STORAGE_KEY, clean);
+    } else {
+      window.localStorage.removeItem(ACTIVE_COMPANY_STORAGE_KEY);
+    }
+  } catch {
+    // Abaikan
+  }
+}
+
+function getScopedStorageKey(baseKey) {
+  if (!baseKey || baseKey.startsWith(WORKSPACE_MANIFEST_PREFIX) || baseKey === ACTIVE_COMPANY_STORAGE_KEY) {
+    return baseKey;
+  }
+  const cid = getActiveCompanyId();
+  return cid ? `${baseKey}:${cid}` : baseKey;
+}
+
+function createEmptyWorkspaceManifest({
+  companyId,
+  adminId = '',
+  adminEmail = '',
+  adminName = 'Admin',
+  businessName = 'Usaha Utama',
+  businessType = 'fnb',
+  paymentFlow = 'pay_first',
+  subscriptionPlan = 'pro'
+}) {
+  return {
+    companyId: String(companyId),
+    adminId: String(adminId || companyId),
+    adminEmail: String(adminEmail || '').trim().toLowerCase(),
+    adminName: String(adminName || 'Admin').trim(),
+    businessName: String(businessName || 'Usaha Utama').trim(),
+    businessType: businessType || 'fnb',
+    paymentFlow: paymentFlow || 'pay_first',
+    subscriptionPlan: subscriptionPlan || 'pro',
+    staffEmails: [],
+    productIds: [],
+    ingredientIds: [],
+    orderIds: [],
+    transactionIds: [],
+    createdAt: new Date().toISOString()
+  };
+}
+
+export function getActiveWorkspaceManifest() {
+  const cid = getActiveCompanyId();
+  if (!cid) return null;
+  if (workspaceManifestCache.has(cid)) {
+    return workspaceManifestCache.get(cid);
+  }
+  try {
+    const raw = window.localStorage.getItem(`${WORKSPACE_MANIFEST_PREFIX}${cid}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      workspaceManifestCache.set(cid, parsed);
+      return parsed;
+    }
+  } catch {
+    // Abaikan
+  }
+  return null;
+}
+
+function saveWorkspaceManifestLocal(manifest) {
+  if (!manifest?.companyId) return;
+  const cid = String(manifest.companyId);
+  workspaceManifestCache.set(cid, manifest);
+  try {
+    window.localStorage.setItem(`${WORKSPACE_MANIFEST_PREFIX}${cid}`, JSON.stringify(manifest));
+  } catch {
+    // Abaikan
+  }
+}
+
+async function persistWorkspaceManifestToDb(manifest) {
+  if (!manifest?.companyId) return;
+  saveWorkspaceManifestLocal(manifest);
+  await runOptionalTableWrite('merchant_settings', async () => {
+    const row = {
+      id: `workspace:${manifest.companyId}`,
+      default_order_channel: 'dine_in',
+      payment_flow: manifest.paymentFlow || 'pay_first',
+      closed_kitchen_enabled: true,
+      require_cashier_shift: true,
+      updated_by: JSON.stringify(manifest),
+      updated_at: new Date().toISOString()
+    };
+    const res = await supabase
+      .from('merchant_settings')
+      .upsert({ ...row, business_type: manifest.businessType || 'fnb' });
+    if (res.error && String(res.error.code) === 'PGRST204') {
+      return supabase.from('merchant_settings').upsert(row);
+    }
+    return res;
+  });
+}
+
+export async function fetchOrInitCompanyWorkspace({
+  companyId,
+  adminId = '',
+  adminEmail = '',
+  adminName = 'Admin',
+  businessName = 'Usaha Utama',
+  businessType = 'fnb',
+  paymentFlow = 'pay_first',
+  subscriptionPlan = 'pro',
+  forceReset = false
+}) {
+  if (!companyId) return null;
+  const cid = String(companyId).trim();
+  setActiveCompanyId(cid);
+
+  if (forceReset) {
+    const fresh = createEmptyWorkspaceManifest({
+      companyId: cid,
+      adminId: adminId || cid,
+      adminEmail,
+      adminName,
+      businessName,
+      businessType,
+      paymentFlow,
+      subscriptionPlan
+    });
+    await persistWorkspaceManifestToDb(fresh);
+    return fresh;
+  }
+
+  const res = await runOptionalTableRead('merchant_settings', () =>
+    supabase
+      .from('merchant_settings')
+      .select('*')
+      .eq('id', `workspace:${cid}`)
+      .maybeSingle()
+  );
+
+  if (res && !res.error && res.data?.updated_by) {
+    try {
+      const parsed = JSON.parse(res.data.updated_by);
+      if (parsed && parsed.companyId) {
+        const merged = {
+          ...createEmptyWorkspaceManifest({ companyId: cid }),
+          ...parsed,
+          businessType: res.data.business_type || parsed.businessType || businessType,
+          paymentFlow: res.data.payment_flow || parsed.paymentFlow || paymentFlow
+        };
+        saveWorkspaceManifestLocal(merged);
+        return merged;
+      }
+    } catch {
+      // Gunakan fallback
+    }
+  }
+
+  const existingLocal = getActiveWorkspaceManifest();
+  if (existingLocal && existingLocal.companyId === cid) {
+    return existingLocal;
+  }
+
+  const initial = createEmptyWorkspaceManifest({
+    companyId: cid,
+    adminId: adminId || cid,
+    adminEmail,
+    adminName,
+    businessName,
+    businessType,
+    paymentFlow,
+    subscriptionPlan
+  });
+  await persistWorkspaceManifestToDb(initial);
+  return initial;
+}
+
+export async function findWorkspaceForEmployeeEmail(email) {
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  if (!cleanEmail) return null;
+  const res = await runOptionalTableRead('merchant_settings', () =>
+    supabase
+      .from('merchant_settings')
+      .select('*')
+      .like('id', 'workspace:%')
+  );
+  if (res && !res.error && Array.isArray(res.data)) {
+    for (const row of res.data) {
+      try {
+        const parsed = JSON.parse(row.updated_by || '{}');
+        if (
+          parsed?.companyId &&
+          (parsed.adminEmail === cleanEmail ||
+            (Array.isArray(parsed.staffEmails) && parsed.staffEmails.includes(cleanEmail)))
+        ) {
+          saveWorkspaceManifestLocal(parsed);
+          return parsed;
+        }
+      } catch {
+        // Lewati baris tidak valid
+      }
+    }
+  }
+  return null;
+}
+
+export async function updateWorkspaceManifest(mutatorFn) {
+  const cid = getActiveCompanyId();
+  if (!cid) return null;
+  const current =
+    getActiveWorkspaceManifest() || createEmptyWorkspaceManifest({ companyId: cid });
+  const next = mutatorFn({
+    ...current,
+    staffEmails: Array.isArray(current.staffEmails) ? [...current.staffEmails] : [],
+    productIds: Array.isArray(current.productIds) ? [...current.productIds] : [],
+    ingredientIds: Array.isArray(current.ingredientIds) ? [...current.ingredientIds] : [],
+    orderIds: Array.isArray(current.orderIds) ? [...current.orderIds] : [],
+    transactionIds: Array.isArray(current.transactionIds) ? [...current.transactionIds] : []
+  });
+  if (!next) return current;
+  await persistWorkspaceManifestToDb(next);
+  return next;
+}
+
+export async function registerCompanyProductId(productId) {
+  if (productId === undefined || productId === null) return;
+  const idStr = String(productId);
+  await updateWorkspaceManifest((m) => ({
+    ...m,
+    productIds: Array.from(new Set([...m.productIds, idStr]))
+  }));
+}
+
+export async function unregisterCompanyProductId(productId) {
+  if (productId === undefined || productId === null) return;
+  const idStr = String(productId);
+  await updateWorkspaceManifest((m) => ({
+    ...m,
+    productIds: m.productIds.filter((id) => String(id) !== idStr)
+  }));
+}
+
+export async function registerCompanyIngredientId(ingredientId) {
+  if (ingredientId === undefined || ingredientId === null) return;
+  const idStr = String(ingredientId);
+  await updateWorkspaceManifest((m) => ({
+    ...m,
+    ingredientIds: Array.from(new Set([...m.ingredientIds, idStr]))
+  }));
+}
+
+export async function unregisterCompanyIngredientId(ingredientId) {
+  if (ingredientId === undefined || ingredientId === null) return;
+  const idStr = String(ingredientId);
+  await updateWorkspaceManifest((m) => ({
+    ...m,
+    ingredientIds: m.ingredientIds.filter((id) => String(id) !== idStr)
+  }));
+}
+
+export async function registerCompanyStaffEmail(email) {
+  const clean = String(email || '').trim().toLowerCase();
+  if (!clean) return;
+  await updateWorkspaceManifest((m) => ({
+    ...m,
+    staffEmails: Array.from(new Set([...m.staffEmails, clean]))
+  }));
+}
+
+export async function unregisterCompanyStaffEmail(email) {
+  const clean = String(email || '').trim().toLowerCase();
+  if (!clean) return;
+  await updateWorkspaceManifest((m) => ({
+    ...m,
+    staffEmails: m.staffEmails.filter((e) => e !== clean)
+  }));
+}
+
+export async function registerCompanyOrderId(orderId) {
+  if (!orderId) return;
+  const idStr = String(orderId);
+  await updateWorkspaceManifest((m) => ({
+    ...m,
+    orderIds: Array.from(new Set([...m.orderIds, idStr]))
+  }));
+}
+
+export async function registerCompanyTransactionId(txId) {
+  if (txId === undefined || txId === null) return;
+  const idStr = String(txId);
+  await updateWorkspaceManifest((m) => ({
+    ...m,
+    transactionIds: Array.from(new Set([...m.transactionIds, idStr]))
+  }));
+}
 
 export function clearUnavailableTablesCache() {
   unavailableTablesSet.clear();
@@ -24,6 +339,32 @@ export function clearUnavailableTablesCache() {
     window.sessionStorage.removeItem('stocko_unavailable_tables_v1');
   } catch {
     // Abaikan
+  }
+}
+
+export function clearOperationalLocalCaches({ preserveMerchantSettings = true } = {}) {
+  const keys = [
+    PRICE_MAP_STORAGE_KEY,
+    INITIAL_PRICE_MAP_STORAGE_KEY,
+    PRICE_HISTORY_STORAGE_KEY,
+    ORDERS_STORAGE_KEY,
+    AUDIT_LOGS_STORAGE_KEY,
+    STOCK_MOVEMENTS_STORAGE_KEY,
+    SEASONAL_EVENTS_STORAGE_KEY,
+    TX_META_STORAGE_KEY,
+    RETAIL_PRODUCTS_META_KEY,
+    RETAIL_PRICE_HISTORY_KEY,
+    DAILY_SALES_HISTORY_KEY,
+    INGREDIENT_BATCHES_KEY,
+    ...(preserveMerchantSettings ? [] : [MERCHANT_SETTINGS_STORAGE_KEY])
+  ];
+  try {
+    keys.forEach((k) => {
+      window.localStorage.removeItem(k);
+      window.localStorage.removeItem(getScopedStorageKey(k));
+    });
+  } catch {
+    // Abaikan jika storage dibatasi
   }
 }
 
@@ -89,7 +430,7 @@ async function runOptionalTableWrite(table, fn) {
 
 function readLocalJson(key, fallback) {
   try {
-    const raw = window.localStorage.getItem(key);
+    const raw = window.localStorage.getItem(getScopedStorageKey(key));
     return raw ? JSON.parse(raw) : fallback;
   } catch {
     return fallback;
@@ -98,7 +439,7 @@ function readLocalJson(key, fallback) {
 
 function writeLocalJson(key, value) {
   try {
-    window.localStorage.setItem(key, JSON.stringify(value));
+    window.localStorage.setItem(getScopedStorageKey(key), JSON.stringify(value));
   } catch {
     // Abaikan jika storage dibatasi browser
   }
@@ -205,6 +546,11 @@ export async function syncIngredientBatchesToDb(ingredientId, batches = []) {
 }
 
 export async function fetchIngredients() {
+  const manifest = getActiveWorkspaceManifest();
+  if (!manifest) return [];
+  const allowedIds = new Set((manifest.ingredientIds || []).map((id) => String(id)));
+  if (allowedIds.size === 0) return [];
+
   const [{ data, error }, batchesMap] = await Promise.all([
     supabase.from('ingredients').select('*'),
     fetchIngredientBatchesMap()
@@ -217,7 +563,9 @@ export async function fetchIngredients() {
   const localPriceMap = readLocalJson(PRICE_MAP_STORAGE_KEY, {});
   const localInitialMap = readLocalJson(INITIAL_PRICE_MAP_STORAGE_KEY, {});
 
-  return data.map(item => {
+  return (data || [])
+    .filter((item) => allowedIds.has(String(item.id)))
+    .map(item => {
     const dbMarketPrice =
       item.current_market_price !== undefined && item.current_market_price !== null
         ? Number(item.current_market_price)
@@ -285,6 +633,11 @@ export async function updateIngredientStock(id, newStock, nextExpiryDate = null)
 }
 
 export async function fetchProducts() {
+  const manifest = getActiveWorkspaceManifest();
+  if (!manifest) return [];
+  const allowedIds = new Set((manifest.productIds || []).map((id) => String(id)));
+  if (allowedIds.size === 0) return [];
+
   const { data, error } = await supabase.from('products').select('*');
   if (error) {
     console.error('Gagal mengambil data produk:', error);
@@ -294,7 +647,9 @@ export async function fetchProducts() {
   const localRetailMeta = readLocalJson(RETAIL_PRODUCTS_META_KEY, {});
 
   // Petakan properti dari database (snake_case) ke format frontend (camelCase)
-  return data.map(item => {
+  return (data || [])
+    .filter((item) => allowedIds.has(String(item.id)))
+    .map(item => {
     const meta = localRetailMeta[String(item.id)] || {};
     const recipeArr = Array.isArray(item.recipe) ? item.recipe : [];
     const resolvedPurchasePrice =
@@ -347,6 +702,11 @@ export async function updateRetailProductStock(productId, newStock) {
 }
 
 export async function fetchRetailPurchasePriceHistory() {
+  const manifest = getActiveWorkspaceManifest();
+  if (!manifest) return [];
+  const allowedProdIds = new Set((manifest.productIds || []).map((id) => String(id)));
+  if (allowedProdIds.size === 0) return [];
+
   const res = await runOptionalTableRead('product_purchase_price_history', () =>
     supabase
       .from('product_purchase_price_history')
@@ -356,24 +716,28 @@ export async function fetchRetailPurchasePriceHistory() {
   );
 
   if (res && !res.error && Array.isArray(res.data)) {
-    const mapped = res.data.map((row) => ({
-      id: row.id,
-      productId: row.product_id,
-      productName: row.product_name,
-      sku: row.sku || '',
-      unit: row.unit || 'pcs',
-      oldPrice: Number(row.old_price) || 0,
-      newPrice: Number(row.new_price) || 0,
-      changePct: Number(row.change_pct) || 0,
-      notes: row.notes || 'Pembaruan harga kulakan supplier',
-      changedBy: row.changed_by || 'Admin',
-      changedAt: row.changed_at
-    }));
+    const mapped = res.data
+      .filter((row) => allowedProdIds.has(String(row.product_id)))
+      .map((row) => ({
+        id: row.id,
+        productId: row.product_id,
+        productName: row.product_name,
+        sku: row.sku || '',
+        unit: row.unit || 'pcs',
+        oldPrice: Number(row.old_price) || 0,
+        newPrice: Number(row.new_price) || 0,
+        changePct: Number(row.change_pct) || 0,
+        notes: row.notes || 'Pembaruan harga kulakan supplier',
+        changedBy: row.changed_by || 'Admin',
+        changedAt: row.changed_at
+      }));
     writeLocalJson(RETAIL_PRICE_HISTORY_KEY, mapped);
     return mapped;
   }
 
-  return readLocalJson(RETAIL_PRICE_HISTORY_KEY, []);
+  return readLocalJson(RETAIL_PRICE_HISTORY_KEY, []).filter((row) =>
+    allowedProdIds.has(String(row.productId))
+  );
 }
 
 export async function recordRetailPurchasePriceChange({
@@ -506,6 +870,8 @@ export async function saveProductWithRetailFields({
     return { success: false, message: error?.message || 'Gagal menyimpan produk.' };
   }
 
+  await registerCompanyProductId(savedRow.id);
+
   // Simpan selalu metadata ritel ke localStorage agar persisten meski kolom DB belum dimigrasi
   const localMeta = readLocalJson(RETAIL_PRODUCTS_META_KEY, {});
   localMeta[String(savedRow.id)] = {
@@ -602,6 +968,7 @@ export async function saveTransaction(
   }
 
   if (Array.isArray(data) && data[0]?.id) {
+    await registerCompanyTransactionId(data[0].id);
     const metaMap = readLocalJson(TX_META_STORAGE_KEY, {});
     metaMap[String(data[0].id)] = {
       order_channel: extendedPayload.order_channel,
@@ -623,6 +990,11 @@ export async function saveTransaction(
 
 // --- FUNGSI BARU UNTUK REPORTING ---
 export async function fetchTransactions() {
+  const manifest = getActiveWorkspaceManifest();
+  if (!manifest) return [];
+  const allowedTxIds = new Set((manifest.transactionIds || []).map((id) => String(id)));
+  if (allowedTxIds.size === 0) return [];
+
   const { data, error } = await supabase
     .from('transactions')
     .select('*')
@@ -633,10 +1005,12 @@ export async function fetchTransactions() {
     return [];
   }
   const metaMap = readLocalJson(TX_META_STORAGE_KEY, {});
-  return (data || []).map((row) => ({
-    ...row,
-    ...(metaMap[String(row.id)] || {})
-  }));
+  return (data || [])
+    .filter((row) => allowedTxIds.has(String(row.id)))
+    .map((row) => ({
+      ...row,
+      ...(metaMap[String(row.id)] || {})
+    }));
 }
 
 export async function registerUser(email, password) {
@@ -653,15 +1027,24 @@ export async function registerUser(email, password) {
 }
 
 // --- AUTHENTICATION LOGIN ---
-export async function loginUser(email, password) {
+export async function loginUser(identifier, password) {
+  const raw = String(identifier || '').trim();
+  const resolvedEmail = raw.includes('@')
+    ? raw.toLowerCase()
+    : `${raw
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '')}@staff.stocko.app`;
+
   const { data, error } = await supabase.auth.signInWithPassword({
-    email,
+    email: resolvedEmail,
     password
   });
 
   if (error) {
     console.error('Gagal login:', error.message);
-    return { success: false, message: error.message };
+    return { success: false, message: 'Username/Email atau kata sandi salah. Silakan coba lagi.' };
   }
   return { success: true, data };
 }
@@ -812,6 +1195,15 @@ export async function deleteEmployeeRole(employeeId, email, role) {
 // --- HARGA BAHAN BAKU, RIWAYAT HARGA, & LOG MUTASI ---
 
 export async function fetchPriceHistory() {
+  const manifest = getActiveWorkspaceManifest();
+  if (!manifest) {
+    return { success: true, persistedInDb: false, data: [] };
+  }
+  const allowedIngIds = new Set((manifest.ingredientIds || []).map((id) => String(id)));
+  if (allowedIngIds.size === 0) {
+    return { success: true, persistedInDb: false, data: [] };
+  }
+
   const res = await runOptionalTableRead('ingredient_price_history', () =>
     supabase
       .from('ingredient_price_history')
@@ -824,24 +1216,28 @@ export async function fetchPriceHistory() {
     return {
       success: true,
       persistedInDb: true,
-      data: res.data.map(row => ({
-        id: row.id,
-        ingredientId: row.ingredient_id,
-        ingredientName: row.ingredient_name,
-        unit: row.unit,
-        oldPrice: Number(row.old_price) || 0,
-        newPrice: Number(row.new_price) || 0,
-        changePct: Number(row.change_pct) || 0,
-        notes: row.notes || 'Pembaruan harga pasar',
-        changedAt: row.changed_at
-      }))
+      data: res.data
+        .filter((row) => allowedIngIds.has(String(row.ingredient_id)))
+        .map(row => ({
+          id: row.id,
+          ingredientId: row.ingredient_id,
+          ingredientName: row.ingredient_name,
+          unit: row.unit,
+          oldPrice: Number(row.old_price) || 0,
+          newPrice: Number(row.new_price) || 0,
+          changePct: Number(row.change_pct) || 0,
+          notes: row.notes || 'Pembaruan harga pasar',
+          changedAt: row.changed_at
+        }))
     };
   }
 
   return {
     success: true,
     persistedInDb: false,
-    data: readLocalJson(PRICE_HISTORY_STORAGE_KEY, [])
+    data: readLocalJson(PRICE_HISTORY_STORAGE_KEY, []).filter((row) =>
+      allowedIngIds.has(String(row.ingredientId))
+    )
   };
 }
 
@@ -1070,52 +1466,32 @@ export const DEFAULT_MERCHANT_SETTINGS = {
 };
 
 export async function fetchMerchantSettings() {
-  const res = await runOptionalTableRead('merchant_settings', () =>
-    supabase.from('merchant_settings').select('*').eq('id', 'default').maybeSingle()
-  );
-
-  if (res && !res.error && res.data) {
-    const cachedLocal = readLocalJson(MERCHANT_SETTINGS_STORAGE_KEY, DEFAULT_MERCHANT_SETTINGS);
-    const mapped = {
-      businessType: res.data.business_type || cachedLocal.businessType || 'fnb',
-      defaultOrderChannel: res.data.default_order_channel || 'dine_in',
-      paymentFlow: res.data.payment_flow || 'pay_first',
-      closedKitchenEnabled: res.data.closed_kitchen_enabled ?? true,
-      requireCashierShift: res.data.require_cashier_shift ?? true
+  const manifest = getActiveWorkspaceManifest();
+  if (manifest) {
+    return {
+      ...DEFAULT_MERCHANT_SETTINGS,
+      businessType: manifest.businessType || 'fnb',
+      paymentFlow: manifest.paymentFlow || 'pay_first'
     };
-    writeLocalJson(MERCHANT_SETTINGS_STORAGE_KEY, mapped);
-    return mapped;
   }
   return readLocalJson(MERCHANT_SETTINGS_STORAGE_KEY, DEFAULT_MERCHANT_SETTINGS);
 }
 
-export async function saveMerchantSettings(settings, operatorName = 'Owner') {
+export async function saveMerchantSettings(settings, operatorName = 'Admin') {
   const normalized = {
     ...DEFAULT_MERCHANT_SETTINGS,
     ...settings
   };
   writeLocalJson(MERCHANT_SETTINGS_STORAGE_KEY, normalized);
 
-  await runOptionalTableWrite('merchant_settings', async () => {
-    const baseRow = {
-      id: 'default',
-      default_order_channel: normalized.defaultOrderChannel,
-      payment_flow: normalized.paymentFlow,
-      closed_kitchen_enabled: normalized.closedKitchenEnabled,
-      require_cashier_shift: normalized.requireCashierShift,
-      updated_by: operatorName,
-      updated_at: new Date().toISOString()
-    };
-
-    const res = await supabase
-      .from('merchant_settings')
-      .upsert({ ...baseRow, business_type: normalized.businessType });
-
-    if (res.error && String(res.error.code) === 'PGRST204') {
-      return supabase.from('merchant_settings').upsert(baseRow);
-    }
-    return res;
-  });
+  const cid = getActiveCompanyId();
+  if (cid) {
+    await updateWorkspaceManifest((m) => ({
+      ...m,
+      businessType: normalized.businessType,
+      paymentFlow: normalized.paymentFlow
+    }));
+  }
   return normalized;
 }
 
@@ -1172,19 +1548,29 @@ function mapClientOrderToDb(order) {
 }
 
 export async function fetchOrders() {
+  const manifest = getActiveWorkspaceManifest();
+  if (!manifest) return [];
+  const allowedOrderIds = new Set((manifest.orderIds || []).map((id) => String(id)));
+  if (allowedOrderIds.size === 0) return [];
+
   const res = await runOptionalTableRead('orders', () =>
     supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(100)
   );
 
   if (res && !res.error && Array.isArray(res.data)) {
-    const mapped = res.data.map(mapDbOrderToClient);
+    const mapped = res.data
+      .filter((row) => allowedOrderIds.has(String(row.id)))
+      .map(mapDbOrderToClient);
     writeLocalJson(ORDERS_STORAGE_KEY, mapped);
     return mapped;
   }
-  return readLocalJson(ORDERS_STORAGE_KEY, []);
+  return readLocalJson(ORDERS_STORAGE_KEY, []).filter((o) =>
+    allowedOrderIds.has(String(o.id))
+  );
 }
 
 export async function createOrderRecord(order) {
+  await registerCompanyOrderId(order.id);
   const local = readLocalJson(ORDERS_STORAGE_KEY, []);
   const nextLocal = [order, ...local.filter((o) => o.id !== order.id)].slice(0, 100);
   writeLocalJson(ORDERS_STORAGE_KEY, nextLocal);
@@ -1210,32 +1596,8 @@ export async function updateOrderRecord(order) {
 }
 
 export async function fetchAuditLogs() {
-  const res = await runOptionalTableRead('audit_logs', () =>
-    supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(200)
-  );
-
-  if (res && !res.error && Array.isArray(res.data)) {
-    const mapped = res.data.map((row) => ({
-      id: row.id,
-      userId: row.user_id,
-      userName: row.user_name,
-      role: row.role,
-      cashierName: row.cashier_name || (row.role === 'kasir' ? row.user_name : ''),
-      stockerName: row.stocker_name || (row.role === 'stocker' ? row.user_name : ''),
-      actionType: row.action_type,
-      entityType: row.entity_type,
-      entityId: row.entity_id,
-      entityName: row.entity_name,
-      beforeValue: row.before_value,
-      afterValue: row.after_value,
-      deltaLabel: row.delta_label,
-      reason: row.reason,
-      outlet: row.outlet,
-      createdAt: row.created_at
-    }));
-    writeLocalJson(AUDIT_LOGS_STORAGE_KEY, mapped);
-    return mapped;
-  }
+  const manifest = getActiveWorkspaceManifest();
+  if (!manifest) return [];
   return readLocalJson(AUDIT_LOGS_STORAGE_KEY, []);
 }
 
@@ -1293,33 +1655,8 @@ export async function recordAuditLog(entry) {
 }
 
 export async function fetchStockMovements() {
-  const res = await runOptionalTableRead('stock_movements', () =>
-    supabase.from('stock_movements').select('*').order('created_at', { ascending: false }).limit(200)
-  );
-
-  if (res && !res.error && Array.isArray(res.data)) {
-    const mapped = res.data.map((row) => ({
-      id: row.id,
-      ingredientId: row.ingredient_id,
-      ingredientName: row.ingredient_name,
-      movementType: row.movement_type,
-      qtyChange: Number(row.qty_change) || 0,
-      beforeStock: Number(row.before_stock) || 0,
-      afterStock: Number(row.after_stock) || 0,
-      unit: row.unit || 'pcs',
-      costImpact: Number(row.cost_impact) || 0,
-      orderId: row.order_id || null,
-      userId: row.user_id,
-      userName: row.user_name,
-      role: row.role,
-      cashierName: row.cashier_name || (row.role === 'kasir' ? row.user_name : ''),
-      stockerName: row.stocker_name || (row.role === 'stocker' ? row.user_name : ''),
-      reason: row.reason || '',
-      createdAt: row.created_at
-    }));
-    writeLocalJson(STOCK_MOVEMENTS_STORAGE_KEY, mapped);
-    return mapped;
-  }
+  const manifest = getActiveWorkspaceManifest();
+  if (!manifest) return [];
   return readLocalJson(STOCK_MOVEMENTS_STORAGE_KEY, []);
 }
 
@@ -1447,31 +1784,8 @@ export async function deleteSeasonalEvent(eventId) {
 }
 
 export async function fetchDailySalesHistory() {
-  const res = await runOptionalTableRead('daily_sales_history', () =>
-    supabase
-      .from('daily_sales_history')
-      .select('*')
-      .order('sales_date', { ascending: false })
-      .limit(400)
-  );
-
-  if (res && !res.error && Array.isArray(res.data)) {
-    const mapped = res.data.map((row) => ({
-      salesDate: row.sales_date,
-      menuId: row.menu_id,
-      menuName: row.menu_name,
-      category: row.category || 'Umum',
-      quantitySold: Number(row.quantity_sold) || 0,
-      totalRevenue: Number(row.total_revenue) || 0,
-      estimatedProfit: Number(row.estimated_profit) || 0,
-      transactionsCount: Number(row.transactions_count) || 0,
-      holidayLabel: row.holiday_label || '',
-      isHoliday: Boolean(row.is_holiday)
-    }));
-    writeLocalJson(DAILY_SALES_HISTORY_KEY, mapped);
-    return mapped;
-  }
-
+  const manifest = getActiveWorkspaceManifest();
+  if (!manifest) return [];
   return readLocalJson(DAILY_SALES_HISTORY_KEY, []);
 }
 

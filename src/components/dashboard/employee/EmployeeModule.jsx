@@ -34,7 +34,10 @@ import {
   setEmployeeActiveStatus,
   updateEmployeeProfile,
   deleteEmployeeRole,
-  fetchEmployeeLoginSessions
+  fetchEmployeeLoginSessions,
+  validatePersonalEmployeeName,
+  formatDisplayUsername,
+  usernameToInternalAuthEmail
 } from '../../../services/employeeAuditService';
 
 const OUTLET_OPTIONS = [
@@ -47,7 +50,8 @@ const OUTLET_OPTIONS = [
 export default function EmployeeModule({
   subscriptionPlan = 'pro',
   onUpgradePlan,
-  onRecordAudit
+  onRecordAudit,
+  isSimulationMode = false
 }) {
   const [employees, setEmployees] = useState([]);
   const [sessions, setSessions] = useState([]);
@@ -94,16 +98,32 @@ export default function EmployeeModule({
   };
 
   const isStarter = subscriptionPlan === 'starter';
-  const activeKasirCount = employees.filter(
+
+  const planScopedEmployees = useMemo(() => {
+    if (!isStarter) return employees;
+    const ownerAcc = employees.find(
+      (e) => (e.role || '').toLowerCase() === 'superadmin'
+    );
+    const kasirAcc =
+      employees.find((e) => e.role === 'kasir' && e.isActive !== false) ||
+      employees.find((e) => e.role === 'kasir');
+    return [ownerAcc, kasirAcc].filter(Boolean);
+  }, [employees, isStarter]);
+
+  const activeKasirCount = planScopedEmployees.filter(
     (e) => e.role === 'kasir' && e.isActive !== false
   ).length;
-  const activeStockerCount = employees.filter(
+  const activeStockerCount = planScopedEmployees.filter(
     (e) => e.role === 'stocker' && e.isActive !== false
   ).length;
-  const inactiveCount = employees.filter((e) => e.isActive === false).length;
+  const inactiveCount = planScopedEmployees.filter((e) => e.isActive === false).length;
   const starterLimitReached = isStarter && activeKasirCount >= 1;
 
   const refreshEmployees = async () => {
+    if (isSimulationMode) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     const [empRes, sessionList] = await Promise.all([
       fetchStaffProfiles(),
@@ -115,6 +135,12 @@ export default function EmployeeModule({
   };
 
   useEffect(() => {
+    if (isSimulationMode) {
+      setEmployees([]);
+      setSessions([]);
+      setIsLoading(false);
+      return;
+    }
     let active = true;
     Promise.all([fetchStaffProfiles(), fetchEmployeeLoginSessions()]).then(
       ([empRes, sessionList]) => {
@@ -129,10 +155,10 @@ export default function EmployeeModule({
     return () => {
       active = false;
     };
-  }, []);
+  }, [isSimulationMode]);
 
   const filteredEmployees = useMemo(() => {
-    return employees.filter((emp) => {
+    return planScopedEmployees.filter((emp) => {
       const q = searchName.trim().toLowerCase();
       const matchName =
         !q ||
@@ -144,10 +170,11 @@ export default function EmployeeModule({
         (statusFilter === 'active' ? emp.isActive !== false : emp.isActive === false);
       return matchName && matchRole && matchStatus;
     });
-  }, [employees, searchName, roleFilter, statusFilter]);
+  }, [planScopedEmployees, searchName, roleFilter, statusFilter]);
 
   const filteredSessions = useMemo(() => {
     return sessions.filter((ses) => {
+      if (isStarter && ses.role === 'stocker') return false;
       const q = searchName.trim().toLowerCase();
       const matchName =
         !q ||
@@ -156,7 +183,7 @@ export default function EmployeeModule({
       const matchRole = roleFilter === 'Semua' || ses.role === roleFilter;
       return matchName && matchRole;
     });
-  }, [sessions, searchName, roleFilter]);
+  }, [sessions, isStarter, searchName, roleFilter]);
 
   const handleAddEmployee = async (e) => {
     e.preventDefault();
@@ -175,42 +202,67 @@ export default function EmployeeModule({
     }
 
     setIsSubmitting(true);
-    const result = await createSingleEmployeeAccount({
-      email: newEmployee.email,
-      password: newEmployee.password,
-      role: newEmployee.role,
-      fullName: newEmployee.fullName,
-      outletName: newEmployee.outletName,
-      existingEmployees: employees
-    });
+    let result;
+    if (isSimulationMode) {
+      const nameValidation = validatePersonalEmployeeName(newEmployee.fullName, employees);
+      if (!newEmployee.fullName.trim() || !newEmployee.password) {
+        result = { success: false, message: 'Username dan kata sandi wajib diisi.' };
+      } else if (!nameValidation.valid) {
+        result = { success: false, message: nameValidation.message };
+      } else {
+        const cleanEmail = usernameToInternalAuthEmail(nameValidation.cleanName);
+        const createdEmp = {
+          id: `SIM-EMP-${Date.now()}`,
+          email: cleanEmail,
+          username: nameValidation.cleanName,
+          role: newEmployee.role,
+          fullName: nameValidation.cleanName,
+          outletName: 'Utama',
+          isActive: true,
+          status: 'active',
+          deactivatedAt: null,
+          deactivatedReason: ''
+        };
+        setEmployees((prev) => [...prev, createdEmp]);
+        result = { success: true, employee: createdEmp };
+      }
+    } else {
+      result = await createSingleEmployeeAccount({
+        username: newEmployee.fullName,
+        password: newEmployee.password,
+        role: newEmployee.role,
+        fullName: newEmployee.fullName,
+        existingEmployees: employees
+      });
+    }
 
     if (result.success) {
       await onRecordAudit?.({
         actionType: 'Account Status',
         entityType: 'employee',
-        entityId: result.employee?.id || newEmployee.email,
+        entityId: result.employee?.id || newEmployee.fullName,
         entityName: result.employee?.fullName || newEmployee.fullName,
         beforeValue: 'Belum Terdaftar',
         afterValue: `Aktif (${newEmployee.role === 'kasir' ? 'Kasir' : 'Stocker'})`,
         deltaLabel: '1 Akun = 1 Karyawan',
-        reason: `Registrasi akun pribadi ${newEmployee.fullName.trim()} (${newEmployee.outletName})`
+        reason: `Registrasi akun karyawan ${newEmployee.fullName.trim()}`
       });
 
       await refreshEmployees();
       setSuccessMsg(
-        `Akun pribadi atas nama "${result.employee?.fullName || newEmployee.fullName}" berhasil didaftarkan!`
+        `Akun karyawan "${result.employee?.fullName || newEmployee.fullName}" berhasil didaftarkan!`
       );
       setNewEmployee({
         fullName: '',
         email: '',
         password: '',
         role: 'kasir',
-        outletName: 'Cabang Utama - Makassar'
+        outletName: 'Utama'
       });
       setIsModalOpen(false);
       setTimeout(() => setSuccessMsg(''), 3500);
     } else {
-      setErrorMessage(result.message || 'Gagal menambahkan karyawan. Periksa nama atau email.');
+      setErrorMessage(result.message || 'Gagal menambahkan karyawan. Periksa username atau password.');
     }
 
     setIsSubmitting(false);
@@ -222,7 +274,28 @@ export default function EmployeeModule({
     const emp = statusModalEmp;
     const targetActive = emp.isActive === false;
 
-    const result = await setEmployeeActiveStatus(emp, targetActive, statusReason);
+    const result = isSimulationMode
+      ? {
+          success: true,
+          reason:
+            statusReason.trim() ||
+            (targetActive ? 'Diaktifkan kembali oleh Admin' : 'Dinonaktifkan oleh Admin')
+        }
+      : await setEmployeeActiveStatus(emp, targetActive, statusReason);
+    if (isSimulationMode && result.success) {
+      setEmployees((prev) =>
+        prev.map((item) =>
+          (item.id || item.email) === (emp.id || emp.email)
+            ? {
+                ...item,
+                isActive: targetActive,
+                status: targetActive ? 'active' : 'inactive',
+                deactivatedReason: targetActive ? '' : result.reason
+              }
+            : item
+        )
+      );
+    }
     if (!result.success) {
       setDeleteError({
         email: emp.email,
@@ -277,13 +350,38 @@ export default function EmployeeModule({
     }
 
     setIsSavingEdit(true);
-    const result = await updateEmployeeProfile({
-      employee: editingEmp,
-      fullName: editingEmp.editFullName,
-      role: editingEmp.editRole,
-      outletName: editingEmp.editOutlet,
-      existingEmployees: employees
-    });
+    let result;
+    if (isSimulationMode) {
+      const nameValidation = validatePersonalEmployeeName(
+        editingEmp.editFullName,
+        employees,
+        editingEmp.email
+      );
+      if (!nameValidation.valid) {
+        result = { success: false, message: nameValidation.message };
+      } else {
+        const updatedEmp = {
+          ...editingEmp,
+          fullName: nameValidation.cleanName,
+          role: editingEmp.editRole,
+          outletName: editingEmp.editOutlet
+        };
+        setEmployees((prev) =>
+          prev.map((item) =>
+            (item.id || item.email) === (editingEmp.id || editingEmp.email) ? updatedEmp : item
+          )
+        );
+        result = { success: true, employee: updatedEmp };
+      }
+    } else {
+      result = await updateEmployeeProfile({
+        employee: editingEmp,
+        fullName: editingEmp.editFullName,
+        role: editingEmp.editRole,
+        outletName: editingEmp.editOutlet,
+        existingEmployees: employees
+      });
+    }
 
     if (!result.success) {
       setEditError(result.message || 'Gagal memperbarui data karyawan.');
@@ -326,7 +424,15 @@ export default function EmployeeModule({
     setDeletingId(emp.id || emp.email);
     setDeleteError(null);
 
-    const result = await deleteEmployeeRole(emp.id, emp.email, emp.role);
+    let result;
+    if (isSimulationMode) {
+      setEmployees((prev) =>
+        prev.filter((item) => (item.id || item.email) !== (emp.id || emp.email))
+      );
+      result = { success: true };
+    } else {
+      result = await deleteEmployeeRole(emp.id, emp.email, emp.role);
+    }
 
     if (result.success) {
       await onRecordAudit?.({
@@ -369,17 +475,11 @@ export default function EmployeeModule({
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 pb-5 border-b border-zinc-200">
         <div className="space-y-1">
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="font-mono bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-[0.14em] inline-flex items-center gap-1.5">
-              <ShieldCheck size={12} />{' '}
-              {isStarter ? 'Akses Terbatas (Paket Starter)' : '[ 05 // 1 AKUN = 1 KARYAWAN (RBAC) ]'}
-            </span>
-          </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-[#141414]">
             Kelola Karyawan &amp; Sesi
           </h1>
           <p className="text-xs font-medium text-[#52525B] max-w-xl">
-            Setiap akun Kasir dan Stocker wajib terikat pada <strong>nama lengkap pribadi</strong> (tanpa akun bersama &amp; tanpa perlu ID employee) untuk kesiapan Audit Trail.
+            Setiap kasir dan petugas gudang punya akun dengan <strong>nama lengkap masing-masing</strong> supaya setiap transaksi dan perubahan stok tercatat jelas.
           </p>
         </div>
 
@@ -394,7 +494,7 @@ export default function EmployeeModule({
                   : 'text-[#52525B] hover:text-[#141414]'
               }`}
             >
-              Daftar Akun ({employees.length})
+              Daftar Akun ({planScopedEmployees.length})
             </button>
             <button
               type="button"
@@ -425,7 +525,7 @@ export default function EmployeeModule({
               onClick={() => onUpgradePlan('pro')}
               className="bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] font-extrabold text-xs px-5 py-2.5 rounded-xl shadow-sm flex items-center gap-2 cursor-pointer transition-colors"
             >
-              <UserPlus size={15} /> Upgrade ke Pro (Tambah Staf)
+              <Lock size={14} /> Upgrade ke Pro (Tambah Karyawan)
             </button>
           ) : (
             <button
@@ -448,7 +548,8 @@ export default function EmployeeModule({
             Total Akun Terdaftar
           </span>
           <p className="text-2xl font-extrabold font-mono text-[#141414] mt-1">
-            {employees.length}
+            {planScopedEmployees.length}
+            {isStarter && <span className="text-xs font-semibold text-[#52525B] ml-1">/ 2 Maks</span>}
           </p>
         </div>
         <div className="bg-white border border-zinc-200 rounded-2xl p-4">
@@ -457,6 +558,7 @@ export default function EmployeeModule({
           </span>
           <p className="text-2xl font-extrabold font-mono text-[#141414] mt-1">
             {activeKasirCount}
+            {isStarter && <span className="text-xs font-semibold text-[#52525B] ml-1">/ 1 Maks</span>}
           </p>
         </div>
         <div className="bg-white border border-zinc-200 rounded-2xl p-4">
@@ -464,7 +566,13 @@ export default function EmployeeModule({
             Stocker Aktif
           </span>
           <p className="text-2xl font-extrabold font-mono text-[#141414] mt-1">
-            {activeStockerCount}
+            {isStarter ? (
+              <span className="text-xs font-bold text-[#B45309] bg-[#FEF3C7] border border-[#FDE68A] px-2.5 py-1 rounded-full inline-flex items-center gap-1">
+                <Lock size={11} /> Khusus Pro
+              </span>
+            ) : (
+              activeStockerCount
+            )}
           </p>
         </div>
         <div className="bg-white border border-zinc-200 rounded-2xl p-4">
@@ -496,8 +604,8 @@ export default function EmployeeModule({
           >
             <option value="Semua">Semua Role</option>
             <option value="kasir">Kasir</option>
-            <option value="stocker">Stocker</option>
-            <option value="superadmin">Superadmin</option>
+            {!isStarter && <option value="stocker">Stocker</option>}
+            <option value="superadmin">Admin</option>
           </select>
 
           {activeSubTab === 'accounts' && (
@@ -612,8 +720,8 @@ export default function EmployeeModule({
               <thead>
                 <tr className="bg-[#FAFAFA] border-b border-zinc-200 font-mono text-[10px] font-bold text-[#52525B] uppercase tracking-wider">
                   <th className="p-4 pl-6 w-12">#</th>
-                  <th className="p-4">Nama Karyawan (1 Akun = 1 Orang)</th>
-                  <th className="p-4">Jabatan (Role) &amp; Outlet</th>
+                  <th className="p-4">Username Karyawan</th>
+                  <th className="p-4">Jabatan (Role)</th>
                   <th className="p-4">Status Akun</th>
                   <th className="p-4 text-right pr-6">Aksi</th>
                 </tr>
@@ -635,7 +743,7 @@ export default function EmployeeModule({
                     const isSuperadmin = (emp.role || '').toLowerCase() === 'superadmin';
                     const isActive = emp.isActive !== false;
                     const roleLabel = isSuperadmin
-                      ? 'Superadmin'
+                      ? 'Admin'
                       : emp.role === 'kasir'
                       ? 'Kasir'
                       : 'Stocker';
@@ -663,13 +771,15 @@ export default function EmployeeModule({
                             </div>
                             <div>
                               <p className="font-extrabold text-[#141414] text-sm">
-                                {emp.fullName || emp.email}
+                                {emp.fullName || formatDisplayUsername(emp.email)}
                               </p>
-                              <p className="text-[11px] font-mono text-[#52525B]">{emp.email}</p>
+                              <p className="text-[11px] font-mono text-[#52525B]">
+                                @{formatDisplayUsername(emp.email, emp.username || emp.fullName)}
+                              </p>
                             </div>
                           </div>
                         </td>
-                        <td className="p-4 space-y-1">
+                        <td className="p-4">
                           <span
                             className={`px-2.5 py-0.5 rounded-lg font-mono text-[11px] font-bold inline-flex items-center gap-1.5 ${
                               isSuperadmin
@@ -682,10 +792,6 @@ export default function EmployeeModule({
                             <Briefcase size={12} />
                             {roleLabel}
                           </span>
-                          <p className="text-[11px] text-[#52525B] font-medium flex items-center gap-1">
-                            <MapPin size={11} className="text-zinc-400" />
-                            {emp.outletName || 'Cabang Utama - Makassar'}
-                          </p>
                         </td>
                         <td className="p-4">
                           {isActive ? (
@@ -712,12 +818,12 @@ export default function EmployeeModule({
                                 type="button"
                                 onClick={() => handleOpenEditEmployee(emp)}
                                 className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-[#141414] text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer transition-colors"
-                                title="Edit Nama / Outlet Superadmin"
+                                title="Edit Nama / Outlet Admin"
                               >
                                 <Edit3 size={13} className="text-[#D97706]" /> Edit
                               </button>
                               <span
-                                title="Akun Superadmin tidak dapat dinonaktifkan atau dihapus"
+                                title="Akun Admin tidak dapat dinonaktifkan atau dihapus"
                                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#FAFAFA] border border-zinc-200 font-mono text-[10px] font-bold text-[#52525B] select-none"
                               >
                                 <Lock size={11} className="text-[#D97706]" /> Dilindungi
@@ -795,8 +901,8 @@ export default function EmployeeModule({
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-[#FAFAFA] border-b border-zinc-200 font-mono text-[10px] font-bold text-[#52525B] uppercase tracking-wider">
-                  <th className="p-4 pl-6">Nama Karyawan</th>
-                  <th className="p-4">Role &amp; Outlet</th>
+                  <th className="p-4 pl-6">Username Karyawan</th>
+                  <th className="p-4">Role</th>
                   <th className="p-4">Perangkat / Browser</th>
                   <th className="p-4">Login → Logout</th>
                   <th className="p-4 text-right pr-6">Status Sesi</th>
@@ -814,7 +920,9 @@ export default function EmployeeModule({
                     <tr key={ses.id} className="hover:bg-[#FAFAFA]">
                       <td className="p-4 pl-6">
                         <p className="font-extrabold text-[#141414]">{ses.fullName}</p>
-                        <p className="text-[11px] font-mono text-[#52525B]">{ses.email}</p>
+                        <p className="text-[11px] font-mono text-[#52525B]">
+                          @{formatDisplayUsername(ses.email, ses.fullName)}
+                        </p>
                       </td>
                       <td className="p-4">
                         <span
@@ -828,10 +936,7 @@ export default function EmployeeModule({
                             ? 'Kasir'
                             : ses.role === 'stocker'
                             ? 'Stocker'
-                            : 'Superadmin'}
-                        </span>
-                        <span className="block text-[11px] text-[#52525B] mt-1">
-                          {ses.outletName}
+                            : 'Admin'}
                         </span>
                       </td>
                       <td className="p-4 font-mono text-[11px] text-[#141414]">
@@ -902,7 +1007,7 @@ export default function EmployeeModule({
                       Edit Data Karyawan
                     </h3>
                     <p className="text-[11px] text-[#52525B] font-medium">
-                      Perbarui nama lengkap pribadi, jabatan, atau penempatan outlet.
+                      Perbarui username atau jabatan karyawan.
                     </p>
                   </div>
                 </div>
@@ -923,25 +1028,13 @@ export default function EmployeeModule({
                 )}
 
                 <div>
-                  <label className="block text-[11px] font-bold text-[#52525B] mb-1">
-                    Email Login Akun
-                  </label>
-                  <input
-                    type="text"
-                    readOnly
-                    value={editingEmp.email}
-                    className="w-full bg-zinc-100 border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-[#52525B] cursor-not-allowed"
-                  />
-                </div>
-
-                <div>
                   <label className="block text-[11px] font-bold text-[#141414] mb-1">
-                    Nama Lengkap Karyawan <span className="text-red-600">*</span>
+                    Username Karyawan <span className="text-red-600">*</span>
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="Contoh: Siti Rahmawati"
+                    placeholder="Contoh: budi_kasir"
                     value={editingEmp.editFullName}
                     onChange={(e) =>
                       setEditingEmp({ ...editingEmp, editFullName: e.target.value })
@@ -950,48 +1043,27 @@ export default function EmployeeModule({
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-[#141414] mb-1">
-                      Jabatan (Role)
-                    </label>
-                    <select
-                      value={editingEmp.editRole}
-                      disabled={(editingEmp.role || '').toLowerCase() === 'superadmin'}
-                      onChange={(e) =>
-                        setEditingEmp({ ...editingEmp, editRole: e.target.value })
-                      }
-                      className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl px-3 py-2.5 text-xs font-bold text-[#141414] disabled:opacity-60"
-                    >
-                      {(editingEmp.role || '').toLowerCase() === 'superadmin' ? (
-                        <option value="superadmin">Superadmin (Dilindungi)</option>
-                      ) : (
-                        <>
-                          <option value="kasir">Kasir POS</option>
-                          <option value="stocker">Stocker Gudang</option>
-                        </>
-                      )}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-[#141414] mb-1">
-                      Penempatan Outlet
-                    </label>
-                    <select
-                      value={editingEmp.editOutlet}
-                      onChange={(e) =>
-                        setEditingEmp({ ...editingEmp, editOutlet: e.target.value })
-                      }
-                      className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl px-3 py-2.5 text-xs font-bold text-[#141414]"
-                    >
-                      {OUTLET_OPTIONS.map((out) => (
-                        <option key={out} value={out}>
-                          {out}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-[#141414] mb-1">
+                    Jabatan (Role)
+                  </label>
+                  <select
+                    value={editingEmp.editRole}
+                    disabled={(editingEmp.role || '').toLowerCase() === 'superadmin'}
+                    onChange={(e) =>
+                      setEditingEmp({ ...editingEmp, editRole: e.target.value })
+                    }
+                    className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl px-3 py-2.5 text-xs font-bold text-[#141414] disabled:opacity-60"
+                  >
+                    {(editingEmp.role || '').toLowerCase() === 'superadmin' ? (
+                      <option value="superadmin">Admin (Dilindungi)</option>
+                    ) : (
+                      <>
+                        <option value="kasir">Kasir POS</option>
+                        <option value="stocker">Stocker Gudang</option>
+                      </>
+                    )}
+                  </select>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-2 border-t border-zinc-100">
@@ -1226,10 +1298,10 @@ export default function EmployeeModule({
                   </div>
                   <div>
                     <h3 className="font-black text-zinc-900 text-lg tracking-tight">
-                      Tambah Akun Karyawan Pribadi
+                      Tambah Akun Karyawan
                     </h3>
                     <p className="text-xs font-medium text-zinc-500 mt-0.5">
-                      Kebijakan 1 akun = 1 karyawan (wajib nama lengkap, tanpa ID employee).
+                      Cukup buat username dan kata sandi agar karyawan mudah login.
                     </p>
                   </div>
                 </div>
@@ -1250,13 +1322,9 @@ export default function EmployeeModule({
                     </div>
                   )}
 
-                  <div className="bg-[#FEF3C7]/70 border border-[#FDE68A] rounded-xl p-3 text-[11px] text-[#78350F] font-semibold">
-                    Dilarang membuat akun bersama (seperti &ldquo;Kasir 1&rdquo; atau &ldquo;Stocker Gudang&rdquo;). Gunakan nama lengkap karyawan yang bertanggung jawab.
-                  </div>
-
                   <div>
                     <label className="block text-[11px] font-bold text-zinc-600 mb-1.5">
-                      Nama Lengkap Karyawan <span className="text-red-600">*</span>
+                      Username Karyawan <span className="text-red-600">*</span>
                     </label>
                     <div className="relative">
                       <User
@@ -1266,7 +1334,7 @@ export default function EmployeeModule({
                       <input
                         type="text"
                         required
-                        placeholder="Contoh: Siti Rahmawati"
+                        placeholder="Contoh: budi_kasir"
                         value={newEmployee.fullName}
                         onChange={(e) =>
                           setNewEmployee({ ...newEmployee, fullName: e.target.value })
@@ -1278,64 +1346,23 @@ export default function EmployeeModule({
 
                   <div>
                     <label className="block text-[11px] font-bold text-zinc-600 mb-1.5">
-                      Email Login Pribadi <span className="text-red-600">*</span>
+                      Kata Sandi <span className="text-red-600">*</span>
                     </label>
                     <div className="relative">
-                      <Mail
+                      <Lock
                         size={16}
                         className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400"
                       />
                       <input
-                        type="email"
+                        type="text"
                         required
-                        placeholder="siti.rahma@toko.com"
-                        value={newEmployee.email}
-                        onChange={(e) => setNewEmployee({ ...newEmployee, email: e.target.value })}
+                        placeholder="Minimal 6 karakter"
+                        value={newEmployee.password}
+                        onChange={(e) =>
+                          setNewEmployee({ ...newEmployee, password: e.target.value })
+                        }
                         className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 pl-11 text-sm text-zinc-900 font-bold placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all"
                       />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-bold text-zinc-600 mb-1.5">
-                        Kata Sandi <span className="text-red-600">*</span>
-                      </label>
-                      <div className="relative">
-                        <Lock
-                          size={16}
-                          className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400"
-                        />
-                        <input
-                          type="text"
-                          required
-                          placeholder="Minimal 6 karakter"
-                          value={newEmployee.password}
-                          onChange={(e) =>
-                            setNewEmployee({ ...newEmployee, password: e.target.value })
-                          }
-                          className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 pl-11 text-sm text-zinc-900 font-bold placeholder-zinc-400 focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold text-zinc-600 mb-1.5">
-                        Penempatan Outlet
-                      </label>
-                      <select
-                        value={newEmployee.outletName}
-                        onChange={(e) =>
-                          setNewEmployee({ ...newEmployee, outletName: e.target.value })
-                        }
-                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-3 text-xs text-zinc-900 font-bold focus:outline-none focus:bg-white focus:border-[#F59E0B]"
-                      >
-                        {OUTLET_OPTIONS.map((out) => (
-                          <option key={out} value={out}>
-                            {out}
-                          </option>
-                        ))}
-                      </select>
                     </div>
                   </div>
 

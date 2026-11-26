@@ -41,10 +41,10 @@ export default function MerchantWorkflowModal({
                 </div>
                 <div>
                   <h3 className="font-extrabold text-[#141414] text-base">
-                    Pengaturan Bisnis &amp; Alur Operasional
+                    Pengaturan Jenis Usaha &amp; Cara Bayar
                   </h3>
                   <p className="text-[11px] font-medium text-[#52525B]">
-                    Pilih mode bisnis (F&amp;B / Ritel), kanal order, dan alur kasir toko.
+                    Pilih jenis usaha, cara pembayaran pelanggan, dan alur pesanan toko.
                   </p>
                 </div>
               </div>
@@ -60,21 +60,21 @@ export default function MerchantWorkflowModal({
             <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[78vh] overflow-y-auto">
               {/* 0. Business Type Selector (F&B vs Ritel) */}
               <div className="space-y-2">
-                <label className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#52525B] flex items-center gap-1.5">
-                  <Store size={13} className="text-[#D97706]" /> Tipe Usaha (Business Mode)
+                <label className="text-[11px] font-bold uppercase tracking-wider text-[#52525B] flex items-center gap-1.5">
+                  <Store size={13} className="text-[#D97706]" /> Jenis Usaha
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {[
                     {
                       id: 'fnb',
-                      title: 'F&B / Kafe & Resto',
-                      desc: 'Resep bahan baku (BOM), HPP per porsi, antrean dapur (KDS) & Open Bill.',
+                      title: 'F&B (Kafe & Restoran)',
+                      desc: 'Pakai resep bahan baku, hitung modal per porsi, antrean dapur & bayar nanti.',
                       icon: UtensilsCrossed
                     },
                     {
                       id: 'retail',
-                      title: 'Toko Ritel / Minimarket',
-                      desc: 'Produk unit/SKU & varian, harga kulakan vs jual, potong stok SKU otomatis.',
+                      title: 'Toko Ritel & Minimarket',
+                      desc: 'Produk satuan atau varian, harga kulakan vs jual, potong stok otomatis per barang.',
                       icon: ShoppingBag
                     }
                   ].map((mode) => {
@@ -106,20 +106,20 @@ export default function MerchantWorkflowModal({
 
               {/* 1. Payment Flow */}
               <div className="space-y-2">
-                <label className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#52525B] flex items-center gap-1.5">
-                  <Wallet size={13} className="text-[#D97706]" /> Mode Alur Pembayaran (Payment Flow)
+                <label className="text-[11px] font-bold uppercase tracking-wider text-[#52525B] flex items-center gap-1.5">
+                  <Wallet size={13} className="text-[#D97706]" /> Cara Pembayaran Pelanggan
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {[
                     {
                       id: 'pay_first',
-                      title: 'Pay First (Bayar Awal)',
-                      desc: 'Pesanan masuk dapur setelah pembayaran lunas (paid).'
+                      title: 'Bayar di Awal (Pay First)',
+                      desc: 'Pelanggan bayar lunas dulu saat pesan, baru pesanan diproses.'
                     },
                     {
                       id: 'pay_later',
-                      title: 'Pay Later (Open Bill)',
-                      desc: 'Dapur langsung memasak, bayar di akhir & bisa tambah item susulan.'
+                      title: 'Bayar Nanti / Open Bill (Pay Later)',
+                      desc: 'Pesanan langsung dibuat, bisa tambah item lagi, lalu bayar di akhir.'
                     }
                   ].map((opt) => {
                     const active = draft.paymentFlow === opt.id;

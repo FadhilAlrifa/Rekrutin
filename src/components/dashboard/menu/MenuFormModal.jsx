@@ -56,16 +56,56 @@ export default function MenuFormModal({
   ingredients = [],
   subscriptionPlan = 'pro',
   businessType = 'fnb',
+  availableCategories = [],
   onUpgradePlan
 }) {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [customCategoryName, setCustomCategoryName] = useState('');
   const fileInputRef = useRef(null);
 
   if (!isOpen) return null;
 
   const isStarter = subscriptionPlan === 'starter';
   const isRetailMode = businessType === 'retail' || formData.productMode === 'retail';
+
+  const defaultFnbCategories = isStarter
+    ? ['Minuman', 'Makanan']
+    : ['Minuman', 'Makanan', 'Bakery', 'Dessert'];
+  const defaultRetailCategories = [
+    'Minuman Kemasan',
+    'Makanan Ringan',
+    'Sembako & Kebutuhan',
+    'Aksesoris & Elektronik',
+    'Fashion & Varian',
+    'Minuman',
+    'Makanan',
+    'Lainnya'
+  ];
+
+  const categoryOptions = isStarter && !isRetailMode
+    ? defaultFnbCategories
+    : Array.from(
+        new Set([
+          ...(isRetailMode ? defaultRetailCategories : defaultFnbCategories),
+          ...(availableCategories || []),
+          formData.category
+        ].filter(Boolean))
+      );
+
+  const selectedCategoryValue =
+    isStarter && !isRetailMode && (formData.category === 'Bakery' || formData.category === 'Dessert')
+      ? 'Makanan'
+      : formData.category || categoryOptions[0] || 'Minuman';
+
+  const handleConfirmCustomCategory = () => {
+    const cleaned = customCategoryName.trim().replace(/\s+/g, ' ');
+    if (!cleaned) return;
+    setFormData((prev) => ({ ...prev, category: cleaned }));
+    setCustomCategoryName('');
+    setIsAddingCategory(false);
+  };
 
   const handleImageFileSelect = async (file) => {
     if (!file) return;
@@ -167,10 +207,10 @@ export default function MenuFormModal({
               </h3>
               <p className="text-xs font-medium text-[#52525B] mt-0.5">
                 {isStarter
-                  ? 'Manajemen Produk Dasar (Paket Starter).'
+                  ? 'Atur nama menu, harga jual, dan perkiraan jumlah porsi yang bisa dibuat (Paket Starter).'
                   : isRetailMode
-                  ? 'Atur SKU, varian, stok unit, harga kulakan supplier, dan margin keuntungan ritel.'
-                  : 'Atur komposisi BOM dan pantau kalkulasi HPP (COGS) & margin profit otomatis.'}
+                  ? 'Atur nama barang, varian, jumlah stok, harga kulakan, dan keuntungan.'
+                  : 'Atur takaran resep bahan baku dan pantau modal serta keuntungan per porsi.'}
               </p>
             </div>
           </div>
@@ -211,34 +251,55 @@ export default function MenuFormModal({
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-[#52525B] mb-1.5">
-                    {isRetailMode ? 'Kategori Produk' : 'Kategori Menu'}
-                  </label>
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <label className="block text-[11px] font-bold text-[#52525B]">
+                      {isRetailMode ? 'Kategori Produk' : 'Kategori Menu'}
+                    </label>
+                    {!isStarter && (
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingCategory((prev) => !prev)}
+                        className="text-[11px] font-bold text-[#D97706] hover:text-[#B45309] inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus size={12} /> {isAddingCategory ? 'Batal' : 'Tambah Kategori'}
+                      </button>
+                    )}
+                  </div>
                   <select
-                    value={formData.category}
+                    value={selectedCategoryValue}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                     className="w-full bg-[#FAFAFA] border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-[#141414] focus:outline-none focus:bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all cursor-pointer"
                   >
-                    {isRetailMode ? (
-                      <>
-                        <option value="Minuman Kemasan">Minuman Kemasan</option>
-                        <option value="Makanan Ringan">Makanan Ringan</option>
-                        <option value="Sembako & Kebutuhan">Sembako &amp; Kebutuhan</option>
-                        <option value="Aksesoris & Elektronik">Aksesoris &amp; Elektronik</option>
-                        <option value="Fashion & Varian">Fashion &amp; Varian</option>
-                        <option value="Minuman">Minuman</option>
-                        <option value="Makanan">Makanan</option>
-                        <option value="Lainnya">Lainnya</option>
-                      </>
-                    ) : (
-                      <>
-                        <option value="Minuman">Minuman</option>
-                        <option value="Makanan">Makanan</option>
-                        <option value="Bakery">Bakery</option>
-                        <option value="Dessert">Dessert</option>
-                      </>
-                    )}
+                    {categoryOptions.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
                   </select>
+                  {!isStarter && isAddingCategory && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="Nama kategori baru (mis. Pastry, Frozen Food)"
+                        value={customCategoryName}
+                        onChange={(e) => setCustomCategoryName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleConfirmCustomCategory();
+                          }
+                        }}
+                        className="flex-1 bg-white border border-zinc-300 rounded-xl px-3 py-2 text-xs font-bold text-[#141414] placeholder-zinc-400 focus:outline-none focus:border-[#F59E0B]"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleConfirmCustomCategory}
+                        className="px-3.5 py-2 rounded-xl bg-[#141414] hover:bg-zinc-800 text-[#F59E0B] text-xs font-bold cursor-pointer shrink-0"
+                      >
+                        Simpan
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -411,7 +472,7 @@ export default function MenuFormModal({
 
                   <div>
                     <label className="block text-[11px] font-bold text-[#52525B] mb-1">
-                      Buffer Minimum (Alert)
+                      Batas Peringatan Menipis
                     </label>
                     <input
                       type="number"
@@ -500,12 +561,59 @@ export default function MenuFormModal({
                 </div>
               </div>
             ) : (
-            <div className="space-y-3 pt-2 border-t border-zinc-100">
+            <div className="space-y-4 pt-2 border-t border-zinc-100">
+              {isStarter && (
+                <div className="bg-[#FAFAFA] border border-zinc-200 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-extrabold text-[#141414]">
+                      Kuota Porsi Menu (Paket Starter)
+                    </span>
+                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]">
+                      Otomatis Berkurang di Kasir
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#52525B] font-medium leading-relaxed">
+                    Masukkan perkiraan berapa porsi menu ini yang bisa dibuat dari bahan yang kamu beli. Stok porsi otomatis berkurang tiap ada penjualan.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-[#52525B] mb-1">
+                        Porsi Tersedia Sekarang <span className="text-red-600">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        required
+                        placeholder="Contoh: 10"
+                        value={formData.stock ?? ''}
+                        onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                        className="w-full bg-white border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-[#141414] focus:outline-none focus:border-[#F59E0B]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-[#52525B] mb-1">
+                        Batas Peringatan Menipis
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="Contoh: 3"
+                        value={formData.minLimit ?? 3}
+                        onChange={(e) => setFormData({ ...formData, minLimit: e.target.value })}
+                        className="w-full bg-white border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-[#141414] focus:outline-none focus:border-[#F59E0B]"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Layers size={14} className="text-[#D97706]" />
-                  <span className="font-mono text-[10px] font-bold text-[#52525B] uppercase tracking-wider">
-                    Komposisi Resep (BOM)
+                  <span className="text-[11px] font-bold text-[#52525B] uppercase tracking-wider">
+                    Takaran Resep Bahan
                   </span>
                 </div>
                 {!isStarter && (
@@ -520,16 +628,16 @@ export default function MenuFormModal({
               </div>
 
               {isStarter ? (
-                <div className="bg-[#FEF3C7]/60 border border-[#FDE68A] rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="bg-[#FEF3C7]/50 border border-[#FDE68A] rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
-                    <span className="inline-flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-[#B45309] bg-white px-2.5 py-0.5 rounded-full border border-[#FDE68A]">
-                      <Lock size={10} /> Fitur Paket Pro & Enterprise
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#B45309] bg-white px-2.5 py-0.5 rounded-full border border-[#FDE68A]">
+                      <Lock size={10} /> Khusus Paket Pro &amp; Enterprise
                     </span>
                     <h4 className="text-xs font-extrabold text-[#141414] pt-1">
-                      Kalkulator HPP (COGS) & Pemotongan Resep Otomatis
+                      Potong Stok Bahan Baku Otomatis Berdasarkan Resep
                     </h4>
                     <p className="text-[11px] font-medium text-[#52525B] leading-relaxed">
-                      Upgrade ke <strong>Paket Pro</strong> untuk menghubungkan menu dengan pemotongan gramasi bahan baku gudang dan kalkulasi margin profit otomatis.
+                      Kalau mau hitung otomatis dari stok bahan gudang (gram/ml kopi, susu, sirup) &amp; hitung modal per porsi, aktifkan <strong>Paket Pro</strong>.
                     </p>
                   </div>
                   {onUpgradePlan && (

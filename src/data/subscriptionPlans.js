@@ -4,24 +4,24 @@ export const SUBSCRIPTION_PLANS = [
   {
     id: 'starter',
     name: 'Paket Starter',
-    subtitle: 'Basic POS & Kasir Mandiri',
+    subtitle: 'Kasir & Kuota Stok Menu',
     price: 'Rp79.000',
     period: '/ bulan',
     badge: 'UMKM Mikro & Pemula',
     icon: Store,
-    target: 'UMKM F&B mikro, kedai kopi kecil, atau pedagang pop-up pemula yang baru beralih dari kasir konvensional.',
+    target: 'Kedai kecil, booth minuman, atau toko pemula yang butuh kasir cepat dengan kontrol kuota porsi per menu.',
     highlight: false,
     included: [
-      'Modul POS Kasir lengkap (pencarian menu & catatan dapur)',
-      'Pembayaran Tunai (kalkulator kembalian), QRIS, & Kartu',
-      'Cetak struk senyap (Silent Hidden Iframe)',
-      'Manajemen Menu dasar (Katalog Produk)',
-      'Akses terbatas: 1 Superadmin & maks. 1 Kasir'
+      'Kasir POS lengkap (Tunai, QRIS, Kartu, & catatan dapur)',
+      'Cetak struk transaksi langsung tanpa tab baru',
+      'Kuota porsi/stok per menu (berkurang otomatis saat terjual & peringatan menipis)',
+      'Laporan penjualan harian & unduh rekap CSV',
+      'Akses untuk 1 Admin & maks. 1 Kasir'
     ],
     excluded: [
-      'Mesin pemotong stok resep otomatis (BOM Engine)',
-      'Validasi stok lintas menu & Peringatan FIFO/FEFO',
-      'Modul Self-Order Kiosk Meja & Role Stocker Gudang'
+      'Potong stok bahan baku otomatis sesuai resep (BOM)',
+      'Pengingat bahan kedaluwarsa (FEFO) & akun Stocker gudang',
+      'Pesan mandiri dari meja (QR), Bayar Nanti (Open Bill), & Saran AI'
     ]
   },
   {

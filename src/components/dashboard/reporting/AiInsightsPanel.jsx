@@ -6,8 +6,7 @@ import {
   ArrowRight,
   TrendingUp,
   AlertTriangle,
-  CheckCircle2,
-  SlidersHorizontal
+  CheckCircle2
 } from 'lucide-react';
 import { generateAiInsights } from '../../../utils/cogsCalculator';
 import { computeSeasonalDemandForecast, DEFAULT_SEASONAL_EVENTS } from '../../../utils/seasonalForecasting';
@@ -23,12 +22,6 @@ export default function AiInsightsPanel({
   onNavigateTab
 }) {
   const [refreshTick, setRefreshTick] = useState(0);
-  const [showLlmConfig, setShowLlmConfig] = useState(false);
-  const [llmApiKey, setLlmApiKey] = useState('');
-  const [llmEndpoint, setLlmEndpoint] = useState('https://api.openai.com/v1/chat/completions');
-  const [llmSummary, setLlmSummary] = useState('');
-  const [isCallingLlm, setIsCallingLlm] = useState(false);
-  const [llmError, setLlmError] = useState('');
 
   const insights = useMemo(() => {
     void refreshTick;
@@ -88,49 +81,6 @@ export default function AiInsightsPanel({
     return { tab: 'pos', label: 'Lihat Katalog POS' };
   };
 
-  const handleGenerateLlmExecutiveNote = async () => {
-    if (!llmApiKey.trim()) {
-      setLlmError('Masukkan API Key LLM terlebih dahulu atau gunakan analisis otomatis di bawah.');
-      return;
-    }
-    setIsCallingLlm(true);
-    setLlmError('');
-    try {
-      const contextText = insights.map((i) => `${i.code} - ${i.headline}: ${i.detail}`).join('\n');
-      const res = await fetch(llmEndpoint.trim(), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${llmApiKey.trim()}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content:
-                'Anda adalah konsultan bisnis F&B untuk aplikasi Stocko POS. Berikan ringkasan eksekutif singkat dalam 3 poin aksi prioritas bahasa Indonesia.'
-            },
-            {
-              role: 'user',
-              content: `Berdasarkan data aktual berikut:\n${contextText}`
-            }
-          ],
-          temperature: 0.3
-        })
-      });
-      const json = await res.json();
-      const text = json?.choices?.[0]?.message?.content;
-      if (!res.ok || !text) {
-        throw new Error(json?.error?.message || 'Gagal menerima respons dari endpoint LLM.');
-      }
-      setLlmSummary(text);
-    } catch (err) {
-      setLlmError(err.message);
-    }
-    setIsCallingLlm(false);
-  };
-
   return (
     <div className="space-y-5">
       {/* Header Panel Stocko AI Insights */}
@@ -144,25 +94,17 @@ export default function AiInsightsPanel({
               <h3 className="text-lg font-extrabold text-[#141414] tracking-tight">
                 Stocko AI Business Analyst
               </h3>
-              <span className="font-mono text-[10px] font-bold uppercase bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] px-2.5 py-0.5 rounded-full">
-                Live Data Engine
+              <span className="text-[10px] font-bold bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] px-2.5 py-0.5 rounded-full">
+                Analisis Otomatis
               </span>
             </div>
             <p className="text-xs text-[#52525B] font-medium mt-1">
-              Menganalisis {products.length} menu, {ingredients.length} bahan baku, dan {transactions.length} transaksi secara real-time.
+              Menganalisis {products.length} menu, {ingredients.length} bahan baku, dan {transactions.length} transaksi secara otomatis.
             </p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowLlmConfig((v) => !v)}
-            className="bg-[#FAFAFA] hover:bg-zinc-100 border border-zinc-200 text-[#141414] text-xs font-bold px-3.5 py-2 rounded-xl inline-flex items-center gap-1.5 cursor-pointer transition-colors"
-          >
-            <SlidersHorizontal size={13} className="text-[#D97706]" />
-            <span>Integrasi LLM (Opsional)</span>
-          </button>
           <button
             type="button"
             onClick={() => setRefreshTick((t) => t + 1)}
@@ -173,47 +115,6 @@ export default function AiInsightsPanel({
           </button>
         </div>
       </div>
-
-      {/* Konfigurasi Opsional LLM API */}
-      {showLlmConfig && (
-        <div className="bg-white border border-zinc-200 rounded-2xl p-5 space-y-3 shadow-sm">
-          <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#52525B]">
-            Opsional: Hubungkan LLM API (OpenAI-Compatible) untuk Ringkasan Naratif
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <input
-              type="text"
-              placeholder="Endpoint API"
-              value={llmEndpoint}
-              onChange={(e) => setLlmEndpoint(e.target.value)}
-              className="bg-[#FAFAFA] border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs font-mono text-[#141414] focus:outline-none focus:border-[#F59E0B]"
-            />
-            <input
-              type="password"
-              placeholder="Bearer API Key (sk-...)"
-              value={llmApiKey}
-              onChange={(e) => setLlmApiKey(e.target.value)}
-              className="bg-[#FAFAFA] border border-zinc-200 rounded-xl px-3.5 py-2.5 text-xs font-mono text-[#141414] focus:outline-none focus:border-[#F59E0B]"
-            />
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            {llmError && <span className="text-xs font-bold text-red-600">{llmError}</span>}
-            <button
-              type="button"
-              onClick={handleGenerateLlmExecutiveNote}
-              disabled={isCallingLlm}
-              className="ml-auto bg-[#141414] hover:bg-zinc-800 text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer disabled:opacity-50"
-            >
-              {isCallingLlm ? 'Menghubungi LLM...' : 'Buat Ringkasan Naratif LLM'}
-            </button>
-          </div>
-          {llmSummary && (
-            <div className="bg-[#FAFAFA] border border-zinc-200 rounded-xl p-4 text-xs text-[#141414] whitespace-pre-line leading-relaxed font-medium">
-              {llmSummary}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* 5 Kartu Insight Bisnis Actionable */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

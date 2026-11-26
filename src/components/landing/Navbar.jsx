@@ -89,8 +89,8 @@ export default function Navbar({ onOpenRegister, onOpenLogin, onOpenApp }) {
           <span className="text-lg font-extrabold tracking-tight text-[#141414]">
             Stocko<span className="text-[#F59E0B]">.</span>
           </span>
-          <span className="hidden xl:inline-block font-mono text-[10px] text-[#52525B] border-l border-zinc-200 pl-2.5 uppercase tracking-widest">
-            POS // BOM
+          <span className="hidden xl:inline-block text-[11px] font-semibold text-[#52525B] border-l border-zinc-200 pl-2.5">
+            Kasir &amp; Stok
           </span>
         </div>
 

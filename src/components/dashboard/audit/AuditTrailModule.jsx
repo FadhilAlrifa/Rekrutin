@@ -183,14 +183,11 @@ export default function AuditTrailModule({
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5 pb-5 border-b border-zinc-200">
         <div>
-          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] inline-block mb-2">
-            [ 09 // AUDIT TRAIL &amp; ACCOUNTABILITY BY NAME ]
-          </span>
           <h1 className="text-3xl font-extrabold tracking-tight text-[#141414]">
-            Audit Trail &amp; Log Aktivitas
+            Catatan Aktivitas &amp; Riwayat
           </h1>
           <p className="text-[#52525B] text-[13px] font-medium mt-1">
-            Telusuri setiap transaksi kasir, mutasi stok stocker, stock opname, revisi nota, dan pembatalan berdasarkan <strong>nama lengkap karyawan</strong>.
+            Pantau setiap transaksi kasir, keluar-masuk stok gudang, revisi nota, dan pembatalan lengkap dengan <strong>nama lengkap petugasnya</strong>.
           </p>
         </div>
 

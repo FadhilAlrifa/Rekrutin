@@ -7,16 +7,13 @@ export default function ReportingHeader({ onDownload, currentFilter, setFilter, 
   return (
     <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 pb-5 border-b border-zinc-200">
       <div>
-        <div className="flex flex-wrap items-center gap-2 mb-2">
-          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]">
-            {isStarter ? 'Laporan Dasar • Paket Starter' : '[ 06 // ANALITIK & LAPORAN BISNIS ]'}
-          </span>
-          {isEnterprise && (
-            <span className="font-mono text-[10px] font-bold text-[#52525B] bg-white border border-zinc-200 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+        {isEnterprise && (
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <span className="text-[11px] font-bold text-[#52525B] bg-white border border-zinc-200 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
               <Building2 size={12} className="text-[#D97706]" /> {activeOutlet}
             </span>
-          )}
-        </div>
+          </div>
+        )}
         <h1 className="text-3xl font-extrabold tracking-tight text-[#141414]">
           {isEnterprise ? 'Laporan Performa Multi-Outlet' : 'Laporan Performa Bisnis'}
         </h1>
@@ -48,41 +45,43 @@ export default function ReportingHeader({ onDownload, currentFilter, setFilter, 
             </button>
           ))}
 
-          {/* Input Kalender Khusus */}
+          {/* Input Kalender Khusus (Pro & Enterprise) */}
           <div className="flex items-center pl-1 ml-1 border-l border-zinc-300">
-            <input 
-              type="date"
-              value={customDate}
-              onChange={(e) => {
-                setCustomDate(e.target.value);
-                setFilter('custom');
-              }}
-              title="Pilih Tanggal Bebas"
-              className={`px-2.5 py-1 bg-white rounded-lg text-xs font-semibold outline-none cursor-pointer border transition-all ${
-                currentFilter === 'custom' 
-                ? 'border-[#F59E0B] text-[#B45309] ring-2 ring-[#F59E0B]/20' 
-                : 'border-zinc-200 text-[#52525B] hover:text-[#141414]'
-              }`}
-            />
+            {isStarter ? (
+              <button
+                type="button"
+                onClick={() => onUpgradePlan?.('pro')}
+                title="Pilih tanggal penjualan khusus tersedia di Paket Pro & Enterprise"
+                className="px-2.5 py-1.5 bg-white hover:bg-[#FEF3C7] rounded-lg text-xs font-bold border border-zinc-200 text-[#52525B] hover:text-[#B45309] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <Lock size={12} className="text-[#D97706]" />
+                <span>Pilih Tanggal (Pro)</span>
+              </button>
+            ) : (
+              <input 
+                type="date"
+                value={customDate}
+                onChange={(e) => {
+                  setCustomDate(e.target.value);
+                  setFilter('custom');
+                }}
+                title="Pilih Tanggal Bebas"
+                className={`px-2.5 py-1 bg-white rounded-lg text-xs font-semibold outline-none cursor-pointer border transition-all ${
+                  currentFilter === 'custom' 
+                  ? 'border-[#F59E0B] text-[#B45309] ring-2 ring-[#F59E0B]/20' 
+                  : 'border-zinc-200 text-[#52525B] hover:text-[#141414]'
+                }`}
+              />
+            )}
           </div>
         </div>
 
-        {isStarter ? (
-          <button
-            onClick={() => onUpgradePlan?.('pro')}
-            className="bg-white hover:bg-zinc-100 text-[#141414] border border-zinc-200 font-bold text-xs px-4 py-2 rounded-xl cursor-pointer flex items-center justify-center gap-2 transition-colors min-h-[36px]"
-            title="Ekspor CSV tersedia pada Paket Pro & Enterprise"
-          >
-            <Lock size={13} className="text-[#D97706]" /> Unduh CSV (Pro)
-          </button>
-        ) : (
-          <button 
-            onClick={onDownload}
-            className="bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] font-extrabold text-xs px-4 py-2 rounded-xl shadow-sm cursor-pointer flex items-center justify-center gap-2 transition-all min-h-[36px] active:scale-95"
-          >
-            <Download size={14} /> Unduh CSV
-          </button>
-        )}
+        <button 
+          onClick={onDownload}
+          className="bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] font-extrabold text-xs px-4 py-2 rounded-xl shadow-sm cursor-pointer flex items-center justify-center gap-2 transition-all min-h-[36px] active:scale-95"
+        >
+          <Download size={14} /> Unduh CSV
+        </button>
       </div>
     </div>
   );

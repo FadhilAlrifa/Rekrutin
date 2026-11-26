@@ -96,21 +96,21 @@ export default function AlertsModule({ ingredients = [], setActiveTab }) {
       id: 'all',
       label: 'Total Peringatan',
       count: enrichedAlerts.length,
-      hint: 'Memerlukan atensi',
+      hint: 'Perlu segera dicek',
       tone: 'text-[#141414]',
       activeBorder: 'border-[#141414]'
     },
     {
       id: 'expired',
-      label: 'Sudah Expired',
+      label: 'Sudah Kedaluwarsa',
       count: expiredCount,
-      hint: 'Tarik dari gudang',
+      hint: 'Segera tarik dari gudang',
       tone: 'text-red-600',
       activeBorder: 'border-red-600'
     },
     {
       id: 'stock',
-      label: 'Stok Kritis',
+      label: 'Stok Hampir Habis',
       count: lowStockCount,
       hint: 'Di bawah batas aman',
       tone: 'text-red-600',
@@ -118,9 +118,9 @@ export default function AlertsModule({ ingredients = [], setActiveTab }) {
     },
     {
       id: 'fefo',
-      label: 'Prioritas FEFO',
+      label: 'Hampir Kedaluwarsa',
       count: fefoCount,
-      hint: 'Kedaluwarsa ≤ 30 hari',
+      hint: 'Sisa simpan ≤ 30 hari',
       tone: 'text-[#D97706]',
       activeBorder: 'border-[#F59E0B]'
     }
@@ -150,14 +150,11 @@ export default function AlertsModule({ ingredients = [], setActiveTab }) {
       {/* 1. Header Editorial */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 pb-5 border-b border-zinc-200">
         <div>
-          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] inline-block mb-2">
-            [ 04 // PERINGATAN KHUSUS & FEFO ]
-          </span>
           <h1 className="text-3xl font-extrabold tracking-tight text-[#141414]">
-            Peringatan Khusus
+            Peringatan Bahan Gudang
           </h1>
           <p className="text-[#52525B] text-[13px] font-medium mt-1">
-            Triase otomatis bahan baku kedaluwarsa, stok di bawah batas minimum, dan prioritas rotasi FEFO.
+            Pantau bahan baku yang stoknya menipis, mendekati kedaluwarsa, atau sudah lewat tanggal simpan.
           </p>
         </div>
 

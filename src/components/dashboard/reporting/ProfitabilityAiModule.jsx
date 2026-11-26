@@ -57,14 +57,11 @@ export default function ProfitabilityAiModule({
       {/* Header Halaman */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5 pb-5 border-b border-zinc-200">
         <div>
-          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] inline-block mb-2">
-            [ 07 // MENU ENGINEERING & AI INSIGHTS ]
-          </span>
           <h1 className="text-3xl font-extrabold tracking-tight text-[#141414]">
-            Analisis Profitabilitas & AI
+            Analisis Keuntungan &amp; Saran AI
           </h1>
           <p className="text-[#52525B] text-[13px] font-medium mt-1">
-            Gabungkan volume penjualan vs. margin HPP (COGS) dan dapatkan rekomendasi bisnis otomatis dari Stocko AI.
+            Lihat menu mana yang paling laku dan paling menguntungkan, serta dapatkan saran otomatis dari Stocko AI.
           </p>
         </div>
 

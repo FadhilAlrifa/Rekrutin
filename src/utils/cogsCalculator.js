@@ -292,15 +292,22 @@ export function analyzeIngredientPriceImpact(ingredient, newPrice, products = []
 /**
  * Hitung maksimal porsi tersisa & status stok detail untuk kasir POS.
  */
-export function evaluateMenuStockStatus(product, ingredients = [], businessType = 'fnb') {
+export function evaluateMenuStockStatus(
+  product,
+  ingredients = [],
+  businessType = 'fnb',
+  useDirectQuota = false
+) {
   const recipe = Array.isArray(product?.recipe) ? product.recipe : [];
   const isRetailItem =
     product?.productMode === 'retail' || (businessType === 'retail' && recipe.length === 0);
 
-  if (isRetailItem) {
+  if (useDirectQuota || isRetailItem) {
     const currentStock = Number(product?.stock ?? 0);
-    const minLimit = Number(product?.minLimit ?? product?.min_stock_threshold ?? 5);
-    const unit = product?.unit || 'pcs';
+    const defaultMin = useDirectQuota && !isRetailItem ? 3 : 5;
+    const minLimit = Number(product?.minLimit ?? product?.min_stock_threshold ?? defaultMin);
+    const unit =
+      isRetailItem || businessType === 'retail' ? product?.unit || 'pcs' : 'porsi';
 
     if (currentStock <= 0) {
       return {
@@ -699,7 +706,7 @@ export function generateAiInsights({
   return [
     {
       id: 'margin',
-      code: '01 // ANALISIS MARGIN',
+      code: 'Keuntungan Menu',
       title: 'Rentang Profitabilitas Menu',
       status: lowestMargin && lowestMargin.marginPct < 30 ? 'critical' : 'healthy',
       headline: topMargin
@@ -713,7 +720,7 @@ export function generateAiInsights({
     },
     {
       id: 'popularity',
-      code: '02 // ANALISIS POPULARITAS',
+      code: 'Menu Terlaris',
       title: 'Pergerakan Volume Penjualan',
       status: 'neutral',
       headline:
@@ -731,7 +738,7 @@ export function generateAiInsights({
     },
     {
       id: 'upselling',
-      code: '03 // PELUANG UPSELLING',
+      code: 'Peluang Tambahan',
       title: 'Kandidat Menu Profit Maksimal',
       status: 'amber',
       headline:
@@ -749,7 +756,7 @@ export function generateAiInsights({
     },
     {
       id: 'pricing',
-      code: '04 // EVALUASI HARGA JUAL',
+      code: 'Cek Harga Jual',
       title: 'Deteksi Erosi Margin & Kenaikan Pasar',
       status: vulnerableMenus.length > 0 || recentHikes.length > 0 ? 'critical' : 'healthy',
       headline:
@@ -768,7 +775,7 @@ export function generateAiInsights({
     },
     {
       id: 'stock',
-      code: '05 // PREDIKSI & SARAN STOK',
+      code: 'Saran Belanja Stok',
       title: 'Estimasi Ketahanan Persediaan Gudang',
       status: urgentStock.length > 0 ? 'critical' : 'healthy',
       headline:
@@ -790,7 +797,7 @@ export function generateAiInsights({
       ? [
           {
             id: 'seasonal',
-            code: '06 // SEASONAL DEMAND FORECAST',
+            code: 'Perkiraan Hari Besar',
             title: `Proyeksi Periode: ${seasonalForecast.selectedEvent?.name || 'Baseline'}`,
             status: seasonalForecast.summary?.raiseBufferCount > 0 ? 'amber' : 'healthy',
             headline:

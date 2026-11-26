@@ -124,8 +124,8 @@ export default function Features() {
         {/* Editorial Section Header */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pb-16 border-b border-zinc-200 mb-14 items-end">
           <div className="lg:col-span-8 space-y-4">
-            <span className="features-editorial-sub font-mono text-xs uppercase tracking-[0.2em] text-[#D97706] font-bold block gpu-accelerated">
-              [ 01 // FITUR UTAMA ]
+            <span className="features-editorial-sub text-xs text-[#D97706] font-bold block gpu-accelerated">
+              Fitur Utama
             </span>
             <h2
               ref={headingRef}

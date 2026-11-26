@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Lock, CalendarDays, Layers } from 'lucide-react';
 import {
   fetchTransactions,
   fetchDailySalesHistory,
@@ -23,7 +23,10 @@ export default function ReportingModule({
   products = [],
   ingredients = [],
   seasonalEvents = [],
-  businessType = 'fnb'
+  businessType = 'fnb',
+  isSimulationMode = false,
+  externalTransactions = [],
+  externalDailyRows = []
 }) {
   const { showAlert, showToast } = useNotify();
   const [isLoading, setIsLoading] = useState(true);
@@ -46,10 +49,17 @@ export default function ReportingModule({
   useEffect(() => {
     async function loadReportData() {
       setIsLoading(true);
-      const [txData, dailyRows] = await Promise.all([
-        fetchTransactions(),
-        fetchDailySalesHistory()
-      ]);
+      let txData = [];
+      let dailyRows = [];
+      if (isSimulationMode) {
+        txData = Array.isArray(externalTransactions) ? externalTransactions : [];
+        dailyRows = Array.isArray(externalDailyRows) ? externalDailyRows : [];
+      } else {
+        [txData, dailyRows] = await Promise.all([
+          fetchTransactions(),
+          fetchDailySalesHistory()
+        ]);
+      }
       setPersistedDailyRows(Array.isArray(dailyRows) ? dailyRows : []);
       
       let totalAllTime = 0;
@@ -117,7 +127,7 @@ export default function ReportingModule({
         persistedDailyRows: Array.isArray(dailyRows) ? dailyRows : [],
         businessType
       });
-      if (builtDaily.flatRows.length > 0) {
+      if (!isSimulationMode && builtDaily.flatRows.length > 0) {
         syncDailySalesHistoryEntries(builtDaily.flatRows, activeOutlet);
       }
 
@@ -130,25 +140,27 @@ export default function ReportingModule({
     }
 
     loadReportData();
-    loadReportData();
-  }, [activeOutlet, businessType, ingredients, products, seasonalEvents]);
+  }, [activeOutlet, businessType, ingredients, products, seasonalEvents, isSimulationMode, externalTransactions, externalDailyRows]);
+
+  const isStarter = subscriptionPlan === 'starter';
+  const activeFilter = isStarter && filter === 'custom' ? 'all' : filter;
 
   const filteredTransactions = transactions.filter(tx => {
     const txDate = new Date(tx.created_at);
     const now = new Date();
 
-    if (filter === 'today') {
+    if (activeFilter === 'today') {
       return txDate.toDateString() === now.toDateString();
     }
-    if (filter === 'yesterday') {
+    if (activeFilter === 'yesterday') {
       const yesterday = new Date(now);
       yesterday.setDate(yesterday.getDate() - 1);
       return txDate.toDateString() === yesterday.toDateString();
     }
-    if (filter === 'month') {
+    if (activeFilter === 'month') {
       return txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
     }
-    if (filter === 'custom' && customDate) {
+    if (activeFilter === 'custom' && customDate) {
       const localISODate = new Date(txDate.getTime() - (txDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
       return localISODate === customDate;
     }
@@ -156,10 +168,10 @@ export default function ReportingModule({
   });
 
   let fLabel = 'Semua Waktu';
-  if (filter === 'today') fLabel = 'Hari Ini';
-  else if (filter === 'yesterday') fLabel = 'Kemarin';
-  else if (filter === 'month') fLabel = 'Bulan Ini';
-  else if (filter === 'custom' && customDate) {
+  if (activeFilter === 'today') fLabel = 'Hari Ini';
+  else if (activeFilter === 'yesterday') fLabel = 'Kemarin';
+  else if (activeFilter === 'month') fLabel = 'Bulan Ini';
+  else if (activeFilter === 'custom' && customDate) {
     fLabel = new Date(customDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
@@ -230,7 +242,7 @@ export default function ReportingModule({
     <div className="space-y-8 pb-16 relative">
       <ReportingHeader 
         onDownload={handleDownloadReport} 
-        currentFilter={filter} 
+        currentFilter={activeFilter} 
         setFilter={setFilter} 
         customDate={customDate}
         setCustomDate={setCustomDate}
@@ -250,14 +262,45 @@ export default function ReportingModule({
         />
       </div>
 
-      <DailySalesHistoryPanel
-        transactions={transactions}
-        products={products}
-        ingredients={ingredients}
-        seasonalEvents={seasonalEvents}
-        persistedDailyRows={persistedDailyRows}
-        businessType={businessType}
-      />
+      {isStarter ? (
+        <div className="bg-white border border-zinc-200 rounded-2xl p-6 sm:p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-[#FEF3C7] border border-[#FDE68A] text-[#B45309] flex items-center justify-center shrink-0">
+              <CalendarDays size={22} />
+            </div>
+            <div className="space-y-1.5">
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#141414] text-[#F59E0B]">
+                <Lock size={10} /> Khusus Paket Pro &amp; Enterprise
+              </span>
+              <h3 className="text-lg font-extrabold text-[#141414] tracking-tight">
+                Riwayat Penjualan Harian &amp; Menu Favorit
+              </h3>
+              <p className="text-xs text-[#52525B] font-medium max-w-2xl leading-relaxed">
+                Lihat catatan penjualan lengkap per tanggal, peringkat menu paling laris harian, serta filter pilih tanggal penjualan bebas dengan upgrade ke <strong>Paket Pro</strong>.
+              </p>
+            </div>
+          </div>
+
+          {onUpgradePlan && (
+            <button
+              type="button"
+              onClick={() => onUpgradePlan('pro')}
+              className="px-5 py-3 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] text-xs font-extrabold inline-flex items-center justify-center gap-2 shrink-0 cursor-pointer shadow-sm transition-colors"
+            >
+              <Layers size={14} /> Aktifkan Paket Pro
+            </button>
+          )}
+        </div>
+      ) : (
+        <DailySalesHistoryPanel
+          transactions={transactions}
+          products={products}
+          ingredients={ingredients}
+          seasonalEvents={seasonalEvents}
+          persistedDailyRows={persistedDailyRows}
+          businessType={businessType}
+        />
+      )}
 
       <ReceiptModal
         selectedTx={selectedTx} 

@@ -1,5 +1,13 @@
 import { supabase, supabaseAdminAuth } from './supabaseClient.js';
-import { fetchEmployees, deleteEmployeeRole } from './stockoService.js';
+import {
+  fetchEmployees,
+  deleteEmployeeRole as rawDeleteEmployeeRole,
+  getActiveCompanyId,
+  getActiveWorkspaceManifest,
+  registerCompanyStaffEmail,
+  unregisterCompanyStaffEmail,
+  findWorkspaceForEmployeeEmail
+} from './stockoService.js';
 
 const EMPLOYEE_PROFILES_STORAGE_KEY = 'stocko_employee_profiles_v1';
 const EMPLOYEE_SESSIONS_STORAGE_KEY = 'stocko_employee_sessions_v1';
@@ -8,9 +16,14 @@ const unavailableTablesSet = new Set();
 const GENERIC_SHARED_NAME_REGEX =
   /^(kasir|cashier|stocker|gudang|admin|superadmin|staff|karyawan|team|shared|umum|bersama|shift|akun|operator|user|demo)(\s*\d*)$/i;
 
+function getScopedEmployeeKey(key) {
+  const cid = getActiveCompanyId();
+  return cid ? `${key}:${cid}` : key;
+}
+
 function readLocalJson(key, fallback) {
   try {
-    const raw = window.localStorage.getItem(key);
+    const raw = window.localStorage.getItem(getScopedEmployeeKey(key));
     return raw ? JSON.parse(raw) : fallback;
   } catch {
     return fallback;
@@ -19,7 +32,7 @@ function readLocalJson(key, fallback) {
 
 function writeLocalJson(key, value) {
   try {
-    window.localStorage.setItem(key, JSON.stringify(value));
+    window.localStorage.setItem(getScopedEmployeeKey(key), JSON.stringify(value));
   } catch {
     // Abaikan jika storage dibatasi
   }
@@ -49,35 +62,52 @@ function isMissingResourceError(error) {
   );
 }
 
+export function usernameToInternalAuthEmail(usernameOrEmail) {
+  const raw = String(usernameOrEmail || '').trim();
+  if (!raw) return '';
+  if (raw.includes('@')) return raw.toLowerCase();
+  const slug = raw
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
+  return `${slug || 'staff'}@staff.stocko.app`;
+}
+
+export function formatDisplayUsername(emailOrUsername, fullName = '') {
+  const rawEmail = String(emailOrUsername || '').trim();
+  if (rawEmail.toLowerCase().endsWith('@staff.stocko.app')) {
+    return rawEmail.slice(0, -'@staff.stocko.app'.length);
+  }
+  const cleanFull = String(fullName || '').trim();
+  if (cleanFull) return cleanFull;
+  return rawEmail;
+}
+
 /**
- * Validasi kebijakan 1 Akun = 1 Karyawan (wajib nama lengkap pribadi, tanpa akun bersama/generik).
+ * Validasi username karyawan (minimal 3 karakter, unik dalam perusahaan).
  */
 export function validatePersonalEmployeeName(fullName, existingEmployees = [], ignoreEmail = '') {
   const clean = String(fullName || '').trim().replace(/\s+/g, ' ');
   if (clean.length < 3) {
     return {
       valid: false,
-      message: 'Nama lengkap karyawan wajib diisi minimal 3 karakter (tanpa ID employee).'
+      message: 'Username karyawan wajib diisi minimal 3 karakter.'
     };
   }
 
-  if (GENERIC_SHARED_NAME_REGEX.test(clean)) {
-    return {
-      valid: false,
-      message:
-        'Dilarang menggunakan nama generik/akun bersama (mis. "Kasir 1", "Stocker", "Admin"). Masukkan nama lengkap pribadi karyawan.'
-    };
-  }
-
+  const targetEmail = usernameToInternalAuthEmail(clean);
   const duplicate = (existingEmployees || []).find((emp) => {
-    if (ignoreEmail && (emp.email || '').toLowerCase() === ignoreEmail.toLowerCase()) return false;
-    return (emp.fullName || '').trim().toLowerCase() === clean.toLowerCase();
+    const empEmail = String(emp.email || '').toLowerCase();
+    if (ignoreEmail && empEmail === ignoreEmail.toLowerCase()) return false;
+    const empName = String(emp.username || emp.fullName || '').trim().toLowerCase();
+    return empName === clean.toLowerCase() || (empEmail && empEmail === targetEmail);
   });
 
   if (duplicate) {
     return {
       valid: false,
-      message: `Nama karyawan "${clean}" sudah terdaftar pada akun (${duplicate.email}). Kebijakan 1 akun = 1 karyawan melarang duplikasi nama.`
+      message: `Username "${clean}" sudah terdaftar. Gunakan username lain yang unik.`
     };
   }
 
@@ -117,15 +147,37 @@ function deriveFallbackName(email) {
  * Ambil daftar akun staf lengkap dengan nama pribadi, status aktif/resign, & penempatan outlet.
  */
 export async function fetchStaffProfiles() {
+  const manifest = getActiveWorkspaceManifest();
+  if (!manifest) {
+    return { success: true, data: [] };
+  }
+
+  const adminEmail = String(manifest.adminEmail || '').trim().toLowerCase();
+  const staffSet = new Set(
+    (manifest.staffEmails || []).map((e) => String(e || '').trim().toLowerCase()).filter(Boolean)
+  );
+
   const result = await fetchEmployees();
-  if (!result.success) return result;
-
+  const dbRows = result.success ? result.data || [] : [];
   const localMap = readLocalJson(EMPLOYEE_PROFILES_STORAGE_KEY, {});
+  const defaultOutlet = manifest.businessName
+    ? `${manifest.businessName} - Utama`
+    : 'Cabang Utama - Makassar';
 
-  const enriched = (result.data || []).map((row) => {
+  const scopedRows = dbRows.filter((row) => {
+    const emailKey = String(row.email || '').trim().toLowerCase();
+    return (adminEmail && emailKey === adminEmail) || staffSet.has(emailKey);
+  });
+
+  const enriched = scopedRows.map((row) => {
     const emailKey = String(row.email || '').toLowerCase();
     const cached = localMap[emailKey] || localMap[String(row.id)] || {};
-    const resolvedFullName = row.full_name || cached.fullName || deriveFallbackName(row.email);
+    const isAdminRow = adminEmail && emailKey === adminEmail;
+    const resolvedFullName =
+      row.full_name ||
+      cached.fullName ||
+      (isAdminRow ? manifest.adminName : '') ||
+      deriveFallbackName(row.email);
     const resolvedIsActive =
       row.is_active !== undefined && row.is_active !== null
         ? Boolean(row.is_active)
@@ -138,15 +190,59 @@ export async function fetchStaffProfiles() {
     return {
       id: row.id,
       email: row.email,
-      role: row.role || 'kasir',
+      username: formatDisplayUsername(row.email, resolvedFullName),
+      role: isAdminRow ? 'superadmin' : row.role || cached.role || 'kasir',
       fullName: resolvedFullName,
-      outletName: row.outlet_name || cached.outletName || 'Cabang Utama - Makassar',
+      outletName: row.outlet_name || cached.outletName || defaultOutlet,
       isActive: resolvedIsActive,
       status: resolvedStatus,
       deactivatedAt: row.deactivated_at || cached.deactivatedAt || null,
       deactivatedReason: row.deactivated_reason || cached.deactivatedReason || ''
     };
   });
+
+  if (
+    adminEmail &&
+    !enriched.some((e) => String(e.email || '').toLowerCase() === adminEmail)
+  ) {
+    const cachedAdmin = localMap[adminEmail] || {};
+    const adminDisplayName =
+      cachedAdmin.fullName || manifest.adminName || deriveFallbackName(adminEmail);
+    enriched.unshift({
+      id: manifest.adminId || manifest.companyId,
+      email: adminEmail,
+      username: adminDisplayName,
+      role: 'superadmin',
+      fullName: adminDisplayName,
+      outletName: cachedAdmin.outletName || defaultOutlet,
+      isActive: true,
+      status: 'active',
+      deactivatedAt: null,
+      deactivatedReason: ''
+    });
+  }
+
+  for (const staffEmail of staffSet) {
+    if (!enriched.some((e) => String(e.email || '').toLowerCase() === staffEmail)) {
+      const cached = localMap[staffEmail];
+      if (cached) {
+        const staffDisplayName =
+          cached.fullName || formatDisplayUsername(staffEmail) || deriveFallbackName(staffEmail);
+        enriched.push({
+          id: cached.id || staffEmail,
+          email: staffEmail,
+          username: formatDisplayUsername(staffEmail, staffDisplayName),
+          role: cached.role || 'kasir',
+          fullName: staffDisplayName,
+          outletName: cached.outletName || defaultOutlet,
+          isActive: cached.isActive !== false,
+          status: cached.status || 'active',
+          deactivatedAt: cached.deactivatedAt || null,
+          deactivatedReason: cached.deactivatedReason || ''
+        });
+      }
+    }
+  }
 
   return { success: true, data: enriched };
 }
@@ -155,34 +251,39 @@ export async function fetchStaffProfiles() {
  * Daftarkan akun karyawan eksklusif (1 akun = 1 karyawan, wajib full_name tanpa ID employee).
  */
 export async function createSingleEmployeeAccount({
+  username,
   email,
   password,
   role,
   fullName,
-  outletName = 'Cabang Utama - Makassar',
+  outletName = 'Utama',
   existingEmployees = []
 }) {
-  const cleanEmail = String(email || '').trim().toLowerCase();
-  if (!cleanEmail || !password) {
-    return { success: false, message: 'Email login dan kata sandi wajib diisi.' };
+  const rawNameOrUsername = String(username || fullName || email || '').trim();
+  if (!rawNameOrUsername || !password) {
+    return { success: false, message: 'Username dan kata sandi wajib diisi.' };
   }
 
-  const nameValidation = validatePersonalEmployeeName(fullName, existingEmployees);
+  const nameValidation = validatePersonalEmployeeName(rawNameOrUsername, existingEmployees);
   if (!nameValidation.valid) {
     return { success: false, message: nameValidation.message };
   }
+
+  const cleanName = nameValidation.cleanName;
+  const cleanEmail = usernameToInternalAuthEmail(email || cleanName);
 
   if (
     existingEmployees.some((emp) => String(emp.email || '').toLowerCase() === cleanEmail)
   ) {
     return {
       success: false,
-      message: `Email ${cleanEmail} sudah terdaftar. Setiap karyawan wajib memiliki akun unik.`
+      message: `Username "${cleanName}" sudah terdaftar. Gunakan username lain yang unik.`
     };
   }
 
-  const cleanName = nameValidation.cleanName;
-  const resolvedOutlet = outletName || 'Cabang Utama - Makassar';
+  const resolvedOutlet = outletName || 'Utama';
+  const activeCompanyId = getActiveCompanyId() || '';
+  const manifest = getActiveWorkspaceManifest();
 
   const { data, error } = await supabaseAdminAuth.auth.signUp({
     email: cleanEmail,
@@ -190,19 +291,37 @@ export async function createSingleEmployeeAccount({
     options: {
       data: {
         role,
+        username: cleanName,
         full_name: cleanName,
         outlet_name: resolvedOutlet,
-        is_active: true
+        is_active: true,
+        company_id: activeCompanyId,
+        business_name: manifest?.businessName || '',
+        business_type: manifest?.businessType || 'fnb',
+        payment_flow: manifest?.paymentFlow || 'pay_first',
+        subscription_plan: manifest?.subscriptionPlan || 'pro'
       }
     }
   });
 
   if (error) {
+    const msg = String(error.message || '').toLowerCase();
+    if (msg.includes('already registered') || msg.includes('already exists')) {
+      return {
+        success: false,
+        message: `Username "${cleanName}" sudah pernah digunakan. Pilih username lain (mis. ${cleanName.replace(/\s+/g, '').toLowerCase()}2).`
+      };
+    }
     return { success: false, message: error.message };
   }
 
+  await registerCompanyStaffEmail(cleanEmail);
+
   const localMap = readLocalJson(EMPLOYEE_PROFILES_STORAGE_KEY, {});
   localMap[cleanEmail] = {
+    id: data?.user?.id || cleanEmail,
+    role,
+    username: cleanName,
     fullName: cleanName,
     outletName: resolvedOutlet,
     isActive: true,
@@ -234,6 +353,7 @@ export async function createSingleEmployeeAccount({
     employee: {
       id: data?.user?.id || cleanEmail,
       email: cleanEmail,
+      username: cleanName,
       role,
       fullName: cleanName,
       outletName: resolvedOutlet,
@@ -418,7 +538,18 @@ export async function resolveAuthenticatedEmployeeProfile(user) {
 
   const hasRoleAccess =
     Boolean(dbRow?.role) ||
+    Boolean(user.user_metadata?.role) ||
     (role !== 'kasir' && role !== 'stocker');
+
+  let companyId = user.user_metadata?.company_id || null;
+  if (!companyId) {
+    if (role === 'superadmin') {
+      companyId = user.id;
+    } else {
+      const matchedWorkspace = await findWorkspaceForEmployeeEmail(user.email);
+      companyId = matchedWorkspace?.companyId || user.id;
+    }
+  }
 
   return {
     id: user.id,
@@ -427,11 +558,21 @@ export async function resolveAuthenticatedEmployeeProfile(user) {
     fullName,
     outletName,
     isActive,
-    hasRoleAccess
+    hasRoleAccess,
+    companyId
   };
 }
 
 export async function fetchEmployeeLoginSessions() {
+  const manifest = getActiveWorkspaceManifest();
+  if (!manifest) return [];
+  const adminEmail = String(manifest.adminEmail || '').trim().toLowerCase();
+  const allowedEmails = new Set([
+    ...(adminEmail ? [adminEmail] : []),
+    ...(manifest.staffEmails || []).map((e) => String(e || '').trim().toLowerCase())
+  ]);
+  if (allowedEmails.size === 0) return [];
+
   if (!isTableUnavailable('employee_login_sessions')) {
     try {
       const { data, error } = await supabase
@@ -443,18 +584,20 @@ export async function fetchEmployeeLoginSessions() {
       if (isMissingResourceError(error)) {
         markTableUnavailable('employee_login_sessions');
       } else if (!error && Array.isArray(data)) {
-        const mapped = data.map((row) => ({
-          id: row.id,
-          userId: row.user_id,
-          fullName: row.full_name,
-          email: row.email,
-          role: row.role,
-          outletName: row.outlet_name || 'Cabang Utama - Makassar',
-          deviceInfo: row.device_info || 'Web Browser',
-          sessionStatus: row.session_status || 'active',
-          loginAt: row.login_at,
-          logoutAt: row.logout_at
-        }));
+        const mapped = data
+          .filter((row) => allowedEmails.has(String(row.email || '').trim().toLowerCase()))
+          .map((row) => ({
+            id: row.id,
+            userId: row.user_id,
+            fullName: row.full_name,
+            email: row.email,
+            role: row.role,
+            outletName: row.outlet_name || 'Cabang Utama - Makassar',
+            deviceInfo: row.device_info || 'Web Browser',
+            sessionStatus: row.session_status || 'active',
+            loginAt: row.login_at,
+            logoutAt: row.logout_at
+          }));
         writeLocalJson(EMPLOYEE_SESSIONS_STORAGE_KEY, mapped);
         return mapped;
       }
@@ -463,7 +606,9 @@ export async function fetchEmployeeLoginSessions() {
     }
   }
 
-  return readLocalJson(EMPLOYEE_SESSIONS_STORAGE_KEY, []);
+  return readLocalJson(EMPLOYEE_SESSIONS_STORAGE_KEY, []).filter((row) =>
+    allowedEmails.has(String(row.email || '').trim().toLowerCase())
+  );
 }
 
 export async function recordEmployeeSessionEvent({
@@ -543,4 +688,32 @@ export async function recordEmployeeSessionEvent({
   return newSession;
 }
 
-export { deleteEmployeeRole };
+export async function deleteEmployeeRole(employeeId, email, role) {
+  if ((role || '').toLowerCase() === 'superadmin') {
+    return {
+      success: false,
+      code: 'PROTECTED_ROLE',
+      message: 'Akun Admin utama dilindungi dan tidak dapat dihapus.'
+    };
+  }
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  if (cleanEmail) {
+    await unregisterCompanyStaffEmail(cleanEmail);
+    const localMap = readLocalJson(EMPLOYEE_PROFILES_STORAGE_KEY, {});
+    delete localMap[cleanEmail];
+    writeLocalJson(EMPLOYEE_PROFILES_STORAGE_KEY, localMap);
+  }
+  await rawDeleteEmployeeRole(employeeId, email, role);
+  return { success: true };
+}
+
+export function clearEmployeeLocalCaches() {
+  try {
+    window.localStorage.removeItem(EMPLOYEE_PROFILES_STORAGE_KEY);
+    window.localStorage.removeItem(EMPLOYEE_SESSIONS_STORAGE_KEY);
+    window.localStorage.removeItem(getScopedEmployeeKey(EMPLOYEE_PROFILES_STORAGE_KEY));
+    window.localStorage.removeItem(getScopedEmployeeKey(EMPLOYEE_SESSIONS_STORAGE_KEY));
+  } catch {
+    // Abaikan jika storage dibatasi
+  }
+}

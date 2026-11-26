@@ -10,6 +10,9 @@ export default function DashboardNavbar({
   businessType = 'fnb',
   onBackToLanding,
   userRole = 'superadmin',
+  isSimulationMode = false,
+  canSwitchRole = false,
+  onSwitchRole,
   subscriptionPlan = 'pro',
   setSubscriptionPlan
 }) {
@@ -17,21 +20,21 @@ export default function DashboardNavbar({
   const isStarter = subscriptionPlan === 'starter';
 
   const allNavItems = [
-    { id: 'pos', label: businessType === 'retail' ? 'POS Kasir Ritel' : 'POS Kasir', icon: Store },
-    { id: 'self-order', label: 'Pemesanan Mandiri', icon: QrCode, badge: 'Kiosk', proOnly: true },
+    { id: 'pos', label: businessType === 'retail' ? 'Kasir Toko Ritel' : 'Kasir (POS)', icon: Store },
+    { id: 'self-order', label: 'Pesan dari Meja (QR)', icon: QrCode, badge: 'QR Meja', proOnly: true },
     {
       id: 'menu-management',
-      label: businessType === 'retail' ? 'Produk & Kulakan' : 'Kelola Menu',
+      label: businessType === 'retail' ? 'Daftar Produk & Kulakan' : 'Daftar Menu & Resep',
       icon: UtensilsCrossed,
       count: businessType === 'retail' && !isStarter ? retailLowStockCount : 0
     },
-    { id: 'inventory', label: businessType === 'retail' ? 'Gudang Bahan / Ekstra' : 'Stok & BOM Gudang', icon: Package, count: isStarter ? 0 : lowStockCount, proOnly: true },
-    { id: 'alerts', label: 'Peringatan Khusus', icon: Bell, count: isStarter ? 0 : alertCount, proOnly: true },
-    { id: 'employees', label: 'Kelola Karyawan', icon: Users, badge: 'Admin' },
-    { id: 'reporting', label: 'Analitik Laporan', icon: BarChart3 },
-    { id: 'profitability', label: 'Profit & AI Insights', icon: Sparkles, badge: 'AI', proOnly: true },
-    { id: 'seasonal-analytics', label: 'Seasonal & Forecast', icon: CalendarRange, badge: 'Forecast', proOnly: true },
-    { id: 'audit-trail', label: 'Audit Trail', icon: ClipboardList, badge: 'Log', proOnly: true },
+    { id: 'inventory', label: businessType === 'retail' ? 'Stok Gudang Tambahan' : 'Stok Bahan Gudang', icon: Package, count: isStarter ? 0 : lowStockCount, proOnly: true },
+    { id: 'alerts', label: 'Peringatan Bahan', icon: Bell, count: isStarter ? 0 : alertCount, proOnly: true },
+    { id: 'employees', label: 'Daftar Karyawan', icon: Users, badge: 'Admin' },
+    { id: 'reporting', label: 'Laporan Penjualan', icon: BarChart3 },
+    { id: 'profitability', label: 'Analisis Untung & AI', icon: Sparkles, badge: 'AI', proOnly: true },
+    { id: 'seasonal-analytics', label: 'Jadwal Musiman & Stok', icon: CalendarRange, badge: 'Musiman', proOnly: true },
+    { id: 'audit-trail', label: 'Catatan Aktivitas', icon: ClipboardList, badge: 'Riwayat', proOnly: true },
   ];
 
   // Logika Penyaring (Filter) Berdasarkan Jabatan Karyawan
@@ -47,15 +50,15 @@ export default function DashboardNavbar({
   });
 
   const planLabels = {
-    starter: { name: 'Starter', desc: 'POS & Menu Digital' },
-    pro: { name: 'Pro / Business', desc: 'BOM Engine Aktif' },
-    enterprise: { name: 'Enterprise', desc: 'Multi-Outlet Sync' }
+    starter: { name: 'Starter', desc: 'Kasir & Menu Dasar' },
+    pro: { name: 'Pro / Business', desc: 'Stok Resep Otomatis' },
+    enterprise: { name: 'Enterprise', desc: 'Banyak Cabang' }
   };
 
   const roleLabels = {
-    superadmin: { label: 'Owner / Super Admin', badge: 'Full Access' },
-    kasir: { label: 'Kasir POS', badge: 'Frontline' },
-    stocker: { label: 'Stocker Gudang', badge: 'Inventory' }
+    superadmin: { label: 'Admin', badge: 'Semua Akses' },
+    kasir: { label: 'Kasir', badge: 'Kasir' },
+    stocker: { label: 'Petugas Gudang (Stocker)', badge: 'Gudang' }
   };
 
   return (
@@ -109,19 +112,65 @@ export default function DashboardNavbar({
                 </span>
               </div>
             </div>
-            <span className="font-mono text-[9px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
-              LIVE
-            </span>
           </div>
 
-          {/* Simulasi Switcher Paket Langganan */}
-          {userRole === 'superadmin' && setSubscriptionPlan && (
+          {/* Simulasi Switcher Role (HANYA MODE SIMULASI) */}
+          {isSimulationMode && canSwitchRole && onSwitchRole && (
             <div className="bg-[#FAFAFA] border border-zinc-200 rounded-2xl p-3 space-y-2 mt-6 lg:mt-0">
               <div className="flex items-center justify-between px-1">
-                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#52525B] flex items-center gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#52525B] flex items-center gap-1.5">
+                  <Users size={12} className="text-[#D97706]" /> Tampilan Role
+                </span>
+                <span className="text-[9px] font-bold text-[#B45309] bg-[#FEF3C7] border border-[#FDE68A] px-2 py-0.5 rounded-full">
+                  Simulasi
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-1 bg-zinc-200/70 p-1 rounded-xl">
+                {[
+                  { id: 'superadmin', label: 'Admin' },
+                  { id: 'kasir', label: 'Kasir' },
+                  { id: 'stocker', label: 'Stocker', lockedInStarter: isStarter }
+                ].map(r => {
+                  const active = userRole === r.id;
+                  return (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => {
+                        onSwitchRole(r.id);
+                        setIsOpen(false);
+                      }}
+                      title={r.lockedInStarter ? 'Role Stocker tersedia di Paket Pro & Enterprise' : undefined}
+                      className={`py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer inline-flex items-center justify-center gap-1 ${
+                        r.lockedInStarter
+                          ? 'text-zinc-400 hover:text-[#141414]'
+                          : active
+                          ? 'bg-[#141414] text-[#F59E0B] shadow-sm'
+                          : 'text-[#52525B] hover:text-[#141414]'
+                      }`}
+                    >
+                      {r.lockedInStarter && <Lock size={9} />}
+                      <span>{r.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {isStarter && (
+                <p className="text-[10px] text-[#52525B] font-medium px-1 leading-snug">
+                  Paket Starter khusus <strong>Admin &amp; Kasir</strong>. Role Stocker terbuka di Paket Pro.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Simulasi Switcher Paket Langganan (HANYA MODE SIMULASI) */}
+          {isSimulationMode && setSubscriptionPlan && (
+            <div className="bg-[#FAFAFA] border border-zinc-200 rounded-2xl p-3 space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#52525B] flex items-center gap-1.5">
                   <SlidersHorizontal size={12} className="text-[#D97706]" /> Paket Aktif
                 </span>
-                <span className="font-mono text-[9px] font-bold text-[#B45309] bg-[#FEF3C7] border border-[#FDE68A] px-2 py-0.5 rounded-full">
+                <span className="text-[9px] font-bold text-[#B45309] bg-[#FEF3C7] border border-[#FDE68A] px-2 py-0.5 rounded-full">
                   Simulasi
                 </span>
               </div>
@@ -146,6 +195,28 @@ export default function DashboardNavbar({
                     </button>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* Informasi Paket & Role Tetap (KHUSUS AKUN ASLI / TERDAFTAR) */}
+          {!isSimulationMode && (
+            <div className="bg-[#FAFAFA] border border-zinc-200 rounded-2xl p-3.5 space-y-2 mt-6 lg:mt-0">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-[#52525B]">
+                  Paket Langganan
+                </span>
+                <span className="font-mono text-[10px] font-extrabold uppercase bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] px-2.5 py-0.5 rounded-full">
+                  {planLabels[subscriptionPlan]?.name || subscriptionPlan}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-zinc-200/70">
+                <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-[#52525B]">
+                  Role Akun
+                </span>
+                <span className="text-xs font-extrabold text-[#141414]">
+                  {roleLabels[userRole]?.label || userRole}
+                </span>
               </div>
             </div>
           )}

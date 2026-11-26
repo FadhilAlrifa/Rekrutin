@@ -77,8 +77,8 @@ export default function CTA({ onOpenApp, onOpenRegister }) {
     >
       <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 text-center">
         <div className="cta-card-reveal bg-[#FAFAFA] border border-zinc-200 rounded-3xl p-8 sm:p-14 md:p-20 relative overflow-hidden space-y-7 gpu-accelerated">
-          <span className="cta-reveal font-mono text-xs uppercase tracking-[0.2em] text-[#D97706] font-bold block gpu-accelerated">
-            [ SIAP DICOBA ]
+          <span className="cta-reveal text-xs text-[#D97706] font-bold block gpu-accelerated">
+            Siap Dicoba
           </span>
 
           <h2

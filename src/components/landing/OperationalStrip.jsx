@@ -9,7 +9,7 @@ gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 const OPERATIONAL_PILLARS = [
   {
-    code: '01 // TAKARAN RESEP',
+    code: 'Takaran Resep',
     metric: '0.001 kg/L',
     title: 'Potong Stok Sesuai Resep',
     desc: 'Setiap penjualan otomatis memotong gramasi & mililiter bahan baku di gudang.',
@@ -17,7 +17,7 @@ const OPERATIONAL_PILLARS = [
     icon: Layers
   },
   {
-    code: '02 // CEK KEDALUWARSA',
+    code: 'Cek Kedaluwarsa',
     metric: '≤ 30 Hari',
     title: 'Pengingat Bahan Hampir Basi',
     desc: 'Prioritaskan pemakaian stok bahan yang paling cepat kedaluwarsa.',
@@ -25,7 +25,7 @@ const OPERATIONAL_PILLARS = [
     icon: Clock
   },
   {
-    code: '03 // CEGAH STOK HABIS',
+    code: 'Cegah Stok Habis',
     metric: 'Otomatis',
     title: 'Cek Porsi Sebelum Pesan',
     desc: 'Menu yang bahannya habis langsung tidak bisa dipesan di kasir maupun QR meja.',
@@ -33,7 +33,7 @@ const OPERATIONAL_PILLARS = [
     icon: ShieldCheck
   },
   {
-    code: '04 // PEMBAYARAN',
+    code: 'Pembayaran',
     metric: '< 3 Detik',
     title: 'Bayar & Cetak Struk Cepat',
     desc: 'Pembayaran QRIS, Tunai, Kartu, dan cetak struk thermal tanpa hambatan.',

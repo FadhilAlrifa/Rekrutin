@@ -158,14 +158,11 @@ export default function SeasonalAnalyticsModule({
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5 pb-5 border-b border-zinc-200">
         <div>
-          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] inline-block mb-2">
-            [ 08 // HISTORICAL & SEASONAL DEMAND FORECASTING ]
-          </span>
           <h1 className="text-3xl font-extrabold tracking-tight text-[#141414]">
-            Analitik Musiman & Prediksi Stok
+            Analisis Hari Besar &amp; Perkiraan Stok
           </h1>
           <p className="text-[#52525B] text-[13px] font-medium mt-1">
-            Analisis penjualan lintas periode (Harian–Tahunan), penandaan event musiman, dan kalkulasi proyeksi kebutuhan bahan baku.
+            Lihat riwayat penjualan harian sampai tahunan, tandai momen hari besar, dan perkirakan stok bahan yang perlu disiapkan.
           </p>
         </div>
 

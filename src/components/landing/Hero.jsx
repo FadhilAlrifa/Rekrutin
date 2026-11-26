@@ -315,9 +315,9 @@ export default function Hero({ onOpenApp, onOpenRegister }) {
               <div className="w-2.5 h-2.5 rounded-full bg-zinc-300" />
               <div className="w-2.5 h-2.5 rounded-full bg-zinc-300" />
               <div className="w-2.5 h-2.5 rounded-full bg-[#F59E0B]" />
-              <div className="hidden sm:flex items-center gap-2 ml-3 pl-3 border-l border-zinc-200 font-mono text-[11px] text-[#52525B]">
+              <div className="hidden sm:flex items-center gap-2 ml-3 pl-3 border-l border-zinc-200 text-[11px] font-semibold text-[#52525B]">
                 <Building2 size={13} className="text-[#D97706]" />
-                <span>OUTLET // CABANG UTAMA - MAKASSAR</span>
+                <span>Cabang Utama • Makassar</span>
               </div>
             </div>
 

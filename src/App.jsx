@@ -28,6 +28,7 @@ import EmployeeModule from './components/dashboard/employee/EmployeeModule';
 import NotificationProvider from './components/common/NotificationProvider';
 import { useNotify } from './components/common/NotificationContext';
 import HolidayReminderModal from './components/dashboard/inventory/HolidayReminderModal';
+import SimulationSetupModal from './components/dashboard/pos/SimulationSetupModal';
 import { supabase } from './services/supabaseClient';
 import {
   fetchProducts,
@@ -50,6 +51,9 @@ import {
   recordStockMovement,
   fetchSeasonalEvents,
   clearUnavailableTablesCache,
+  clearOperationalLocalCaches,
+  setActiveCompanyId,
+  fetchOrInitCompanyWorkspace,
   updateRetailProductStock,
   fetchRetailPurchasePriceHistory,
   fetchTransactions,
@@ -60,7 +64,8 @@ import {
 import {
   fetchStaffProfiles,
   resolveAuthenticatedEmployeeProfile,
-  recordEmployeeSessionEvent
+  recordEmployeeSessionEvent,
+  clearEmployeeLocalCaches
 } from './services/employeeAuditService';
 import {
   createOrderPayload,
@@ -77,6 +82,12 @@ import {
 import { buildDailySalesHistory } from './utils/dailySalesHistory';
 import { checkExpiryStatus } from './utils/inventoryStatus';
 import { deductBatchesFefo, restoreBatchesFefo } from './utils/fefoBatchEngine';
+import {
+  createSimulationFnbProducts,
+  createSimulationFnbIngredients,
+  createSimulationRetailProducts,
+  createSimulationAnalyticsData
+} from './data/simulationCatalog';
 
 function AppContent() {
   const { showToast } = useNotify();
@@ -108,8 +119,19 @@ function AppContent() {
   const [authNotice, setAuthNotice] = useState('');
   const [selectedReminderEvent, setSelectedReminderEvent] = useState(null);
   const [dismissedReminderBanner, setDismissedReminderBanner] = useState(false);
+  const [simulationSetupOpen, setSimulationSetupOpen] = useState(false);
+  const [pendingSimulationPlan, setPendingSimulationPlan] = useState(null);
+  const [isSimulationMode, setIsSimulationMode] = useState(false);
   const activeSessionIdRef = useRef(null);
   const holidayToastShownRef = useRef(false);
+  const stockerToastShownRef = useRef(false);
+  const starterShowcaseAppliedRef = useRef(false);
+  const currentViewRef = useRef(currentView);
+  const expectedLoginRoleRef = useRef(null);
+
+  useEffect(() => {
+    currentViewRef.current = currentView;
+  }, [currentView]);
 
   const refreshAuditData = async () => {
     setIsRefreshingAudit(true);
@@ -138,35 +160,21 @@ function AppContent() {
   const [activeOutlet, setActiveOutlet] = useState('Semua Cabang (Terpusat)');
 
   // State Riwayat Mutasi Stok (Keluar-Masuk Gudang & Antar-Cabang)
-  const [stockLogs, setStockLogs] = useState(() => [
-    {
-      id: 'LOG-INIT-1',
-      timestamp: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
-      itemName: 'Biji Kopi Arabika',
-      type: 'TRANSFER CENTRAL KITCHEN',
-      qty: '+5 kg',
-      outlet: 'Cabang Utama - Makassar',
-      note: 'Pasokan rutin mingguan dari Gudang Pusat'
-    },
-    {
-      id: 'LOG-INIT-2',
-      timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-      itemName: 'Susu Segar UHT',
-      type: 'MASUK (Restock Supplier)',
-      qty: '+12 liter',
-      outlet: 'Cabang 2 - Bandung',
-      note: 'Penerimaan faktur supplier pagi'
-    },
-    {
-      id: 'LOG-INIT-3',
-      timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-      itemName: 'Biji Kopi Arabika',
-      type: 'KELUAR (Otomatis BOM POS)',
-      qty: '-0.036 kg',
-      outlet: 'Cabang Utama - Makassar',
-      note: 'Pemotongan otomatis penjualan 2x Kopi Susu'
-    }
-  ]);
+  const [stockLogs, setStockLogs] = useState([]);
+
+  const resetWorkspaceState = () => {
+    setProducts([]);
+    setIngredients([]);
+    setPriceHistory([]);
+    setRetailPriceHistory([]);
+    setOrders([]);
+    setAuditLogs([]);
+    setStockMovements([]);
+    setStockLogs([]);
+    setTransactions([]);
+    setDailySalesRows([]);
+    setStaffProfiles([]);
+  };
 
   const resolvedOutletLabel =
     activeOutlet === 'Semua Cabang (Terpusat)' ? 'Cabang Utama - Makassar' : activeOutlet;
@@ -315,8 +323,10 @@ function AppContent() {
 
       const afterStock = Math.max(0, Number(nextItemState.stock) || 0);
       updatedIngredients[idx] = nextItemState;
-      await updateIngredientStock(cur.id, afterStock, nextItemState.expiryDate);
-      await syncIngredientBatchesToDb(cur.id, nextItemState.batches || []);
+      if (!isSimulationMode && !String(cur.id).startsWith('SIM-')) {
+        await updateIngredientStock(cur.id, afterStock, nextItemState.expiryDate);
+        await syncIngredientBatchesToDb(cur.id, nextItemState.batches || []);
+      }
 
       const cleanName = String(cur.name || '').split(' | ')[0];
       const fullReason = `${reason}${batchTraceLabel}`;
@@ -383,7 +393,9 @@ function AppContent() {
       const unit = cur.unit || 'pcs';
 
       updatedProducts[idx] = { ...cur, stock: afterStock };
-      await updateRetailProductStock(cur.id, afterStock);
+      if (!isSimulationMode && !String(cur.id).startsWith('SIM-')) {
+        await updateRetailProductStock(cur.id, afterStock);
+      }
 
       const logEntry = {
         id: `MOV-RET-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -431,6 +443,25 @@ function AppContent() {
     const profile = await resolveAuthenticatedEmployeeProfile(user);
     if (!profile) return;
 
+    const expectedRole = expectedLoginRoleRef.current;
+    if (expectedRole && profile.role !== expectedRole) {
+      const roleLabels = {
+        superadmin: 'Admin',
+        kasir: 'Kasir',
+        stocker: 'Stocker'
+      };
+      expectedLoginRoleRef.current = null;
+      setAuthNotice(
+        `Akun ini terdaftar sebagai ${roleLabels[profile.role] || profile.role}, bukan ${roleLabels[expectedRole] || expectedRole}. Pilih kategori ${roleLabels[profile.role] || profile.role} untuk masuk.`
+      );
+      currentViewRef.current = 'login';
+      setCurrentView('login');
+      await supabase.auth.signOut();
+      setUserRole('superadmin');
+      return;
+    }
+    expectedLoginRoleRef.current = null;
+
     if (!profile.hasRoleAccess || profile.isActive === false) {
       await recordEmployeeSessionEvent({
         userId: profile.id,
@@ -442,8 +473,8 @@ function AppContent() {
       });
       setAuthNotice(
         profile.isActive === false
-          ? `Akun karyawan atas nama "${profile.fullName}" berstatus nonaktif / resign. Hubungi Owner untuk aktivasi.`
-          : 'Akses karyawan telah dicabut. Hubungi Owner/Admin.'
+          ? `Akun karyawan atas nama "${profile.fullName}" berstatus nonaktif / resign. Hubungi Admin untuk aktivasi.`
+          : 'Akses karyawan telah dicabut. Hubungi Admin.'
       );
       await supabase.auth.signOut();
       setUserRole('superadmin');
@@ -452,7 +483,79 @@ function AppContent() {
     }
 
     setAuthNotice('');
+    setIsSimulationMode(false);
+    starterShowcaseAppliedRef.current = false;
     setUserRole(profile.role);
+
+    const resolvedCompanyId = profile.companyId || user.user_metadata?.company_id || user.id;
+    const workspace = await fetchOrInitCompanyWorkspace({
+      companyId: resolvedCompanyId,
+      adminId: profile.role === 'superadmin' ? user.id : resolvedCompanyId,
+      adminEmail: profile.role === 'superadmin' ? profile.email : '',
+      adminName: profile.role === 'superadmin' ? profile.fullName : 'Admin',
+      businessName: user.user_metadata?.business_name || 'Usaha Utama',
+      businessType: user.user_metadata?.business_type || 'fnb',
+      paymentFlow: user.user_metadata?.payment_flow || 'pay_first',
+      subscriptionPlan: user.user_metadata?.subscription_plan || 'pro',
+      forceReset: false
+    });
+
+    const resolvedPlan =
+      workspace?.subscriptionPlan || user.user_metadata?.subscription_plan || 'pro';
+    setSubscriptionPlan(resolvedPlan);
+
+    const resolvedBusinessType =
+      workspace?.businessType || user.user_metadata?.business_type || 'fnb';
+    const resolvedPaymentFlow =
+      workspace?.paymentFlow || user.user_metadata?.payment_flow || 'pay_first';
+    setMerchantSettings((prev) => ({
+      ...prev,
+      businessType: resolvedBusinessType,
+      paymentFlow: resolvedPaymentFlow
+    }));
+
+    const [
+      dbProducts,
+      dbIngredients,
+      historyRes,
+      dbOrders,
+      dbAudit,
+      dbMovements,
+      staffRes,
+      retailHistoryRes,
+      dbTransactions,
+      dbDailySales
+    ] = await Promise.all([
+      fetchProducts(),
+      fetchIngredients(),
+      fetchPriceHistory(),
+      fetchOrders(),
+      fetchAuditLogs(),
+      fetchStockMovements(),
+      fetchStaffProfiles(),
+      fetchRetailPurchasePriceHistory(),
+      fetchTransactions(),
+      fetchDailySalesHistory()
+    ]);
+
+    const safeProducts = Array.isArray(dbProducts) ? dbProducts : [];
+    const safeIngredients = Array.isArray(dbIngredients) ? dbIngredients : [];
+    setProducts(safeProducts);
+    setIngredients(safeIngredients);
+    const validIngIds = new Set(safeIngredients.map((i) => String(i.id)));
+    setPriceHistory(
+      Array.isArray(historyRes?.data)
+        ? historyRes.data.filter((h) => validIngIds.has(String(h.ingredientId)))
+        : []
+    );
+    setRetailPriceHistory(Array.isArray(retailHistoryRes) ? retailHistoryRes : []);
+    setOrders(Array.isArray(dbOrders) ? dbOrders : []);
+    setAuditLogs(Array.isArray(dbAudit) ? dbAudit : []);
+    setStockMovements(Array.isArray(dbMovements) ? dbMovements : []);
+    setStaffProfiles(staffRes?.success && Array.isArray(staffRes.data) ? staffRes.data : []);
+    setTransactions(Array.isArray(dbTransactions) ? dbTransactions : []);
+    setDailySalesRows(Array.isArray(dbDailySales) ? dbDailySales : []);
+    setStockLogs([]);
     setCurrentOperator({
       id: profile.id,
       name: profile.fullName,
@@ -512,9 +615,18 @@ function AppContent() {
         fetchDailySalesHistory()
       ]);
 
-      if (dbProducts && dbProducts.length > 0) setProducts(dbProducts);
-      if (dbIngredients && dbIngredients.length > 0) setIngredients(dbIngredients);
-      if (historyRes?.data) setPriceHistory(historyRes.data);
+      const safeProducts = Array.isArray(dbProducts) ? dbProducts : [];
+      const safeIngredients = Array.isArray(dbIngredients) ? dbIngredients : [];
+      setProducts(
+        starterShowcaseAppliedRef.current
+          ? buildStarterShowcaseProducts(safeProducts)
+          : safeProducts
+      );
+      setIngredients(safeIngredients);
+      const validIngIds = new Set(safeIngredients.map((i) => String(i.id)));
+      if (historyRes?.data) {
+        setPriceHistory(historyRes.data.filter((h) => validIngIds.has(String(h.ingredientId))));
+      }
       if (Array.isArray(retailHistoryRes?.data)) setRetailPriceHistory(retailHistoryRes.data);
       if (savedSettings) setMerchantSettings(savedSettings);
       if (Array.isArray(dbOrders)) setOrders(dbOrders);
@@ -527,8 +639,17 @@ function AppContent() {
     }
     loadBackendData();
 
+    const isRegistrationActive = () => {
+      if (currentViewRef.current === 'register') return true;
+      try {
+        return window.sessionStorage.getItem('stocko_registration_active') === '1';
+      } catch {
+        return false;
+      }
+    };
+
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
+      if (session && !isRegistrationActive()) {
         checkUserRole(session.user);
         setCurrentView('app');
       }
@@ -536,10 +657,15 @@ function AppContent() {
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
+        if (isRegistrationActive()) {
+          return;
+        }
         checkUserRole(session.user);
         setCurrentView('app');
       } else if (event === 'SIGNED_OUT') {
-        setCurrentView('landing');
+        if (currentViewRef.current !== 'login' && !isRegistrationActive()) {
+          setCurrentView('landing');
+        }
       }
     });
 
@@ -585,14 +711,14 @@ function AppContent() {
       currentView === 'app' &&
       !holidayToastShownRef.current &&
       activeHolidayReminders.length > 0 &&
-      (userRole === 'superadmin' || userRole === 'stocker') &&
+      userRole === 'superadmin' &&
       subscriptionPlan !== 'starter'
     ) {
       holidayToastShownRef.current = true;
       const topEvt = activeHolidayReminders[0];
       showToast({
-        title: `Reminder ${topEvt.countdownBadge} Hari Besar`,
-        message: `${topEvt.name} (${topEvt.startDate}) — Harap update daftar harga & cek stok referensi tahun lalu.`,
+        title: `Pengingat ${topEvt.countdownBadge} Hari Besar`,
+        message: `${topEvt.name} (${topEvt.startDate}) — Siapkan stok dan perbarui harga bahan sebelum pemasok libur.`,
         variant: 'warning',
         duration: 6000
       });
@@ -615,76 +741,320 @@ function AppContent() {
   const lowStockIngredients = ingredients.filter(
     (ing) => Number(ing.stock) <= Number(ing.minLimit ?? 5)
   );
+  const expiringIngredients = ingredients.filter((ing) => checkExpiryAlert(ing.expiryDate));
   const lowStockCount = lowStockIngredients.length;
   const retailLowStockProducts = products.filter(
     (p) => (p.productMode === 'retail' || businessType === 'retail') && Number(p.stock ?? 0) <= Number(p.minLimit ?? 5)
+  );
+  const starterLowStockProducts = products.filter(
+    (p) => Number(p.stock ?? 0) <= Number(p.minLimit ?? 3)
   );
   const retailLowStockCount = retailLowStockProducts.length;
   const alertCount = ingredients.filter(
     (ing) => Number(ing.stock) <= Number(ing.minLimit ?? 5) || checkExpiryAlert(ing.expiryDate)
   ).length;
 
-  const handleCheckout = async (cartItems, tableNumber = 'Kasir Utama', paymentMethod = 'cash') => {
-    const reqs = computeBomRequirementsForItems(cartItems, ingredients);
-    await applyStockDeltas(reqs, {
-      movementType: 'BOM_SALE',
-      actionType: 'Stock Out',
-      reason: `Penjualan POS (${tableNumber})`,
-      orderId: null,
-      logType: 'KELUAR (Otomatis BOM POS)',
-      isAddition: false
-    });
+  const buildStarterShowcaseProducts = (list = []) => {
+    if (!Array.isArray(list) || list.length === 0) return list;
+    const presetStocks = [15, 3, 0, 10];
+    return list.map((p, idx) => ({
+      ...p,
+      stock: presetStocks[idx] !== undefined ? presetStocks[idx] : 10,
+      minLimit: 3
+    }));
+  };
 
-    const retailReqs = computeRetailSkuRequirementsForItems(cartItems, products, businessType);
-    await applyRetailStockDeltas(retailReqs, {
-      movementType: 'BOM_SALE',
-      actionType: 'Stock Out',
-      reason: `Penjualan POS Ritel (${tableNumber})`,
-      orderId: null,
-      logType: 'KELUAR (Otomatis POS Ritel)',
-      isAddition: false
+  const ensureStarterDemoQuotas = () => {
+    if (starterShowcaseAppliedRef.current) return;
+    setProducts((prev) => {
+      if (!Array.isArray(prev) || prev.length === 0) return prev;
+      starterShowcaseAppliedRef.current = true;
+      return buildStarterShowcaseProducts(prev);
     });
+  };
+
+  const handleChangeSubscriptionPlan = (nextPlan) => {
+    setSubscriptionPlan(nextPlan);
+    if (nextPlan === 'starter') {
+      if (userRole === 'stocker') {
+        setUserRole('superadmin');
+        setCurrentOperator((prev) => ({
+          ...prev,
+          id: 'OP-SIM-OWNER',
+          name: 'Admin',
+          role: 'superadmin'
+        }));
+        setActiveTab('pos');
+      }
+      if (isSimulationMode) {
+        ensureStarterDemoQuotas();
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (
+      currentView === 'app' &&
+      !stockerToastShownRef.current &&
+      userRole === 'stocker' &&
+      subscriptionPlan !== 'starter' &&
+      (lowStockCount > 0 || expiringIngredients.length > 0)
+    ) {
+      stockerToastShownRef.current = true;
+      showToast({
+        title: 'Peringatan Bahan Gudang',
+        message: `${lowStockCount} bahan stoknya menipis dan ${expiringIngredients.length} bahan mendekati / lewat kedaluwarsa.`,
+        variant: 'warning',
+        duration: 5500
+      });
+    }
+  }, [currentView, userRole, subscriptionPlan, lowStockCount, expiringIngredients.length, showToast]);
+
+  const handleRequestSimulation = (planId = null) => {
+    setPendingSimulationPlan(planId);
+    setSimulationSetupOpen(true);
+  };
+
+  useEffect(() => {
+    if (
+      currentView === 'app' &&
+      subscriptionPlan === 'starter' &&
+      isSimulationMode &&
+      products.length > 0 &&
+      !starterShowcaseAppliedRef.current
+    ) {
+      ensureStarterDemoQuotas();
+    }
+  }, [currentView, subscriptionPlan, isSimulationMode, products.length]);
+
+  const handleConfirmSimulation = async ({ businessType: nextBusinessType, paymentFlow: nextPaymentFlow }) => {
+    if (pendingSimulationPlan) {
+      setSubscriptionPlan(pendingSimulationPlan);
+    }
+    setActiveCompanyId(null);
+    starterShowcaseAppliedRef.current = true;
+    if (nextBusinessType === 'retail') {
+      setProducts(createSimulationRetailProducts());
+      setIngredients([]);
+    } else {
+      setProducts(createSimulationFnbProducts());
+      setIngredients(createSimulationFnbIngredients());
+    }
+    const simAnalytics = createSimulationAnalyticsData(nextBusinessType);
+    setTransactions(simAnalytics.transactions);
+    setStockMovements(simAnalytics.stockMovements);
+    setPriceHistory(simAnalytics.priceHistory);
+    setRetailPriceHistory(simAnalytics.retailPriceHistory);
+    setAuditLogs(simAnalytics.auditLogs);
+    setStockLogs(simAnalytics.stockLogs);
+    setDailySalesRows([]);
+    setOrders([]);
+    const nextSettings = {
+      ...merchantSettings,
+      businessType: nextBusinessType,
+      paymentFlow: nextPaymentFlow
+    };
+    setMerchantSettings(nextSettings);
+
+    setIsSimulationMode(true);
+    setUserRole('superadmin');
+    setCurrentOperator({
+      id: 'OP-SIM-OWNER',
+      name: 'Admin',
+      role: 'superadmin',
+      shiftActive: true,
+      isAuthenticatedEmployee: false
+    });
+    setActiveTab('pos');
+    setSimulationSetupOpen(false);
+    setPendingSimulationPlan(null);
+    holidayToastShownRef.current = false;
+    stockerToastShownRef.current = false;
+    setCurrentView('app');
+
+    showToast({
+      title: 'Simulasi POS Siap Dicoba',
+      message: `Mode ${nextBusinessType === 'retail' ? 'Toko Ritel & Minimarket' : 'F&B / Kafe'} • ${
+        nextPaymentFlow === 'pay_later' ? 'Bayar Nanti (Open Bill)' : 'Bayar di Awal'
+      }.`,
+      variant: 'success',
+      duration: 5000
+    });
+  };
+
+  const handleSwitchSimulationRole = (nextRole) => {
+    if (subscriptionPlan === 'starter' && nextRole === 'stocker') {
+      showToast({
+        title: 'Role Stocker Khusus Paket Pro',
+        message: 'Paket Starter khusus untuk 1 Admin & 1 Kasir (stok porsi per menu). Pilih Paket Pro untuk mencoba Stocker & gudang bahan.',
+        variant: 'info',
+        duration: 4500
+      });
+      return;
+    }
+
+    const roleNames = {
+      superadmin: 'Admin',
+      kasir: 'Kasir',
+      stocker: 'Petugas Gudang'
+    };
+
+    setUserRole(nextRole);
+    setCurrentOperator((prev) => ({
+      ...prev,
+      id: `OP-SIM-${nextRole.toUpperCase()}`,
+      name: roleNames[nextRole] || 'Petugas',
+      role: nextRole,
+      shiftActive: true,
+      isAuthenticatedEmployee: false
+    }));
+
+    if (nextRole === 'kasir' && !['pos', 'menu-management'].includes(activeTab)) {
+      setActiveTab('pos');
+    } else if (nextRole === 'stocker' && !['inventory', 'alerts'].includes(activeTab)) {
+      setActiveTab('inventory');
+    }
+  };
+
+  const handleCheckout = async (cartItems, tableNumber = 'Kasir Utama', paymentMethod = 'cash') => {
+    let starterDeducted = false;
+    let reqs = [];
+    let retailReqs = [];
+
+    if (subscriptionPlan === 'starter') {
+      const qtyById = new Map();
+      cartItems.forEach((item) => {
+        const key = String(item.id);
+        qtyById.set(key, (qtyById.get(key) || 0) + (Number(item.qty) || 0));
+      });
+
+      const updatedProducts = [];
+      const changedTargets = [];
+      for (const prod of products) {
+        const soldQty = qtyById.get(String(prod.id)) || 0;
+        if (soldQty > 0) {
+          const beforeStock = Math.max(0, Number(prod.stock ?? 0));
+          const afterStock = Math.max(0, Number((beforeStock - soldQty).toFixed(3)));
+          updatedProducts.push({ ...prod, stock: afterStock });
+          changedTargets.push({ id: prod.id, afterStock });
+          starterDeducted = true;
+        } else {
+          updatedProducts.push(prod);
+        }
+      }
+
+      if (starterDeducted) {
+        setProducts(updatedProducts);
+        for (const t of changedTargets) {
+          if (!isSimulationMode && !String(t.id).startsWith('SIM-')) {
+            await updateRetailProductStock(t.id, t.afterStock);
+          }
+        }
+      }
+    } else {
+      reqs = computeBomRequirementsForItems(cartItems, ingredients);
+      await applyStockDeltas(reqs, {
+        movementType: 'BOM_SALE',
+        actionType: 'Stock Out',
+        reason: `Penjualan POS (${tableNumber})`,
+        orderId: null,
+        logType: 'KELUAR (Otomatis BOM POS)',
+        isAddition: false
+      });
+
+      retailReqs = computeRetailSkuRequirementsForItems(cartItems, products, businessType);
+      await applyRetailStockDeltas(retailReqs, {
+        movementType: 'BOM_SALE',
+        actionType: 'Stock Out',
+        reason: `Penjualan POS Ritel (${tableNumber})`,
+        orderId: null,
+        logType: 'KELUAR (Otomatis POS Ritel)',
+        isAddition: false
+      });
+    }
 
     const currentSubtotal = cartItems.reduce((sum, item) => sum + item.price * item.qty, 0);
-    const savedTxRows = await saveTransaction(currentSubtotal, cartItems, tableNumber, paymentMethod, {
-      orderChannel: 'dine_in',
-      paymentFlow: 'pay_first',
-      paymentStatus: 'paid',
-      kitchenStatus: 'served',
-      cashierId: currentOperator?.id,
-      cashierName: currentOperator?.name || 'Kasir Aktif'
-    });
+    let savedTxRows = null;
+    if (isSimulationMode) {
+      savedTxRows = [
+        {
+          id: `SIM-TX-${Date.now()}`,
+          total_amount: currentSubtotal,
+          items: cartItems,
+          table_number: tableNumber || 'Takeaway / Kasir',
+          payment_method: paymentMethod,
+          created_at: new Date().toISOString(),
+          order_channel: 'dine_in',
+          payment_flow: 'pay_first',
+          payment_status: 'paid',
+          kitchen_status: 'served',
+          cashier_id: currentOperator?.id,
+          cashier_name: currentOperator?.name || 'Kasir Simulasi'
+        }
+      ];
+    } else {
+      savedTxRows = await saveTransaction(currentSubtotal, cartItems, tableNumber, paymentMethod, {
+        orderChannel: 'dine_in',
+        paymentFlow: 'pay_first',
+        paymentStatus: 'paid',
+        kitchenStatus: 'served',
+        cashierId: currentOperator?.id,
+        cashierName: currentOperator?.name || 'Kasir Aktif'
+      });
+    }
 
     if (Array.isArray(savedTxRows) && savedTxRows.length > 0) {
       const nextTxList = [savedTxRows[0], ...transactions];
       setTransactions(nextTxList);
-      const rebuiltDaily = buildDailySalesHistory({
-        transactions: nextTxList,
-        products,
-        ingredients,
-        seasonalEvents,
-        persistedDailyRows: dailySalesRows,
-        businessType
-      });
-      syncDailySalesHistoryEntries(rebuiltDaily.flatRows, resolvedOutletLabel);
+      if (!isSimulationMode) {
+        const rebuiltDaily = buildDailySalesHistory({
+          transactions: nextTxList,
+          products,
+          ingredients,
+          seasonalEvents,
+          persistedDailyRows: dailySalesRows,
+          businessType
+        });
+        syncDailySalesHistoryEntries(rebuiltDaily.flatRows, resolvedOutletLabel);
+      }
     }
 
     showToast({
       title: 'Transaksi POS tercatat',
-      message:
-        reqs.length > 0 || retailReqs.length > 0
-          ? `Stok otomatis terpotong untuk ${tableNumber}.`
-          : `Pembayaran ${tableNumber} berhasil diproses.`,
+      message: starterDeducted
+        ? `Kuota porsi menu berkurang untuk ${tableNumber}.`
+        : reqs.length > 0 || retailReqs.length > 0
+        ? `Stok otomatis terpotong untuk ${tableNumber}.`
+        : `Pembayaran ${tableNumber} berhasil diproses.`,
       variant: 'success'
     });
   };
 
   const handleSaveMerchantSettings = async (nextSettings) => {
+    const prevBusinessType = merchantSettings?.businessType || 'fnb';
     const saved = await saveMerchantSettings(nextSettings, currentOperator?.name || 'Owner');
     setMerchantSettings(saved);
+
+    if (isSimulationMode && saved?.businessType && saved.businessType !== prevBusinessType) {
+      if (saved.businessType === 'retail') {
+        setProducts(createSimulationRetailProducts());
+        setIngredients([]);
+      } else {
+        setProducts(createSimulationFnbProducts());
+        setIngredients(createSimulationFnbIngredients());
+      }
+      const simAnalytics = createSimulationAnalyticsData(saved.businessType);
+      setTransactions(simAnalytics.transactions);
+      setStockMovements(simAnalytics.stockMovements);
+      setPriceHistory(simAnalytics.priceHistory);
+      setRetailPriceHistory(simAnalytics.retailPriceHistory);
+      setAuditLogs(simAnalytics.auditLogs);
+      setStockLogs(simAnalytics.stockLogs);
+    }
+
     showToast({
-      title: 'Pengaturan merchant tersimpan',
-      message: `Mode usaha aktif: ${saved?.businessType === 'retail' ? 'Ritel' : 'F&B / Kafe'}.`,
+      title: 'Pengaturan toko tersimpan',
+      message: `Jenis usaha aktif: ${saved?.businessType === 'retail' ? 'Toko Ritel & Minimarket' : 'F&B / Kafe'}.`,
       variant: 'success'
     });
   };
@@ -1089,20 +1459,28 @@ function AppContent() {
         ))}
       </div>
 
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-        <button
-          onClick={() => setSubscriptionPlan('pro')}
-          className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] font-bold text-xs shadow-sm cursor-pointer active:scale-95 transition-all"
-        >
-          Aktifkan Paket Pro (Rp149.000/bln)
-        </button>
-        <button
-          onClick={() => setSubscriptionPlan('enterprise')}
-          className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-[#141414] hover:bg-zinc-800 text-white font-bold text-xs cursor-pointer active:scale-95 transition-all"
-        >
-          Coba Paket Enterprise (Multi-Outlet)
-        </button>
-      </div>
+      {isSimulationMode ? (
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+          <button
+            onClick={() => setSubscriptionPlan('pro')}
+            className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] font-bold text-xs shadow-sm cursor-pointer active:scale-95 transition-all"
+          >
+            Coba Simulasi Paket Pro (Rp149.000/bln)
+          </button>
+          <button
+            onClick={() => setSubscriptionPlan('enterprise')}
+            className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-[#141414] hover:bg-zinc-800 text-white font-bold text-xs cursor-pointer active:scale-95 transition-all"
+          >
+            Coba Simulasi Paket Enterprise (Multi-Outlet)
+          </button>
+        </div>
+      ) : (
+        <div className="pt-2">
+          <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#FEF3C7] border border-[#FDE68A] text-[#B45309] text-xs font-bold">
+            <Lock size={14} /> Akun perusahaan Anda terdaftar pada Paket Starter
+          </span>
+        </div>
+      )}
     </motion.div>
   );
 
@@ -1119,7 +1497,7 @@ function AppContent() {
             className="w-full min-h-screen"
           >
             <LandingPage
-              onOpenApp={() => setCurrentView('app')}
+              onOpenApp={() => handleRequestSimulation(null)}
               onOpenRegister={() => setCurrentView('register')}
               onOpenLogin={() => setCurrentView('login')}
               onSelectPlan={(planId) => {
@@ -1127,8 +1505,7 @@ function AppContent() {
                 setCurrentView('register');
               }}
               onSimulatePlan={(planId) => {
-                setSubscriptionPlan(planId);
-                setCurrentView('app');
+                handleRequestSimulation(planId);
               }}
             />
           </motion.div>
@@ -1145,11 +1522,49 @@ function AppContent() {
             className="w-full min-h-screen"
           >
             <Register
-              key={subscriptionPlan}
               onBack={() => setCurrentView('landing')}
-              onOpenLogin={() => setCurrentView('login')}
+              onOpenLogin={() => {
+                setAuthNotice('');
+                setCurrentView('login');
+              }}
               initialPlan={subscriptionPlan}
               onPlanChange={setSubscriptionPlan}
+              onCompleteRegistration={async ({
+                subscriptionPlan: chosenPlan,
+                businessType: chosenBusinessType,
+                paymentFlow: chosenPaymentFlow,
+                username,
+                email,
+                user
+              }) => {
+                clearOperationalLocalCaches({ preserveMerchantSettings: true });
+                clearEmployeeLocalCaches();
+                resetWorkspaceState();
+                setIsSimulationMode(false);
+                starterShowcaseAppliedRef.current = false;
+                if (chosenPlan) setSubscriptionPlan(chosenPlan);
+                setMerchantSettings((prev) => ({
+                  ...prev,
+                  businessType: chosenBusinessType || 'fnb',
+                  paymentFlow: chosenPaymentFlow || 'pay_first'
+                }));
+                setUserRole('superadmin');
+                setActiveTab('pos');
+                setCurrentOperator({
+                  id: user?.id || 'OWNER-NEW',
+                  name: username || 'Admin',
+                  email: email || user?.email || '',
+                  role: 'superadmin',
+                  outlet: 'Cabang Utama',
+                  shiftActive: true,
+                  isAuthenticatedEmployee: false
+                });
+                const staffRes = await fetchStaffProfiles();
+                setStaffProfiles(
+                  staffRes?.success && Array.isArray(staffRes.data) ? staffRes.data : []
+                );
+                setCurrentView('app');
+              }}
             />
           </motion.div>
         );
@@ -1165,10 +1580,21 @@ function AppContent() {
             className="w-full min-h-screen"
           >
             <Login
-              onBack={() => setCurrentView('landing')}
-              onOpenRegister={() => setCurrentView('register')}
+              onBack={() => {
+                setAuthNotice('');
+                setCurrentView('landing');
+              }}
+              onOpenRegister={() => {
+                setAuthNotice('');
+                setCurrentView('register');
+              }}
+              onPrepareLoginRole={(role) => {
+                expectedLoginRoleRef.current = role;
+                setAuthNotice('');
+              }}
               onLoginSuccess={() => {
                 setAuthNotice('');
+                setIsSimulationMode(false);
                 setCurrentView('app');
               }}
               externalError={authNotice}
@@ -1197,8 +1623,11 @@ function AppContent() {
                 retailLowStockCount={retailLowStockCount}
                 businessType={businessType}
                 userRole={userRole}
+                isSimulationMode={isSimulationMode}
+                canSwitchRole={isSimulationMode}
+                onSwitchRole={isSimulationMode ? handleSwitchSimulationRole : undefined}
                 subscriptionPlan={subscriptionPlan}
-                setSubscriptionPlan={setSubscriptionPlan}
+                setSubscriptionPlan={isSimulationMode ? handleChangeSubscriptionPlan : undefined}
                 onBackToLanding={async () => {
                   if (activeSessionIdRef.current) {
                     await recordEmployeeSessionEvent({
@@ -1208,6 +1637,11 @@ function AppContent() {
                     activeSessionIdRef.current = null;
                   }
                   await supabase.auth.signOut();
+                  setActiveCompanyId(null);
+                  setIsSimulationMode(false);
+                  starterShowcaseAppliedRef.current = false;
+                  resetWorkspaceState();
+                  setUserRole('superadmin');
                   setCurrentView('landing');
                   setActiveTab('pos');
                 }}
@@ -1236,7 +1670,7 @@ function AppContent() {
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-xs font-extrabold tracking-tight">
-                              Enterprise Multi-Outlet & Central Kitchen
+                              Pengelolaan Banyak Cabang &amp; Gudang Pusat
                             </span>
                             <span className="font-mono text-[9px] font-bold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">
                               Sinkronisasi Aktif
@@ -1269,10 +1703,10 @@ function AppContent() {
                     </motion.div>
                   )}
 
-                  {/* REMINDER H-14 HARI BESAR & REFERENSI PEMBELIAN TAHUN LALU */}
+                  {/* PENGINGAT JADWAL MUSIMAN / HARI BESAR (KHUSUS PEMILIK / SUPERADMIN) */}
                   {!dismissedReminderBanner &&
                     activeHolidayReminders.length > 0 &&
-                    (userRole === 'superadmin' || userRole === 'stocker') &&
+                    userRole === 'superadmin' &&
                     activeTab !== 'self-order' &&
                     subscriptionPlan !== 'starter' && (() => {
                       const topReminder = activeHolidayReminders[0];
@@ -1288,13 +1722,13 @@ function AppContent() {
                                   {topReminder.countdownBadge} Menuju Hari H
                                 </span>
                                 <span className="text-xs sm:text-sm font-extrabold text-[#141414]">
-                                  Reminder Hari Besar: {topReminder.name} ({topReminder.startDate})
+                                  Pengingat Hari Besar: {topReminder.name} ({topReminder.startDate})
                                 </span>
                               </div>
                               <p className="text-xs font-semibold text-[#78350F]">
-                                Harap update daftar harga bahan baku &amp; siapkan restock sebelum vendor tutup.{' '}
+                                Segera perbarui daftar harga bahan &amp; siapkan stok tambahan sebelum pemasok tutup.{' '}
                                 <span className="font-medium text-[#52525B]">
-                                  (Stok buffer minimum tetap berbasis riwayat historis.)
+                                  (Mengacu pada catatan penjualan periode sebelumnya.)
                                 </span>
                               </p>
                             </div>
@@ -1307,7 +1741,7 @@ function AppContent() {
                               className="px-3.5 py-2 rounded-xl bg-[#FAFAFA] hover:bg-zinc-100 border border-[#E5E5E5] text-[#141414] text-[11px] font-extrabold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                             >
                               <History size={13} className="text-[#D97706]" />
-                              Lihat Referensi Tahun Lalu
+                              Lihat Tahun Lalu
                             </button>
                             {activeTab !== 'inventory' && (
                               <button
@@ -1315,13 +1749,13 @@ function AppContent() {
                                 onClick={() => setActiveTab('inventory')}
                                 className="px-4 py-2 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] text-[11px] font-extrabold inline-flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
                               >
-                                Update Daftar Harga <ArrowRight size={13} />
+                                Cek Harga Bahan <ArrowRight size={13} />
                               </button>
                             )}
                             <button
                               type="button"
                               onClick={() => setDismissedReminderBanner(true)}
-                              aria-label="Tutup banner reminder hari besar"
+                              aria-label="Tutup banner pengingat hari besar"
                               className="w-8 h-8 rounded-lg hover:bg-zinc-100 text-zinc-400 hover:text-[#141414] flex items-center justify-center cursor-pointer transition-colors"
                             >
                               <X size={15} />
@@ -1331,49 +1765,9 @@ function AppContent() {
                       );
                     })()}
 
-                  {/* REAL-TIME BUFFER INVENTORY / LOW-STOCK ALERT BANNER */}
+                  {/* PERINGATAN PRODUK RITEL MENIPIS (PEMILIK & STOCKER) */}
                   {businessType === 'retail' &&
                     retailLowStockProducts.length > 0 &&
-                    activeTab !== 'self-order' &&
-                    subscriptionPlan !== 'starter' && (
-                      <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-2xl px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="flex items-start sm:items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-[#F59E0B] text-[#141414] flex items-center justify-center shrink-0">
-                            <AlertTriangle size={18} />
-                          </div>
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-xs font-extrabold text-[#141414]">
-                                {retailLowStockProducts.length} SKU Produk Ritel Menyentuh Batas Minimum
-                              </span>
-                              <span className="font-mono text-[9px] font-bold uppercase bg-white text-[#B45309] border border-[#FDE68A] px-2 py-0.5 rounded-full">
-                                Retail Stock Alert
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-[#78350F] font-medium mt-0.5">
-                              {retailLowStockProducts
-                                .slice(0, 3)
-                                .map((p) => `${p.name} (${Number(p.stock ?? 0)} ${p.unit || 'pcs'})`)
-                                .join(', ')}
-                              {retailLowStockProducts.length > 3
-                                ? ` dan ${retailLowStockProducts.length - 3} SKU lainnya`
-                                : ''}
-                            </p>
-                          </div>
-                        </div>
-
-                        {activeTab !== 'menu-management' && userRole !== 'stocker' && (
-                          <button
-                            onClick={() => setActiveTab('menu-management')}
-                            className="px-4 py-2 rounded-xl bg-[#141414] hover:bg-zinc-800 text-[#F59E0B] text-[11px] font-bold flex items-center gap-1.5 shrink-0 cursor-pointer transition-all active:scale-95"
-                          >
-                            Restock SKU Ritel <ArrowRight size={13} />
-                          </button>
-                        )}
-                      </div>
-                    )}
-
-                  {lowStockIngredients.length > 0 &&
                     (userRole === 'superadmin' || userRole === 'stocker') &&
                     activeTab !== 'self-order' &&
                     subscriptionPlan !== 'starter' && (
@@ -1385,10 +1779,98 @@ function AppContent() {
                           <div>
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="text-xs font-extrabold text-[#141414]">
-                                {lowStockIngredients.length} Bahan Baku Menyentuh Batas Minimum (Buffer Stock)
+                                {retailLowStockProducts.length} Produk Toko Hampir Habis
                               </span>
-                              <span className="font-mono text-[9px] font-bold uppercase bg-white text-[#B45309] border border-[#FDE68A] px-2 py-0.5 rounded-full">
-                                Low Stock Alert
+                              <span className="text-[10px] font-bold bg-white text-[#B45309] border border-[#FDE68A] px-2 py-0.5 rounded-full">
+                                Stok Menipis
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-[#78350F] font-medium mt-0.5">
+                              {retailLowStockProducts
+                                .slice(0, 3)
+                                .map((p) => `${p.name} (${Number(p.stock ?? 0)} ${p.unit || 'pcs'})`)
+                                .join(', ')}
+                              {retailLowStockProducts.length > 3
+                                ? ` dan ${retailLowStockProducts.length - 3} produk lainnya`
+                                : ''}
+                            </p>
+                          </div>
+                        </div>
+
+                        {activeTab !== 'menu-management' && userRole !== 'stocker' && (
+                          <button
+                            onClick={() => setActiveTab('menu-management')}
+                            className="px-4 py-2 rounded-xl bg-[#141414] hover:bg-zinc-800 text-[#F59E0B] text-[11px] font-bold flex items-center gap-1.5 shrink-0 cursor-pointer transition-all active:scale-95"
+                          >
+                            Tambah Stok Produk <ArrowRight size={13} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                  {/* PERINGATAN KUOTA PORSI MENU (PAKET STARTER • PEMILIK & KASIR) */}
+                  {subscriptionPlan === 'starter' &&
+                    starterLowStockProducts.length > 0 &&
+                    (userRole === 'superadmin' || userRole === 'kasir') && (
+                      <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-2xl px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-start sm:items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-[#F59E0B] text-[#141414] flex items-center justify-center shrink-0">
+                            <AlertTriangle size={18} />
+                          </div>
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-xs font-extrabold text-[#141414]">
+                                {starterLowStockProducts.length} Menu Hampir Habis atau Sudah Habis
+                              </span>
+                              <span className="text-[10px] font-bold bg-white text-[#B45309] border border-[#FDE68A] px-2 py-0.5 rounded-full">
+                                Peringatan Kuota Menu
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-[#78350F] font-medium mt-0.5">
+                              {starterLowStockProducts
+                                .slice(0, 3)
+                                .map((p) => {
+                                  const qty = Math.max(0, Number(p.stock ?? 0));
+                                  const unit = businessType === 'retail' || p.productMode === 'retail' ? (p.unit || 'pcs') : 'porsi';
+                                  return qty <= 0 ? `${p.name} (Habis)` : `${p.name} (sisa ${qty} ${unit})`;
+                                })
+                                .join(', ')}
+                              {starterLowStockProducts.length > 3
+                                ? ` dan ${starterLowStockProducts.length - 3} menu lainnya`
+                                : ''}
+                            </p>
+                          </div>
+                        </div>
+
+                        {(userRole === 'superadmin' || userRole === 'kasir') && activeTab !== 'menu-management' && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('menu-management')}
+                            className="px-4 py-2 rounded-xl bg-[#141414] hover:bg-zinc-800 text-[#F59E0B] text-[11px] font-bold flex items-center gap-1.5 shrink-0 cursor-pointer transition-all active:scale-95"
+                          >
+                            Tambah Stok Menu <ArrowRight size={13} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                  {/* PERINGATAN BAHAN BAKU MENIPIS (KHUSUS PETUGAS GUDANG / STOCKER) */}
+                  {lowStockIngredients.length > 0 &&
+                    userRole === 'stocker' &&
+                    activeTab !== 'self-order' &&
+                    subscriptionPlan !== 'starter' && (
+                      <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-2xl px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-start sm:items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-[#F59E0B] text-[#141414] flex items-center justify-center shrink-0">
+                            <AlertTriangle size={18} />
+                          </div>
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-xs font-extrabold text-[#141414]">
+                                {lowStockIngredients.length} Bahan Baku Sudah Hampir Habis
+                              </span>
+                              <span className="text-[10px] font-bold bg-white text-[#B45309] border border-[#FDE68A] px-2 py-0.5 rounded-full">
+                                Perlu Belanja Ulang
                               </span>
                             </div>
                             <p className="text-[11px] text-[#78350F] font-medium mt-0.5">
@@ -1408,7 +1890,49 @@ function AppContent() {
                             onClick={() => setActiveTab('inventory')}
                             className="px-4 py-2 rounded-xl bg-[#141414] hover:bg-zinc-800 text-[#F59E0B] text-[11px] font-bold flex items-center gap-1.5 shrink-0 cursor-pointer transition-all active:scale-95"
                           >
-                            Cek Gudang & Restock <ArrowRight size={13} />
+                            Cek Gudang &amp; Tambah Stok <ArrowRight size={13} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                  {/* PERINGATAN BAHAN HAMPIR KEDALUWARSA / EXPIRED (KHUSUS PETUGAS GUDANG / STOCKER) */}
+                  {expiringIngredients.length > 0 &&
+                    userRole === 'stocker' &&
+                    activeTab !== 'self-order' &&
+                    subscriptionPlan !== 'starter' && (
+                      <div className="bg-red-50 border border-red-200 rounded-2xl px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-start sm:items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0">
+                            <CalendarClock size={18} />
+                          </div>
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-xs font-extrabold text-[#141414]">
+                                {expiringIngredients.length} Bahan Baku Hampir atau Sudah Kedaluwarsa
+                              </span>
+                              <span className="text-[10px] font-bold bg-white text-red-700 border border-red-200 px-2 py-0.5 rounded-full">
+                                Pakai Duluan / Tarik
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-red-800 font-medium mt-0.5">
+                              {expiringIngredients
+                                .slice(0, 3)
+                                .map((ing) => `${(ing.name || '').split(' | ')[0]} (${ing.expiryDate || '-'})`)
+                                .join(', ')}
+                              {expiringIngredients.length > 3
+                                ? ` dan ${expiringIngredients.length - 3} bahan lainnya`
+                                : ''}
+                            </p>
+                          </div>
+                        </div>
+
+                        {activeTab !== 'alerts' && (
+                          <button
+                            onClick={() => setActiveTab('alerts')}
+                            className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold flex items-center gap-1.5 shrink-0 cursor-pointer transition-all active:scale-95"
+                          >
+                            Lihat Peringatan Bahan <ArrowRight size={13} />
                           </button>
                         )}
                       </div>
@@ -1440,18 +1964,19 @@ function AppContent() {
                           onCancelOrder={handleCancelOrder}
                           onSettleOpenBill={handleSettleOpenBill}
                           onReceiveClosedKitchenDemo={handleReceiveClosedKitchenDemo}
+                          isSimulationMode={isSimulationMode}
                         />
                       )}
 
                       {activeTab === 'self-order' &&
                         (subscriptionPlan === 'starter' ? (
                           renderStarterLockedFeature(
-                            'Modul Self-Order Kiosk (Pemesanan Meja)',
-                            'Pada Paket Starter, pemesanan hanya dilakukan melalui kasir utama. Tingkatkan ke Paket Pro untuk mengaktifkan QR Self-Order agar pelanggan dapat memesan langsung dari meja.',
+                            'Pesan Mandiri dari Meja (QR)',
+                            'Di Paket Starter, pesanan hanya dicatat lewat kasir. Upgrade ke Paket Pro supaya pelanggan bisa scan QR dan pesan langsung dari meja.',
                             [
-                              'Pelanggan pesan mandiri dari meja tanpa instal aplikasi',
-                              'Pesanan otomatis terhubung ke stok bahan baku (BOM)',
-                              'Mengurangi antrean kasir & beban staf pelayan hingga 40%'
+                              'Pelanggan pesan sendiri dari meja tanpa instal aplikasi',
+                              'Pesanan langsung cek dan potong stok bahan di gudang',
+                              'Mengurangi antrean di kasir saat jam ramai'
                             ]
                           )
                         ) : (
@@ -1469,8 +1994,10 @@ function AppContent() {
                           setProducts={setProducts}
                           ingredients={ingredients}
                           subscriptionPlan={subscriptionPlan}
-                          onUpgradePlan={setSubscriptionPlan}
+                          onUpgradePlan={isSimulationMode ? handleChangeSubscriptionPlan : undefined}
                           businessType={businessType}
+                          userRole={userRole}
+                          isSimulationMode={isSimulationMode}
                           retailPriceHistory={retailPriceHistory}
                           onRetailPriceHistoryAdded={(entry) =>
                             setRetailPriceHistory((prev) => [entry, ...prev])
@@ -1483,12 +2010,12 @@ function AppContent() {
                       {activeTab === 'inventory' &&
                         (subscriptionPlan === 'starter' ? (
                           renderStarterLockedFeature(
-                            'Smart Inventory & Automated BOM Engine',
-                            'Paket Starter tidak mencakup manajemen stok bahan mentah dan pemotongan resep otomatis. Upgrade ke Paket Pro (Core Product) untuk mengendalikan gudang dan mencegah food waste.',
+                            'Stok Gudang & Potong Resep Otomatis',
+                            'Paket Starter belum mencakup pengelolaan bahan baku dan potong stok resep otomatis. Upgrade ke Paket Pro agar stok gudang terkontrol dan tidak banyak bahan terbuang.',
                             [
-                              'Pemotongan stok bahan mentah otomatis (gram/ml ke kg/liter presisi 3 angka desimal)',
-                              'Validasi lintas menu di keranjang untuk mencegah stok minus',
-                              'Pelacakan tanggal masuk & masa kedaluwarsa bahan (FIFO/FEFO)'
+                              'Stok bahan baku otomatis terpotong sesuai takaran resep setiap kali ada penjualan',
+                              'Mencegah kasir menerima pesanan jika bahan di gudang sudah habis',
+                              'Catat tanggal masuk dan pengingat bahan yang hampir kedaluwarsa'
                             ]
                           )
                         ) : (
@@ -1505,8 +2032,9 @@ function AppContent() {
                             onAddStockLog={handleAddStockLog}
                             onRecordAudit={handleRecordAudit}
                             currentOperator={currentOperator}
-                            onUpgradePlan={setSubscriptionPlan}
-                            holidayReminders={activeHolidayReminders}
+                            isSimulationMode={isSimulationMode}
+                            onUpgradePlan={isSimulationMode ? setSubscriptionPlan : undefined}
+                            holidayReminders={userRole === 'superadmin' ? activeHolidayReminders : []}
                             onOpenHolidayReminder={setSelectedReminderEvent}
                           />
                         ))}
@@ -1514,12 +2042,12 @@ function AppContent() {
                       {activeTab === 'alerts' &&
                         (subscriptionPlan === 'starter' ? (
                           renderStarterLockedFeature(
-                            'FIFO/FEFO Early Warning & Smart Alerts',
-                            'Fitur peringatan dini bahan baku kritis dan deteksi masa kedaluwarsa (≤ 30 hari) merupakan bagian dari Paket Pro / Business & Enterprise.',
+                            'Peringatan Stok Habis & Bahan Hampir Basi',
+                            'Fitur pengingat bahan yang stoknya menipis dan mendekati tanggal kedaluwarsa (≤ 30 hari) tersedia di Paket Pro dan Enterprise.',
                             [
-                              'Deteksi otomatis bahan baku yang mendekati tanggal expired (≤ 30 hari)',
-                              'Notifikasi instan saat stok bahan menyentuh batas minimum aman',
-                              'Mencegah kerugian akibat bahan baku basi di gudang'
+                              'Pengingat otomatis jika ada bahan yang hampir kedaluwarsa (≤ 30 hari)',
+                              'Peringatan langsung saat stok bahan menyentuh batas minimum',
+                              'Membantu mengurangi kerugian karena bahan terbuang basi'
                             ]
                           )
                         ) : (
@@ -1529,8 +2057,9 @@ function AppContent() {
                       {activeTab === 'employees' && (
                         <EmployeeModule
                           subscriptionPlan={subscriptionPlan}
-                          onUpgradePlan={setSubscriptionPlan}
+                          onUpgradePlan={isSimulationMode ? setSubscriptionPlan : undefined}
                           onRecordAudit={handleRecordAudit}
+                          isSimulationMode={isSimulationMode}
                         />
                       )}
 
@@ -1538,23 +2067,26 @@ function AppContent() {
                         <ReportingModule
                           subscriptionPlan={subscriptionPlan}
                           activeOutlet={activeOutlet}
-                          onUpgradePlan={setSubscriptionPlan}
+                          onUpgradePlan={isSimulationMode ? setSubscriptionPlan : undefined}
                           products={products}
                           ingredients={ingredients}
                           seasonalEvents={seasonalEvents}
                           businessType={businessType}
+                          isSimulationMode={isSimulationMode}
+                          externalTransactions={transactions}
+                          externalDailyRows={dailySalesRows}
                         />
                       )}
 
                       {activeTab === 'profitability' &&
                         (subscriptionPlan === 'starter' ? (
                           renderStarterLockedFeature(
-                            'Profitability Matrix & Stocko AI Insights',
-                            'Analitik Menu Engineering (Stars, Plowhorses, Puzzles, Dogs), tren laba kotor vs kuantitas penjualan, serta Stocko AI Business Analyst tersedia di Paket Pro & Enterprise.',
+                            'Analisis Keuntungan & Saran AI',
+                            'Lihat menu mana yang paling laku dan paling untung, pantau modal bahan baku, serta dapatkan saran bisnis otomatis di Paket Pro & Enterprise.',
                             [
-                              'Klasifikasi otomatis menu berdasarkan volume penjualan & margin COGS aktual',
-                              'Deteksi lonjakan harga bahan baku yang menekan margin di bawah batas aman',
-                              'Rekomendasi upselling berbasis margin tinggi & prediksi restock gudang'
+                              'Pengelompokan menu berdasarkan laris tidaknya dan besarnya keuntungan',
+                              'Peringatan jika kenaikan harga bahan membuat keuntungan menipis',
+                              'Saran menu tambahan untuk ditawarkan ke pembeli dan saran belanja ulang'
                             ]
                           )
                         ) : (
@@ -1572,12 +2104,12 @@ function AppContent() {
                       {activeTab === 'seasonal-analytics' &&
                         (subscriptionPlan === 'starter' ? (
                           renderStarterLockedFeature(
-                            'Historical Data Analysis & Seasonal Demand Forecasting',
-                            'Analisis historis multi-periode (Harian–Tahunan), penandaan kalender musiman, serta proyeksi kebutuhan stok tersedia di Paket Pro & Enterprise.',
+                            'Analisis Hari Besar & Perkiraan Stok',
+                            'Pantau penjualan harian hingga tahunan, tandai momen hari besar/liburan, dan perkirakan stok bahan yang perlu disiapkan di Paket Pro & Enterprise.',
                             [
-                              'Tren omzet & konsumsi bahan baku dari harian hingga tahunan',
-                              'Komparasi Baseline vs Seasonal Lift % (Ramadan, Idulfitri, Libur Sekolah, Promo)',
-                              'Rekomendasi kenaikan buffer stok & strategi menu musiman'
+                              'Grafik penjualan dan pemakaian bahan dari harian sampai tahunan',
+                              'Perbandingan hari biasa vs hari ramai (Ramadan, Lebaran, Libur, Promo)',
+                              'Pengingat persiapan stok menjelang hari besar'
                             ]
                           )
                         ) : (
@@ -1597,12 +2129,12 @@ function AppContent() {
                       {activeTab === 'audit-trail' &&
                         (subscriptionPlan === 'starter' ? (
                           renderStarterLockedFeature(
-                            'Audit Trail & Akuntabilitas Operasional',
-                            'Rekam jejak penuh setiap perubahan stok, harga bahan baku, Nota Coret, dan pembatalan pesanan tersedia di Paket Pro & Enterprise.',
+                            'Catatan Aktivitas & Riwayat Karyawan',
+                            'Lihat riwayat lengkap setiap perubahan stok, update harga bahan, revisi nota, dan pembatalan pesanan di Paket Pro & Enterprise.',
                             [
-                              'Identitas petugas & role tercatat di setiap log mutasi dan pembatalan',
-                              'Pelacakan before/after stock opname & alasan revisi transaksi',
-                              'Pemisahan jelas antara pembatalan pra-masak dan waste pasca-produksi'
+                              'Nama petugas tercatat jelas di setiap perubahan stok dan pembatalan',
+                              'Riwayat stok sebelum dan sesudah perubahan plus alasan revisi nota',
+                              'Pemisahan jelas antara pesanan batal sebelum dimasak dan bahan terbuang'
                             ]
                           )
                         ) : (
@@ -1629,6 +2161,18 @@ function AppContent() {
       <AnimatePresence mode="wait" onExitComplete={() => window.scrollTo(0, 0)}>
         {renderCurrentView()}
       </AnimatePresence>
+
+      <SimulationSetupModal
+        isOpen={simulationSetupOpen}
+        onClose={() => {
+          setSimulationSetupOpen(false);
+          setPendingSimulationPlan(null);
+        }}
+        initialBusinessType={merchantSettings?.businessType || 'fnb'}
+        initialPaymentFlow={merchantSettings?.paymentFlow || 'pay_first'}
+        pendingPlan={pendingSimulationPlan}
+        onConfirm={handleConfirmSimulation}
+      />
 
       <AnimatePresence>
         {selectedReminderMeta && (

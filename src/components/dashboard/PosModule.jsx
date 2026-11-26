@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { evaluateMenuStockStatus, getSmartUpsellRecommendations } from '../../utils/cogsCalculator';
 import { ORDER_CHANNEL_LABELS } from '../../utils/orderStateMachine';
+import { getProductFallbackImage } from '../../data/simulationCatalog';
 import MerchantWorkflowModal from './pos/MerchantWorkflowModal';
 import KitchenOrdersDrawer from './pos/KitchenOrdersDrawer';
 import { OrderModificationModal, OrderCancelModal, CashierShiftModal } from './pos/OrderActionModals';
@@ -26,7 +27,8 @@ export default function PosModule({
   onModifyOrder,
   onCancelOrder,
   onSettleOpenBill,
-  onReceiveClosedKitchenDemo
+  onReceiveClosedKitchenDemo,
+  isSimulationMode = false
 }) {
   const [cart, setCart] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('Semua');
@@ -65,7 +67,13 @@ export default function PosModule({
     message: ''
   });
 
-  const categories = ['Semua', ...new Set(products.map(p => p.category))];
+  const normalizePosCategory = (cat) =>
+    isStarter && !isRetailBusiness && (cat === 'Bakery' || cat === 'Dessert') ? 'Makanan' : cat;
+
+  const categories =
+    isStarter && !isRetailBusiness
+      ? ['Semua', 'Minuman', 'Makanan']
+      : ['Semua', ...new Set(products.map((p) => p.category).filter(Boolean))];
 
   const getSubDescription = (prod) => {
     if (isRetailBusiness || prod.productMode === 'retail') {
@@ -103,10 +111,8 @@ export default function PosModule({
     return neededBase;
   };
 
-  // FUNGSI UTAMA: Mensimulasikan penambahan kuantitas item dan memeriksa apakah total bahan gudang mencukupi
+  // FUNGSI UTAMA: Mensimulasikan penambahan kuantitas item dan memeriksa apakah stok / kuota porsi mencukupi
   const validateCartWithNewItem = (currentCart, targetProduct, deltaQty) => {
-    if (isStarter) return { isValid: true };
-
     let simulatedCart = [...currentCart];
     const existingIndex = simulatedCart.findIndex(item => item.id === targetProduct.id);
 
@@ -119,6 +125,22 @@ export default function PosModule({
       }
     } else if (deltaQty > 0) {
       simulatedCart.push({ ...targetProduct, qty: 1 });
+    }
+
+    if (isStarter) {
+      for (const cartItem of simulatedCart) {
+        const availableQuota = Math.max(0, Math.floor(Number(cartItem.stock ?? 0)));
+        if (cartItem.qty > availableQuota) {
+          return {
+            isValid: false,
+            exceededIngredient: cartItem.name,
+            required: cartItem.qty,
+            stock: availableQuota,
+            unit: isRetailBusiness || cartItem.productMode === 'retail' ? (cartItem.unit || 'pcs') : 'porsi'
+          };
+        }
+      }
+      return { isValid: true };
     }
 
     const accumulatedDemand = {};
@@ -183,7 +205,9 @@ export default function PosModule({
 
   // Hitung maksimal porsi / unit tersisa untuk satu produk mandiri
   const getMaxPossiblePortions = (product) => {
-    if (isStarter) return 999;
+    if (isStarter) {
+      return Math.max(0, Math.floor(Number(product?.stock ?? 0)));
+    }
     const hasBomRecipe = Array.isArray(product?.recipe) && product.recipe.length > 0;
     if (product?.productMode === 'retail' || (isRetailBusiness && !hasBomRecipe)) {
       return Math.max(0, Math.floor(Number(product?.stock ?? 0)));
@@ -211,7 +235,6 @@ export default function PosModule({
   };
 
   const checkIsIngredientAvailable = (product) => {
-    if (isStarter) return true;
     return getMaxPossiblePortions(product) > 0;
   };
 
@@ -221,8 +244,10 @@ export default function PosModule({
     if (!validation.isValid) {
       setStockAlertModal({
         isOpen: true,
-        title: 'Stok Bahan Gudang Tidak Cukup',
-        message: `Penghitungan kolektif gagal: Bahan "${validation.exceededIngredient}" di gudang tidak mencukupi untuk kombinasi pesanan ini. Stok tersedia: ${validation.stock} ${validation.unit}.`
+        title: isStarter ? 'Kuota Porsi Tidak Cukup' : 'Stok Bahan Gudang Tidak Cukup',
+        message: isStarter
+          ? `Sisa "${validation.exceededIngredient}" hanya ${validation.stock} ${validation.unit}. Tambah kuota porsi di Daftar Menu jika sudah belanja bahan.`
+          : `Penghitungan kolektif gagal: Bahan "${validation.exceededIngredient}" di gudang tidak mencukupi untuk kombinasi pesanan ini. Stok tersedia: ${validation.stock} ${validation.unit}.`
       });
       return;
     }
@@ -244,8 +269,10 @@ export default function PosModule({
     if (!validation.isValid && delta > 0) {
       setStockAlertModal({
         isOpen: true,
-        title: 'Batas Akumulasi Bahan Tercapai',
-        message: `Tidak dapat menambah jumlah pesanan karena bahan "${validation.exceededIngredient}" telah mencapai batas maksimal kombinasi di keranjang. Stok gudang: ${validation.stock} ${validation.unit}.`
+        title: isStarter ? 'Batas Kuota Porsi Tercapai' : 'Batas Akumulasi Bahan Tercapai',
+        message: isStarter
+          ? `Jumlah "${validation.exceededIngredient}" sudah mencapai batas sisa (${validation.stock} ${validation.unit}).`
+          : `Tidak dapat menambah jumlah pesanan karena bahan "${validation.exceededIngredient}" telah mencapai batas maksimal kombinasi di keranjang. Stok gudang: ${validation.stock} ${validation.unit}.`
       });
       return;
     }
@@ -396,8 +423,11 @@ export default function PosModule({
     ? []
     : getSmartUpsellRecommendations(cart, products, ingredients, 2, businessType);
 
+  const activePosCategory = categories.includes(selectedCategory) ? selectedCategory : 'Semua';
+
   const filteredProducts = products.filter(p => {
-    const matchesCategory = selectedCategory === 'Semua' || p.category === selectedCategory;
+    const matchesCategory =
+      activePosCategory === 'Semua' || normalizePosCategory(p.category) === activePosCategory;
     const q = searchQuery.toLowerCase();
     const matchesSearch =
       p.name.toLowerCase().includes(q) ||
@@ -412,52 +442,60 @@ export default function PosModule({
       {/* 1. Header POS Light Editorial */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 pb-5 border-b border-zinc-200">
         <div>
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]">
-              {isStarter
-                ? 'Paket Starter • Kasir Mandiri'
-                : isRetailBusiness
-                ? '[ 01 // POS RITEL • AUTO SKU STOCK ]'
-                : '[ 01 // POS KASIR • AUTO BOM ]'}
-            </span>
-            {subscriptionPlan === 'enterprise' && (
-              <span className="font-mono text-[10px] font-bold text-[#52525B] bg-white border border-zinc-200 px-2.5 py-0.5 rounded-full">
+          {subscriptionPlan === 'enterprise' && (
+            <div className="mb-2">
+              <span className="text-[11px] font-bold text-[#52525B] bg-white border border-zinc-200 px-2.5 py-0.5 rounded-full">
                 {activeOutlet}
               </span>
-            )}
-          </div>
+            </div>
+          )}
           <h1 className="text-3xl font-extrabold tracking-tight text-[#141414]">Katalog Penjualan</h1>
           <p className="text-[#52525B] text-[13px] font-medium mt-1">
             {isStarter
-              ? 'Pencatatan kasir cepat, catatan pesanan dapur, dan cetak struk transaksi.'
-              : 'Pilih menu pesanan. Stok bahan baku otomatis dicek dan dipotong secara presisi.'}
+              ? 'Catat pesanan pelanggan. Porsi menu otomatis berkurang saat terjual dan muncul peringatan jika hampir habis.'
+              : 'Pilih menu pesanan. Stok bahan atau barang otomatis dicek dan langsung terpotong saat transaksi.'}
           </p>
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
           {!isStarter && (
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShiftModalOpen(true)}
-                className={`px-3 py-2 rounded-xl text-[11px] font-bold border inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
-                  currentOperator?.shiftActive
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : 'bg-[#FEF3C7] text-[#B45309] border-[#FDE68A]'
-                }`}
-              >
-                <UserCheck size={13} />
-                {currentOperator?.name || 'Verifikasi Shift'}
-              </button>
+              {isSimulationMode ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShiftModalOpen(true)}
+                    className={`px-3 py-2 rounded-xl text-[11px] font-bold border inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+                      currentOperator?.shiftActive
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-[#FEF3C7] text-[#B45309] border-[#FDE68A]'
+                    }`}
+                  >
+                    <UserCheck size={13} />
+                    {currentOperator?.name || 'Verifikasi Shift'}
+                  </button>
 
-              <button
-                type="button"
-                onClick={() => setWorkflowModalOpen(true)}
-                className="px-3 py-2 rounded-xl bg-white hover:bg-[#FAFAFA] border border-zinc-200 text-[#141414] text-[11px] font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
-              >
-                <SlidersHorizontal size={13} className="text-[#D97706]" />
-                {isRetailBusiness ? 'Ritel' : 'F&B'} • {isPayLaterMode ? 'Pay Later' : 'Pay First'}
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => setWorkflowModalOpen(true)}
+                    className="px-3 py-2 rounded-xl bg-white hover:bg-[#FAFAFA] border border-zinc-200 text-[#141414] text-[11px] font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <SlidersHorizontal size={13} className="text-[#D97706]" />
+                    {isRetailBusiness ? 'Toko Ritel' : 'F&B / Kafe'} • {isPayLaterMode ? 'Bayar Nanti' : 'Bayar di Awal'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="px-3 py-2 rounded-xl text-[11px] font-bold border bg-emerald-50 text-emerald-700 border-emerald-200 inline-flex items-center gap-1.5">
+                    <UserCheck size={13} />
+                    {currentOperator?.name || 'Petugas Aktif'}
+                  </span>
+
+                  <span className="px-3 py-2 rounded-xl bg-[#FAFAFA] border border-zinc-200 text-[#52525B] text-[11px] font-bold inline-flex items-center gap-1.5">
+                    {isRetailBusiness ? 'Toko Ritel' : 'F&B / Kafe'} • {isPayLaterMode ? 'Bayar Nanti' : 'Bayar di Awal'}
+                  </span>
+                </>
+              )}
 
               <div className="flex items-center bg-zinc-200/70 p-1 rounded-xl">
                 <button
@@ -508,7 +546,7 @@ export default function PosModule({
           onOpenModify={(order) => setModifyingOrder(order)}
           onOpenCancel={(order) => setCancellingOrder(order)}
           onSettleOpenBill={handleTriggerSettleOpenBill}
-          onReceiveClosedKitchenDemo={onReceiveClosedKitchenDemo}
+          onReceiveClosedKitchenDemo={isSimulationMode ? onReceiveClosedKitchenDemo : undefined}
           onViewReceipt={(order) =>
             setReceiptData({
               orderNumber: order.orderNumber,
@@ -532,8 +570,11 @@ export default function PosModule({
           {/* 2. Sistem Filter Kategori */}
       <div className="flex items-center p-1 bg-zinc-200/70 rounded-xl overflow-x-auto hide-scrollbar w-fit max-w-full">
         {categories.map((cat, idx) => {
-          const isActive = selectedCategory === cat;
-          const catCount = cat === 'Semua' ? products.length : products.filter(p => p.category === cat).length;
+          const isActive = activePosCategory === cat;
+          const catCount =
+            cat === 'Semua'
+              ? products.length
+              : products.filter((p) => normalizePosCategory(p.category) === cat).length;
           return (
             <button
               key={idx}
@@ -567,12 +608,15 @@ export default function PosModule({
             <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               <AnimatePresence mode="popLayout">
                 {filteredProducts.map((prod) => {
-                  const stockEval = isStarter
-                    ? { status: 'available', maxPortions: 999, hasLowBufferIngredient: false, label: 'Tersedia' }
-                    : evaluateMenuStockStatus(prod, ingredients, businessType);
+                  const stockEval = evaluateMenuStockStatus(
+                    prod,
+                    ingredients,
+                    businessType,
+                    isStarter
+                  );
                   const isAvailable = stockEval.status !== 'out' && checkIsIngredientAvailable(prod);
                   const isLowStock = isAvailable && stockEval.status === 'low';
-                  const maxPortions = isStarter ? 999 : stockEval.maxPortions;
+                  const maxPortions = stockEval.maxPortions;
                   const unitSuffix =
                     isRetailBusiness || prod.productMode === 'retail' ? (prod.unit || 'pcs') : 'porsi';
                   const cartEntry = cart.find(item => item.id === prod.id);
@@ -597,13 +641,17 @@ export default function PosModule({
                     >
                       <div className="relative h-36 w-full overflow-hidden bg-zinc-100">
                         <img 
-                          src={prod.image} 
-                          alt={prod.name} 
+                          src={prod.image || getProductFallbackImage(prod.name, prod.category)} 
+                          alt={prod.name}
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = getProductFallbackImage(prod.name, prod.category);
+                          }}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out" 
                         />
                         <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
                           <span className="bg-white/95 text-[#141414] px-2.5 py-1 rounded-md font-mono text-[10px] font-bold uppercase tracking-wide border border-zinc-200 shadow-sm">
-                            {prod.category}
+                            {normalizePosCategory(prod.category)}
                           </span>
                           {inCartQty > 0 && (
                             <span className="bg-[#F59E0B] text-[#141414] px-2 py-1 rounded-md font-mono text-[10px] font-extrabold shadow-sm">
@@ -614,12 +662,12 @@ export default function PosModule({
                         <div className="absolute top-2.5 right-2.5">
                           <span className={`px-2.5 py-1 rounded-md font-mono text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5 shadow-sm ${!isAvailable ? 'bg-red-600 text-white' : isLowStock ? 'bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]' : 'bg-[#141414]/90 text-white'}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${!isAvailable ? 'bg-white' : isLowStock ? 'bg-[#F59E0B]' : 'bg-emerald-400'}`}></span>
-                            {isStarter
-                              ? 'Tersedia'
-                              : !isAvailable
+                            {!isAvailable
                               ? 'Habis'
                               : isLowStock
                               ? `Menipis • Sisa ${maxPortions}`
+                              : isStarter
+                              ? `Sisa: ${maxPortions} ${unitSuffix}`
                               : maxPortions >= 999
                               ? 'Tersedia'
                               : isRetailBusiness || prod.productMode === 'retail'
@@ -644,6 +692,8 @@ export default function PosModule({
                             <AlertTriangle size={13} className="shrink-0" />{' '}
                             {isRetailBusiness || prod.productMode === 'retail'
                               ? 'Stok unit produk habis'
+                              : isStarter
+                              ? 'Kuota porsi menu habis'
                               : 'Stok bahan baku gudang habis'}
                           </div>
                         )}
@@ -689,7 +739,7 @@ export default function PosModule({
               </div>
               <div>
                 <h3 className="font-bold text-[#141414] text-sm">Keranjang Pesanan</h3>
-                <p className="text-[10px] text-[#52525B] font-medium">Sesi Kasir Aktif</p>
+                <p className="text-[10px] text-[#52525B] font-medium">Kasir Siap Dipakai</p>
               </div>
               <span className="ml-auto bg-[#141414] text-[#F59E0B] font-mono text-xs font-bold px-2.5 py-1 rounded-lg">
                 {cart.reduce((t, i) => t + i.qty, 0)} Item
@@ -782,10 +832,10 @@ export default function PosModule({
                   </div>
                   <div>
                     <p className="text-[11px] font-extrabold text-[#141414] leading-tight">
-                      Rekomendasi Penawaran (Upsell)
+                      Tawarkan Tambahan ke Pelanggan
                     </p>
                     <p className="text-[10px] text-[#52525B] font-medium">
-                      Prioritas profit tinggi &amp; bahan tersedia
+                      Untung besar &amp; stoknya masih aman
                     </p>
                   </div>
                 </div>
@@ -802,7 +852,7 @@ export default function PosModule({
                             {u.product.name}
                           </span>
                           <span className="font-mono text-[9px] font-bold bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] px-1.5 py-0.5 rounded-md shrink-0">
-                            Margin Tinggi • Stok Aman
+                            Untung Besar • Stok Aman
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5 text-[10px] font-mono text-[#52525B]">
@@ -926,7 +976,7 @@ export default function PosModule({
                     transition={{ duration: 0.25 }} 
                     className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-xl text-xs font-bold text-center flex items-center justify-center gap-2"
                   >
-                    <CheckCircle2 size={16} className="text-emerald-600" /> {isStarter ? 'Transaksi Kasir Berhasil' : 'Transaksi Sukses • Stok gudang terpotong'}
+                    <CheckCircle2 size={16} className="text-emerald-600" /> {isStarter ? 'Transaksi Berhasil • Porsi menu berkurang' : 'Transaksi Sukses • Stok gudang terpotong'}
                   </motion.div>
                 )}
               </AnimatePresence>

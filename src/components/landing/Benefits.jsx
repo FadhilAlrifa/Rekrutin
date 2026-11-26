@@ -86,8 +86,8 @@ export default function Benefits() {
         {/* Editorial Header */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end pb-10 border-b border-zinc-200">
           <div className="lg:col-span-8 space-y-3">
-            <span className="benefits-reveal font-mono text-xs uppercase tracking-[0.2em] text-[#D97706] font-bold block gpu-accelerated">
-              [ 03 // MANFAAT ]
+            <span className="benefits-reveal text-xs text-[#D97706] font-bold block gpu-accelerated">
+              Manfaat
             </span>
             <h2
               ref={headingRef}

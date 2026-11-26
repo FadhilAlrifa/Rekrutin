@@ -2,11 +2,17 @@ import { useState, useMemo } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Plus, Search, LayoutGrid, Coffee, Utensils, Croissant, Cake, History, TrendingUp, TrendingDown } from 'lucide-react';
 import { supabase } from '../../../services/supabaseClient';
-import { syncMenuRecipesToDb, saveProductWithRetailFields } from '../../../services/stockoService';
+import {
+  syncMenuRecipesToDb,
+  saveProductWithRetailFields,
+  updateRetailProductStock,
+  unregisterCompanyProductId
+} from '../../../services/stockoService';
 import { calculateMenuCogs } from '../../../utils/cogsCalculator';
 import { useNotify } from '../../common/NotificationContext';
 import MenuCard from './MenuCard';
 import MenuFormModal from './MenuFormModal';
+import { getProductFallbackImage } from '../../../data/simulationCatalog';
 
 export default function MenuManagementModule({
   products,
@@ -14,6 +20,8 @@ export default function MenuManagementModule({
   ingredients = [],
   subscriptionPlan = 'pro',
   businessType = 'fnb',
+  userRole = 'superadmin',
+  isSimulationMode = false,
   retailPriceHistory = [],
   onRetailPriceHistoryAdded,
   onRecordAudit,
@@ -26,6 +34,16 @@ export default function MenuManagementModule({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const isRetail = businessType === 'retail';
+  const isStarter = subscriptionPlan === 'starter';
+  const canEditMenu = userRole !== 'kasir';
+  const canQuickRestock = canEditMenu || (isStarter && userRole === 'kasir');
+
+  const normalizeMenuCategory = (cat) => {
+    if (isStarter && !isRetail && (cat === 'Bakery' || cat === 'Dessert')) {
+      return 'Makanan';
+    }
+    return cat;
+  };
 
   const [formData, setFormData] = useState({
     name: '',
@@ -55,7 +73,9 @@ export default function MenuManagementModule({
           'Fashion & Varian',
           ...products.map((p) => p.category).filter(Boolean)
         ]
-      : ['Semua', 'Minuman', 'Makanan', 'Bakery', 'Dessert'];
+      : isStarter
+      ? ['Semua', 'Minuman', 'Makanan']
+      : ['Semua', 'Minuman', 'Makanan', 'Bakery', 'Dessert', ...products.map((p) => p.category).filter(Boolean)];
 
     const unique = Array.from(new Set(baseCats));
     return unique.map((name) => ({
@@ -71,7 +91,7 @@ export default function MenuManagementModule({
           ? Cake
           : Utensils
     }));
-  }, [isRetail, products]);
+  }, [isRetail, isStarter, products]);
 
   const cogsSummary = useMemo(() => {
     const calculated = products.map((p) => calculateMenuCogs(p, ingredients, businessType));
@@ -100,8 +120,8 @@ export default function MenuManagementModule({
       unit: 'pcs',
       variantLabel: '',
       purchasePrice: '',
-      stock: '',
-      minLimit: '5',
+      stock: subscriptionPlan === 'starter' ? '10' : '',
+      minLimit: subscriptionPlan === 'starter' ? '3' : '5',
       priceChangeNote: '',
       productMode: businessType,
       recipe: [{ name: '', qty: '', unit: 'gram' }]
@@ -138,14 +158,17 @@ export default function MenuManagementModule({
     });
     if (!confirmed) return;
 
-    const { error } = await supabase.from('products').delete().eq('id', id);
-    if (error) {
-      await showAlert({
-        title: `Gagal Menghapus ${isRetail ? 'Produk' : 'Menu'}`,
-        message: error.message,
-        variant: 'danger'
-      });
-      return;
+    if (!isSimulationMode && !String(id).startsWith('SIM-')) {
+      const { error } = await supabase.from('products').delete().eq('id', id);
+      if (error) {
+        await showAlert({
+          title: `Gagal Menghapus ${isRetail ? 'Produk' : 'Menu'}`,
+          message: error.message,
+          variant: 'danger'
+        });
+        return;
+      }
+      await unregisterCompanyProductId(id);
     }
     setProducts(products.filter((p) => p.id !== id));
     showToast({
@@ -173,28 +196,55 @@ export default function MenuManagementModule({
           : []
         : formData.recipe.filter((r) => r.name && r.qty);
 
-    const res = await saveProductWithRetailFields({
-      formData,
-      editingProduct,
-      cleanRecipe,
-      businessType,
-      operatorName: currentOperator?.name || 'Admin'
-    });
+    const isSimItem = isSimulationMode || (editingProduct && String(editingProduct.id).startsWith('SIM-'));
 
-    if (!res.success) {
-      await showAlert({
-        title: 'Gagal Menyimpan Produk',
-        message: res.message || 'Terjadi kesalahan saat menyimpan data produk.',
-        variant: 'danger'
+    let savedProd;
+    let priceHistoryEntry = null;
+
+    if (isSimItem) {
+      const nextStock = Math.max(0, Number(formData.stock) || 0);
+      const nextPurchasePrice = Math.max(0, Number(formData.purchasePrice) || 0);
+      savedProd = {
+        id: editingProduct ? editingProduct.id : `SIM-${isRetail ? 'RTL' : 'FNB'}-${Date.now()}`,
+        name: formData.name.trim(),
+        category: formData.category,
+        price: Number(formData.price),
+        expiryDate: formData.expiryDate || '',
+        image: formData.image || getProductFallbackImage(formData.name, formData.category),
+        recipe: isRetail ? [] : cleanRecipe,
+        sku: (formData.sku || '').trim(),
+        unit: formData.unit || (isRetail ? 'pcs' : 'porsi'),
+        variantLabel: (formData.variantLabel || '').trim(),
+        purchasePrice: nextPurchasePrice,
+        stock: nextStock,
+        minLimit: Math.max(0, Number(formData.minLimit ?? (subscriptionPlan === 'starter' ? 3 : 5))),
+        productMode: isRetail ? 'retail' : 'fnb'
+      };
+    } else {
+      const res = await saveProductWithRetailFields({
+        formData,
+        editingProduct,
+        cleanRecipe,
+        businessType,
+        operatorName: currentOperator?.name || 'Admin'
       });
-      return;
-    }
 
-    const savedProd = res.product;
+      if (!res.success) {
+        await showAlert({
+          title: 'Gagal Menyimpan Produk',
+          message: res.message || 'Terjadi kesalahan saat menyimpan data produk.',
+          variant: 'danger'
+        });
+        return;
+      }
+
+      savedProd = res.product;
+      priceHistoryEntry = res.priceHistoryEntry;
+    }
 
     if (editingProduct) {
       setProducts(products.map((p) => (p.id === editingProduct.id ? savedProd : p)));
-      if (!isRetail) {
+      if (!isRetail && !isSimItem) {
         syncMenuRecipesToDb(editingProduct.id, cleanRecipe, ingredients);
       }
 
@@ -219,9 +269,9 @@ export default function MenuManagementModule({
       }
     } else {
       setProducts([savedProd, ...products]);
-      if (!isRetail) {
+      if (!isRetail && !isSimItem) {
         syncMenuRecipesToDb(savedProd.id, cleanRecipe, ingredients);
-      } else if (Number(savedProd.stock) > 0) {
+      } else if (isRetail && Number(savedProd.stock) > 0) {
         onRecordAudit?.({
           actionType: 'Stock In',
           entityType: 'product',
@@ -241,17 +291,17 @@ export default function MenuManagementModule({
       }
     }
 
-    if (res.priceHistoryEntry) {
-      onRetailPriceHistoryAdded?.(res.priceHistoryEntry);
+    if (priceHistoryEntry) {
+      onRetailPriceHistoryAdded?.(priceHistoryEntry);
       onRecordAudit?.({
         actionType: 'Price Update',
         entityType: 'product',
         entityId: savedProd.id,
         entityName: savedProd.name,
-        beforeValue: `Rp ${res.priceHistoryEntry.oldPrice.toLocaleString('id-ID')}`,
-        afterValue: `Rp ${res.priceHistoryEntry.newPrice.toLocaleString('id-ID')}`,
-        deltaLabel: `${res.priceHistoryEntry.changePct > 0 ? `+${res.priceHistoryEntry.changePct}%` : `${res.priceHistoryEntry.changePct}%`}`,
-        reason: res.priceHistoryEntry.notes
+        beforeValue: `Rp ${priceHistoryEntry.oldPrice.toLocaleString('id-ID')}`,
+        afterValue: `Rp ${priceHistoryEntry.newPrice.toLocaleString('id-ID')}`,
+        deltaLabel: `${priceHistoryEntry.changePct > 0 ? `+${priceHistoryEntry.changePct}%` : `${priceHistoryEntry.changePct}%`}`,
+        reason: priceHistoryEntry.notes
       });
     }
 
@@ -266,8 +316,31 @@ export default function MenuManagementModule({
     setIsModalOpen(false);
   };
 
+  const handleQuickRestock = async (prod, addedQty) => {
+    if (!canQuickRestock || !prod) return;
+    const addAmount = Math.max(1, Math.floor(Number(addedQty) || 0));
+    const beforeStock = Math.max(0, Number(prod.stock ?? 0));
+    const nextStock = beforeStock + addAmount;
+
+    setProducts((prev) =>
+      prev.map((p) => (String(p.id) === String(prod.id) ? { ...p, stock: nextStock } : p))
+    );
+    if (!isSimulationMode && !String(prod.id).startsWith('SIM-')) {
+      await updateRetailProductStock(prod.id, nextStock);
+    }
+
+    const unitLabel = isRetail ? prod.unit || 'pcs' : 'porsi';
+    showToast({
+      title: `Stok ${prod.name} ditambah`,
+      message: `+${addAmount} ${unitLabel} ditambahkan (sekarang ${nextStock} ${unitLabel}).`,
+      variant: 'success'
+    });
+  };
+
+  const activeFilterCategory = categories.some((c) => c.name === activeCategory) ? activeCategory : 'Semua';
+
   const filteredProducts = products.filter((p) => {
-    const matchCat = activeCategory === 'Semua' || p.category === activeCategory;
+    const matchCat = activeFilterCategory === 'Semua' || normalizeMenuCategory(p.category) === activeFilterCategory;
     const q = searchQuery.toLowerCase();
     const matchSearch =
       p.name.toLowerCase().includes(q) ||
@@ -281,32 +354,29 @@ export default function MenuManagementModule({
       {/* Banner Header Modern */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 pb-5 border-b border-zinc-200">
         <div>
-          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] inline-block mb-2">
-            {isRetail
-              ? '[ 02 // PRODUK RITEL, SKU, STOK & MARGIN ]'
-              : '[ 02 // MANAJEMEN MENU, RESEP & HPP (COGS) ]'}
-          </span>
           <h1 className="text-3xl font-extrabold tracking-tight text-[#141414]">
             {isRetail
               ? 'Kelola Produk Ritel & Kulakan'
               : subscriptionPlan === 'starter'
               ? 'Kelola Menu Dasar'
-              : 'Kelola Menu, Resep & HPP'}
+              : 'Kelola Menu, Resep & Modal'}
           </h1>
           <p className="text-[#52525B] text-[13px] font-medium mt-1">
             {isRetail
-              ? 'Atur SKU, varian ukuran/warna, stok unit langsung, harga kulakan supplier, dan margin keuntungan per produk.'
+              ? 'Atur nama barang, varian, jumlah stok, harga kulakan, dan keuntungan per produk.'
               : subscriptionPlan === 'starter'
-              ? 'Atur daftar produk dan harga jual untuk kasir POS mandiri (Paket Starter).'
-              : 'Atur katalog produk, komposisi takaran BOM, dan pantau margin keuntungan kotor tiap porsi.'}
+              ? 'Atur daftar menu dan harga jual untuk kasir dasar.'
+              : 'Atur daftar menu, takaran resep bahan baku, dan lihat keuntungan kotor per porsi.'}
           </p>
         </div>
-        <button
-          onClick={handleOpenAddModal}
-          className="bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] font-extrabold text-xs px-5 py-2.5 rounded-xl shadow-sm cursor-pointer flex items-center gap-2 shrink-0 active:scale-[0.98] transition-all"
-        >
-          <Plus size={16} /> {isRetail ? 'Tambah Produk Ritel' : 'Tambah Menu Baru'}
-        </button>
+        {canEditMenu && (
+          <button
+            onClick={handleOpenAddModal}
+            className="bg-[#F59E0B] hover:bg-[#D97706] text-[#141414] font-extrabold text-xs px-5 py-2.5 rounded-xl shadow-sm cursor-pointer flex items-center gap-2 shrink-0 active:scale-[0.98] transition-all"
+          >
+            <Plus size={16} /> {isRetail ? 'Tambah Produk Ritel' : 'Tambah Menu Baru'}
+          </button>
+        )}
       </div>
 
       {/* Ringkasan HPP & Margin Katalog */}
@@ -348,11 +418,11 @@ export default function MenuManagementModule({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center p-1 bg-zinc-200/70 rounded-xl overflow-x-auto hide-scrollbar w-fit max-w-full">
           {categories.map((cat) => {
-            const isActive = activeCategory === cat.name;
+            const isActive = activeFilterCategory === cat.name;
             const catCount =
               cat.name === 'Semua'
                 ? products.length
-                : products.filter((p) => p.category === cat.name).length;
+                : products.filter((p) => normalizeMenuCategory(p.category) === cat.name).length;
             return (
               <button
                 key={cat.name}
@@ -396,6 +466,9 @@ export default function MenuManagementModule({
               idx={idx}
               onEdit={handleOpenEditModal}
               onDelete={handleDelete}
+              onQuickRestock={handleQuickRestock}
+              canEditMenu={canEditMenu}
+              canQuickRestock={canQuickRestock}
               ingredients={ingredients}
               subscriptionPlan={subscriptionPlan}
               businessType={businessType}
@@ -497,6 +570,7 @@ export default function MenuManagementModule({
           ingredients={ingredients}
           subscriptionPlan={subscriptionPlan}
           businessType={businessType}
+          availableCategories={categories.map((c) => c.name).filter((name) => name !== 'Semua')}
           onUpgradePlan={onUpgradePlan}
         />
       </AnimatePresence>

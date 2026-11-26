@@ -100,17 +100,16 @@ export default function InventoryTable({
   }
 
   return (
-    <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0">
-      <table className="w-full text-left border-collapse min-w-[880px]">
+    <div className="overflow-x-auto">
+      <table className="w-full text-left border-collapse min-w-[640px] lg:min-w-0">
         <thead>
-          <tr className="border-b border-zinc-200 font-mono text-[10px] font-bold uppercase tracking-wider text-[#52525B]">
-            <th className="pb-3 px-3 md:px-4">Nama Barang Gudang</th>
-            <th className="pb-3 px-3 md:px-4">Stok & Buffer</th>
-            <th className="pb-3 px-3 md:px-4">Harga Pasar & Awal</th>
-            <th className="pb-3 px-3 md:px-4">Tgl. Masuk</th>
-            <th className="pb-3 px-3 md:px-4">Kedaluwarsa</th>
-            <th className="pb-3 px-3 md:px-4">Status</th>
-            <th className="pb-3 px-3 md:px-4 text-right">Aksi</th>
+          <tr className="border-b border-zinc-200 text-[10px] font-bold uppercase tracking-wider text-[#52525B]">
+            <th className="pb-3 px-2.5">Bahan Gudang</th>
+            <th className="pb-3 px-2.5">Stok</th>
+            <th className="pb-3 px-2.5">Harga Bahan</th>
+            <th className="pb-3 px-2.5">Masuk &amp; Exp</th>
+            <th className="pb-3 px-2.5">Status</th>
+            <th className="pb-3 px-2.5 text-right">Aksi</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-zinc-100 text-[13px] font-medium text-[#52525B]">
@@ -146,43 +145,45 @@ export default function InventoryTable({
                 key={ing.id}
                 className={`${rowColor} transition-colors`}
               >
-                <td className="py-3.5 px-3 md:px-4 font-bold text-[#141414] text-[14px] flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-[#FAFAFA] text-[#D97706] flex items-center justify-center shrink-0 border border-zinc-200">
-                    <Package size={14} />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="truncate max-w-[140px] sm:max-w-[200px] md:max-w-xs">{ingName}</span>
-                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                      <span className="text-[11px] font-medium text-[#52525B]">{ingCategory}</span>
-                      {(batchCount > 1 || expiredBatchCount > 0) && (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEdit(ing)}
-                          className={`font-mono text-[9px] font-bold px-1.5 py-0.5 rounded border cursor-pointer transition-colors ${
-                            expiredBatchCount > 0
-                              ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
-                              : 'bg-[#FEF3C7] text-[#B45309] border-[#FDE68A] hover:bg-[#FDE68A]'
-                          }`}
-                          title="Klik untuk melihat rincian batch FEFO"
-                        >
-                          {batchCount} Batch FEFO
-                        </button>
-                      )}
+                <td className="py-3 px-2.5 font-bold text-[#141414] text-[13px]">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-[#FAFAFA] text-[#D97706] flex items-center justify-center shrink-0 border border-zinc-200">
+                      <Package size={14} />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="truncate max-w-[140px] xl:max-w-[200px]">{ingName}</span>
+                      <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                        <span className="text-[11px] font-medium text-[#52525B] truncate">{ingCategory}</span>
+                        {(batchCount > 1 || expiredBatchCount > 0) && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(ing)}
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded border cursor-pointer transition-colors ${
+                              expiredBatchCount > 0
+                                ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                                : 'bg-[#FEF3C7] text-[#B45309] border-[#FDE68A] hover:bg-[#FDE68A]'
+                            }`}
+                            title="Klik untuk melihat rincian batch"
+                          >
+                            {batchCount} Batch
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </td>
 
-                <td className="py-3.5 px-3 md:px-4 whitespace-nowrap">
-                  <div className={`font-mono font-bold text-[14px] ${isBelowMin ? 'text-red-600' : 'text-[#141414]'}`}>
-                    {ing.stock} <span className="text-[11px] text-[#52525B] font-medium ml-0.5">{ing.unit}</span>
+                <td className="py-3 px-2.5 whitespace-nowrap">
+                  <div className={`font-mono font-bold text-[13px] ${isBelowMin ? 'text-red-600' : 'text-[#141414]'}`}>
+                    {ing.stock} <span className="text-[11px] text-[#52525B] font-medium">{ing.unit}</span>
                   </div>
                   {expiredStock > 0 && (
                     <span className="block font-mono text-[10px] font-bold text-red-600">
                       Layak: {usableStock} • Exp: {expiredStock}
                     </span>
                   )}
-                  <div className="flex items-center gap-2 mt-1">
-                    <div className="w-16 h-1.5 bg-zinc-200 rounded-full overflow-hidden">
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <div className="w-12 h-1.5 bg-zinc-200 rounded-full overflow-hidden">
                       <div
                         style={{ width: `${stockPct}%` }}
                         className={`h-full rounded-full ${
@@ -198,60 +199,49 @@ export default function InventoryTable({
                   </div>
                 </td>
 
-                <td className="py-3.5 px-3 md:px-4 whitespace-nowrap">
+                <td className="py-3 px-2.5 whitespace-nowrap">
                   {(() => {
                     const priceInfo = computeIngredientPriceComparison(ing);
                     if (!priceInfo.hasPrice) {
                       return (
-                        <span className="font-mono text-[10px] font-bold text-[#B45309] bg-[#FEF3C7] border border-[#FDE68A] px-2 py-0.5 rounded-md">
+                        <span className="text-[10px] font-bold text-[#B45309] bg-[#FEF3C7] border border-[#FDE68A] px-2 py-0.5 rounded-md">
                           Belum diset
                         </span>
                       );
                     }
                     return (
-                      <div className="space-y-1">
+                      <div className="space-y-0.5">
                         <div className="flex items-baseline gap-1">
                           <span className="font-mono font-extrabold text-[#141414] text-xs">
                             Rp {priceInfo.marketPrice.toLocaleString('id-ID')}
                           </span>
                           <span className="text-[10px] text-[#52525B] font-mono">
-                            / {ing.unit}
+                            /{ing.unit}
                           </span>
                         </div>
-                        <div className="flex flex-wrap items-center gap-1.5">
+                        <div className="flex flex-wrap items-center gap-1">
                           <span className="text-[10px] font-mono font-medium text-[#52525B]">
                             Awal: Rp {priceInfo.initialPrice.toLocaleString('id-ID')}
                           </span>
                           {priceInfo.trend === 'up' ? (
                             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200 font-mono text-[9px] font-bold">
-                              <TrendingUp size={10} /> {priceInfo.formattedDiff}
+                              <TrendingUp size={9} /> {priceInfo.formattedDiff}
                             </span>
                           ) : priceInfo.trend === 'down' ? (
                             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono text-[9px] font-bold">
-                              <TrendingDown size={10} /> {priceInfo.formattedDiff}
+                              <TrendingDown size={9} /> {priceInfo.formattedDiff}
                             </span>
-                          ) : (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-[#FAFAFA] text-[#52525B] border border-[#E5E5E5] font-mono text-[9px] font-semibold">
-                              Sama dengan awal
-                            </span>
-                          )}
+                          ) : null}
                         </div>
                       </div>
                     );
                   })()}
                 </td>
 
-                <td className="py-3.5 px-3 md:px-4 text-[#52525B] whitespace-nowrap">
-                  <div className="flex items-center gap-1.5">
-                    <CalendarDays size={14} className="text-zinc-400 shrink-0" />
-                    <span>{formatTanggal(ing.entryDate)}</span>
-                  </div>
-                </td>
-
-                <td className="py-3.5 px-3 md:px-4 text-[#52525B] whitespace-nowrap">
-                  <div className="flex items-center gap-1.5">
+                <td className="py-3 px-2.5 text-[#52525B] whitespace-nowrap">
+                  <div className="flex items-center gap-1 text-xs">
                     <Clock
-                      size={14}
+                      size={13}
                       className={
                         isExpired
                           ? 'text-red-600 shrink-0'
@@ -266,14 +256,14 @@ export default function InventoryTable({
                           ? 'font-bold text-red-600'
                           : isNearExpiry
                           ? 'font-bold text-[#B45309]'
-                          : ''
+                          : 'font-semibold text-[#141414]'
                       }
                     >
                       {formatTanggal(effectiveExpiryDate)}
                     </span>
                     {isExpired && diffDays !== null && (
                       <span className="font-mono text-[10px] font-bold text-red-600">
-                        (Lewat {Math.abs(diffDays)} hr)
+                        (-{Math.abs(diffDays)}h)
                       </span>
                     )}
                     {isNearExpiry && diffDays !== null && (
@@ -282,66 +272,73 @@ export default function InventoryTable({
                       </span>
                     )}
                   </div>
+                  <div className="flex items-center gap-1 text-[10px] text-[#52525B] mt-0.5">
+                    <CalendarDays size={11} className="text-zinc-400 shrink-0" />
+                    <span>Masuk: {formatTanggal(ing.entryDate)}</span>
+                  </div>
                   {batchCount > 1 && (
                     <button
                       type="button"
                       onClick={() => handleOpenEdit(ing)}
-                      className="mt-0.5 font-mono text-[10px] font-semibold text-[#B45309] hover:underline cursor-pointer"
+                      className="mt-0.5 text-[10px] font-semibold text-[#B45309] hover:underline cursor-pointer block"
                     >
-                      FEFO terdekat (+{batchCount - 1} batch lain)
+                      +{batchCount - 1} batch lain
                     </button>
                   )}
                 </td>
 
-                <td className="py-3.5 px-3 md:px-4 whitespace-nowrap">
+                <td className="py-3 px-2.5 whitespace-nowrap">
                   <div className="flex flex-wrap items-center gap-1">
                     {isExpired && (
-                      <span className="bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-md font-mono text-[10px] font-bold inline-flex items-center gap-1 whitespace-nowrap">
-                        <AlertOctagon size={12} /> Expired
+                      <span className="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded-md text-[10px] font-bold inline-flex items-center gap-1 whitespace-nowrap">
+                        <AlertOctagon size={11} /> Expired
                       </span>
                     )}
                     {isBelowMin && (
-                      <span className="bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-md font-mono text-[10px] font-bold inline-flex items-center gap-1 whitespace-nowrap">
-                        <AlertTriangle size={12} /> Restock
+                      <span className="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded-md text-[10px] font-bold inline-flex items-center gap-1 whitespace-nowrap">
+                        <AlertTriangle size={11} /> Menipis
                       </span>
                     )}
                     {isNearExpiry && (
-                      <span className="bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] px-2.5 py-1 rounded-md font-mono text-[10px] font-bold inline-flex items-center gap-1 whitespace-nowrap">
-                        <Clock size={12} /> Hampir Exp
+                      <span className="bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] px-2 py-0.5 rounded-md text-[10px] font-bold inline-flex items-center gap-1 whitespace-nowrap">
+                        <Clock size={11} /> Hampir Exp
                       </span>
                     )}
                     {isHealthy && (
-                      <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-md font-mono text-[10px] font-bold inline-flex items-center gap-1 whitespace-nowrap">
-                        <ShieldCheck size={12} /> Aman
+                      <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-md text-[10px] font-bold inline-flex items-center gap-1 whitespace-nowrap">
+                        <ShieldCheck size={11} /> Aman
                       </span>
                     )}
                   </div>
                 </td>
 
-                <td className="py-3.5 px-3 md:px-4 text-right space-x-1.5 whitespace-nowrap">
-                  {handleOpenPriceModal && (
+                <td className="py-3 px-2.5 text-right whitespace-nowrap">
+                  <div className="inline-flex items-center justify-end gap-1">
+                    {handleOpenPriceModal && (
+                      <button
+                        onClick={() => handleOpenPriceModal(ing)}
+                        className="px-2 py-1.5 bg-[#FEF3C7] hover:bg-[#F59E0B] border border-[#FDE68A] text-[#B45309] hover:text-[#141414] rounded-lg font-bold transition-colors cursor-pointer inline-flex items-center gap-1 text-[11px] active:scale-95"
+                        title="Update Harga Bahan"
+                      >
+                        <Tag size={12} /> <span className="hidden xl:inline">Harga</span>
+                      </button>
+                    )}
                     <button
-                      onClick={() => handleOpenPriceModal(ing)}
-                      className="px-2.5 py-1.5 bg-[#FEF3C7] hover:bg-[#F59E0B] border border-[#FDE68A] text-[#B45309] hover:text-[#141414] rounded-lg font-bold transition-colors cursor-pointer inline-flex items-center gap-1 text-[12px] active:scale-95"
-                      title="Update Harga Pasar & Cek Dampak HPP"
+                      onClick={() => handleOpenEdit(ing)}
+                      className="px-2 py-1.5 bg-[#FAFAFA] hover:bg-zinc-200 border border-zinc-200 text-[#141414] rounded-lg font-bold transition-colors cursor-pointer inline-flex items-center gap-1 text-[11px] active:scale-95"
+                      title="Edit Barang"
                     >
-                      <Tag size={12} /> <span className="hidden lg:inline">Harga</span>
+                      <Edit3 size={12} /> <span className="hidden xl:inline">Edit</span>
                     </button>
-                  )}
-                  <button
-                    onClick={() => handleOpenEdit(ing)}
-                    className="px-2.5 py-1.5 bg-[#FAFAFA] hover:bg-zinc-200 border border-zinc-200 text-[#141414] rounded-lg font-bold transition-colors cursor-pointer inline-flex items-center gap-1 text-[12px] active:scale-95"
-                    title="Edit Barang"
-                  >
-                    <Edit3 size={12} /> <span className="hidden lg:inline">Edit</span>
-                  </button>
-                  <button
-                    onClick={() => handleDeleteIngredient(ing.id, ing.name)}
-                    className="px-2.5 py-1.5 bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-600 rounded-lg font-bold transition-colors cursor-pointer inline-flex items-center gap-1 text-[12px] active:scale-95"
-                    title="Hapus Barang"
-                  >
-                    <Trash2 size={12} /> <span className="hidden lg:inline">Hapus</span>
-                  </button>
+                    <button
+                      onClick={() => handleDeleteIngredient(ing.id, ing.name)}
+                      className="p-1.5 bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-600 rounded-lg font-bold transition-colors cursor-pointer inline-flex items-center justify-center active:scale-95"
+                      title="Hapus Barang"
+                      aria-label={`Hapus ${ingName}`}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 </td>
               </motion.tr>
             );

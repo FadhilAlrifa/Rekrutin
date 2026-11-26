@@ -23,7 +23,9 @@ import { cleanIngredientName } from '../../../utils/cogsCalculator';
 import {
   saveIngredientInitialPrice,
   syncIngredientBatchesToDb,
-  updateIngredientStock
+  updateIngredientStock,
+  registerCompanyIngredientId,
+  unregisterCompanyIngredientId
 } from '../../../services/stockoService';
 import { checkExpiryStatus, evaluateIngredientStatus } from '../../../utils/inventoryStatus';
 import {
@@ -52,6 +54,7 @@ export default function InventoryModule({
   onAddStockLog,
   onRecordAudit,
   currentOperator,
+  isSimulationMode = false,
   onUpgradePlan,
   holidayReminders = [],
   onOpenHolidayReminder
@@ -143,25 +146,27 @@ export default function InventoryModule({
           ? currentStoredMarket
           : nextMarketPrice || 0;
 
-      const { error } = await supabase
-        .from('ingredients')
-        .update({
-          stock: newTotalStock,
-          expiry_date: targetExpiry,
-          entry_date: incomingEntryDate
-        })
-        .eq('id', targetItem.id);
+      if (!isSimulationMode && !String(targetItem.id).startsWith('SIM-')) {
+        const { error } = await supabase
+          .from('ingredients')
+          .update({
+            stock: newTotalStock,
+            expiry_date: targetExpiry,
+            entry_date: incomingEntryDate
+          })
+          .eq('id', targetItem.id);
 
-      if (error) {
-        await showAlert({
-          title: 'Gagal Memperbarui Stok',
-          message: `Gagal memperbarui stok di database: ${error.message}`,
-          variant: 'danger'
-        });
-        return;
+        if (error) {
+          await showAlert({
+            title: 'Gagal Memperbarui Stok',
+            message: `Gagal memperbarui stok di database: ${error.message}`,
+            variant: 'danger'
+          });
+          return;
+        }
+
+        await syncIngredientBatchesToDb(targetItem.id, updatedFromBatch.batches || []);
       }
-
-      await syncIngredientBatchesToDb(targetItem.id, updatedFromBatch.batches || []);
 
       const resolvedUpdatedMarket =
         nextMarketPrice !== null ? nextMarketPrice : currentStoredMarket;
@@ -245,22 +250,41 @@ export default function InventoryModule({
         current_market_price: resolvedMarketPrice
       };
 
-      let insertRes = await supabase.from('ingredients').insert([extendedRecord]).select();
-      if (insertRes.error) {
-        insertRes = await supabase.from('ingredients').insert([baseRecord]).select();
-      }
-      const { data, error } = insertRes;
+      let data;
+      if (isSimulationMode) {
+        data = [
+          {
+            id: `SIM-ING-${Date.now()}`,
+            name: baseRecord.name,
+            stock: baseRecord.stock,
+            unit: baseRecord.unit,
+            min_limit: baseRecord.min_limit,
+            expiry_date: baseRecord.expiry_date,
+            entry_date: baseRecord.entry_date
+          }
+        ];
+      } else {
+        let insertRes = await supabase.from('ingredients').insert([extendedRecord]).select();
+        if (insertRes.error) {
+          insertRes = await supabase.from('ingredients').insert([baseRecord]).select();
+        }
+        const { data: dbData, error } = insertRes;
 
-      if (error) {
-        await showAlert({
-          title: 'Gagal Menambahkan Barang',
-          message: `Gagal menambahkan barang baru ke database: ${error.message}`,
-          variant: 'danger'
-        });
-        return;
+        if (error) {
+          await showAlert({
+            title: 'Gagal Menambahkan Barang',
+            message: `Gagal menambahkan barang baru ke database: ${error.message}`,
+            variant: 'danger'
+          });
+          return;
+        }
+        data = dbData;
       }
 
       if (data && data.length > 0) {
+        if (!isSimulationMode && !String(data[0].id).startsWith('SIM-')) {
+          await registerCompanyIngredientId(data[0].id);
+        }
         const stockerName = currentOperator?.name || 'Petugas Gudang';
         const baseInserted = {
           id: data[0].id,
@@ -363,21 +387,23 @@ export default function InventoryModule({
     });
     const newTotalStock = ckUpdated.stock;
 
-    const { error } = await supabase
-      .from('ingredients')
-      .update({ stock: newTotalStock, expiry_date: ckUpdated.expiryDate || null })
-      .eq('id', targetIng.id);
+    if (!isSimulationMode && !String(targetIng.id).startsWith('SIM-')) {
+      const { error } = await supabase
+        .from('ingredients')
+        .update({ stock: newTotalStock, expiry_date: ckUpdated.expiryDate || null })
+        .eq('id', targetIng.id);
 
-    if (error) {
-      await showAlert({
-        title: 'Gagal Sinkronisasi Central Kitchen',
-        message: error.message,
-        variant: 'danger'
-      });
-      return;
+      if (error) {
+        await showAlert({
+          title: 'Gagal Sinkronisasi Central Kitchen',
+          message: error.message,
+          variant: 'danger'
+        });
+        return;
+      }
+
+      await syncIngredientBatchesToDb(targetIng.id, ckUpdated.batches || []);
     }
-
-    await syncIngredientBatchesToDb(targetIng.id, ckUpdated.batches || []);
     setIngredients((prev) =>
       prev.map((i) => (i.id === targetIng.id ? ckUpdated : i))
     );
@@ -458,28 +484,30 @@ export default function InventoryModule({
       Number(editingItem.initialPurchasePrice ?? prevIng?.initialPurchasePrice ?? parsedMarketPrice)
     );
 
-    const { error } = await supabase
-      .from('ingredients')
-      .update({
-        name: finalName,
-        stock: parseFloat(editingItem.stock),
-        unit: editingItem.unit,
-        min_limit: parseFloat(editingItem.minLimit),
-        expiry_date: editingItem.expiryDate || null,
-        entry_date: editingItem.entryDate || null
-      })
-      .eq('id', editingItem.id);
+    if (!isSimulationMode && !String(editingItem.id).startsWith('SIM-')) {
+      const { error } = await supabase
+        .from('ingredients')
+        .update({
+          name: finalName,
+          stock: parseFloat(editingItem.stock),
+          unit: editingItem.unit,
+          min_limit: parseFloat(editingItem.minLimit),
+          expiry_date: editingItem.expiryDate || null,
+          entry_date: editingItem.entryDate || null
+        })
+        .eq('id', editingItem.id);
 
-    if (error) {
-      await showAlert({
-        title: 'Gagal Memperbarui Barang',
-        message: `Gagal mengedit barang: ${error.message}`,
-        variant: 'danger'
-      });
-      return;
+      if (error) {
+        await showAlert({
+          title: 'Gagal Memperbarui Barang',
+          message: `Gagal mengedit barang: ${error.message}`,
+          variant: 'danger'
+        });
+        return;
+      }
+
+      await saveIngredientInitialPrice(editingItem.id, parsedInitialPrice, parsedMarketPrice);
     }
-
-    await saveIngredientInitialPrice(editingItem.id, parsedInitialPrice, parsedMarketPrice);
 
     const targetStockVal = Math.max(0, parseFloat(editingItem.stock) || 0);
     const prevStockVal = prevIng ? Number(prevIng.stock) || 0 : targetStockVal;
@@ -671,15 +699,18 @@ export default function InventoryModule({
     if (!confirmed) return;
 
     const target = ingredients.find((ing) => ing.id === id);
-    const { error } = await supabase.from('ingredients').delete().eq('id', id);
+    if (!isSimulationMode && !String(id).startsWith('SIM-')) {
+      const { error } = await supabase.from('ingredients').delete().eq('id', id);
 
-    if (error) {
-      await showAlert({
-        title: 'Gagal Menghapus Data',
-        message: error.message,
-        variant: 'danger'
-      });
-      return;
+      if (error) {
+        await showAlert({
+          title: 'Gagal Menghapus Data',
+          message: error.message,
+          variant: 'danger'
+        });
+        return;
+      }
+      await unregisterCompanyIngredientId(id);
     }
 
     if (target) {
@@ -741,21 +772,16 @@ export default function InventoryModule({
       {/* Banner Header Modern */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 pb-5 border-b border-zinc-200">
         <div>
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]">
-              {isEnterprise
-                ? `[ 03 // MULTI-OUTLET • ${activeOutlet} ]`
-                : '[ 03 // SMART INVENTORY, HARGA & BUFFER ]'}
-            </span>
-            {currentOperator?.name && (
-              <span className="font-mono text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                Petugas Aktif: {currentOperator.name}
+          {isEnterprise && (
+            <div className="mb-2">
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]">
+                {activeOutlet}
               </span>
-            )}
-          </div>
+            </div>
+          )}
           <h1 className="text-3xl font-extrabold tracking-tight text-[#141414]">Stok Gudang & Harga Bahan</h1>
           <p className="text-[#52525B] text-[13px] font-medium mt-1">
-            Kelola buffer persediaan minimum, tanggal kedaluwarsa FEFO, dan perbarui harga pasar bahan baku untuk kalkulasi HPP otomatis.
+            Atur batas stok minimum, tanggal kedaluwarsa bahan, dan perbarui harga bahan baku agar hitungan modal tetap akurat.
           </p>
         </div>
 
@@ -907,7 +933,7 @@ export default function InventoryModule({
       </div>
 
       {/* Area Tabel Utama */}
-      <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm overflow-hidden">
+      <div className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 shadow-sm overflow-hidden">
         <InventoryTable
           activeSub="ingredients"
           filteredProducts={[]}

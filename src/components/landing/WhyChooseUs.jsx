@@ -167,8 +167,8 @@ export default function WhyChooseUs() {
           {/* Editorial Header */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end pb-6 border-b border-zinc-800">
             <div className="lg:col-span-8 space-y-3">
-              <span className="why-sub-reveal font-mono text-xs uppercase tracking-[0.2em] text-[#F59E0B] block gpu-accelerated">
-                [ 02 // CARA KERJA ]
+              <span className="why-sub-reveal text-xs text-[#F59E0B] font-bold block gpu-accelerated">
+                Cara Kerja
               </span>
               <h2
                 ref={headingRef}
@@ -215,8 +215,8 @@ export default function WhyChooseUs() {
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#F59E0B]">
-                        {step.num} // {step.badge}
+                      <span className="text-[11px] font-bold text-[#F59E0B]">
+                        {step.num}. {step.badge}
                       </span>
                       <Icon size={15} className="text-[#F59E0B]" />
                     </div>
@@ -241,8 +241,8 @@ export default function WhyChooseUs() {
                         <QrCode size={20} />
                       </div>
                       <div>
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-[#F59E0B]">
-                          TAHAP 01 // KASIR & QR MEJA
+                        <span className="text-[11px] font-bold text-[#F59E0B]">
+                          Langkah 1 • Kasir &amp; QR Meja
                         </span>
                         <h4 className="text-base font-bold text-[#FAFAFA]">Pesanan Masuk #ORD-8821</h4>
                       </div>
@@ -285,8 +285,8 @@ export default function WhyChooseUs() {
                         <Layers size={20} />
                       </div>
                       <div>
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-[#F59E0B]">
-                          TAHAP 02 // HITUNG TAKARAN RESEP
+                        <span className="text-[11px] font-bold text-[#F59E0B]">
+                          Langkah 2 • Hitung Takaran Resep
                         </span>
                         <h4 className="text-base font-bold text-[#FAFAFA]">Hitung & Potong Takaran Bahan</h4>
                       </div>
@@ -333,8 +333,8 @@ export default function WhyChooseUs() {
                         <ShieldCheck size={20} />
                       </div>
                       <div>
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-400">
-                          TAHAP 03 // KEDALUWARSA & CABANG
+                        <span className="text-[11px] font-bold text-emerald-400">
+                          Langkah 3 • Kedaluwarsa &amp; Cabang
                         </span>
                         <h4 className="text-base font-bold text-[#FAFAFA]">Pengingat Kedaluwarsa & Sinkronisasi Cabang</h4>
                       </div>
