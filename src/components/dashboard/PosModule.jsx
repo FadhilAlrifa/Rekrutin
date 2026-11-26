@@ -58,7 +58,7 @@ export default function PosModule({
     ...(isTakeAwayOnlyFnb ? [] : [{ id: 'dine_in', label: 'Dine-In' }]),
     { id: 'take_away', label: 'Take-Away' },
     ...(merchantSettings?.closedKitchenEnabled
-      ? [{ id: 'online_closed_kitchen', label: 'Closed Kitchen' }]
+      ? [{ id: 'online_closed_kitchen', label: 'Online Order' }]
       : [])
   ];
   const effectiveOrderChannel = availableChannels.some((ch) => ch.id === orderChannel)
@@ -328,7 +328,7 @@ export default function PosModule({
       const targetTable =
         tableLabel.trim() ||
         (effectiveOrderChannel === 'online_closed_kitchen'
-          ? 'Online / Closed Kitchen'
+          ? 'Online Order'
           : isTakeAwayOnlyFnb
           ? 'Take-Away Open Bill'
           : 'Meja Open Bill');

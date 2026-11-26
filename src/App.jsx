@@ -1455,7 +1455,7 @@ function AppContent() {
     if (!products || products.length === 0) return;
     const sampleItem = products[0];
     handlePlaceWorkflowOrder({
-      items: [{ ...sampleItem, qty: 1, note: 'Order Online Closed Kitchen' }],
+      items: [{ ...sampleItem, qty: 1, note: 'Online Order' }],
       orderChannel: 'online_closed_kitchen',
       paymentFlow: 'pay_first',
       paymentMethod: 'qris',
@@ -2032,7 +2032,7 @@ function AppContent() {
                               QR Meja Tidak Digunakan pada Outlet Take-Away
                             </h2>
                             <p className="text-xs text-[#52525B] leading-relaxed">
-                              Usaha kamu disetel sebagai F&amp;B Khusus Take-Away tanpa meja makan di tempat. Semua pesanan dicatat langsung lewat Kasir (POS) dengan kanal Take-Away atau Closed Kitchen.
+                              Usaha kamu disetel sebagai F&amp;B Khusus Take-Away tanpa meja makan di tempat. Semua pesanan dicatat langsung lewat Kasir (POS) dengan kanal Take-Away atau Online Order.
                             </p>
                             <button
                               type="button"

@@ -4,7 +4,7 @@ import { cleanIngredientName, findMatchingIngredient, calculateMenuCogs } from '
 export const ORDER_CHANNEL_LABELS = {
   dine_in: 'Dine-In',
   take_away: 'Take-Away',
-  online_closed_kitchen: 'Online / Closed Kitchen'
+  online_closed_kitchen: 'Online Order'
 };
 
 export const PAYMENT_FLOW_LABELS = {
@@ -187,7 +187,7 @@ export function createOrderPayload({
     paymentMethod: isPayLater ? 'open_bill' : paymentMethod,
     tableNumber:
       resolvedChannel === 'online_closed_kitchen'
-        ? 'Online / Closed Kitchen'
+        ? 'Online Order'
         : tableNumber || 'Kasir Utama',
     customerName: customerName.trim(),
     totalAmount,

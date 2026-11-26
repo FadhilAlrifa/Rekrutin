@@ -203,7 +203,7 @@ export default function MerchantWorkflowModal({
                       ? []
                       : [{ id: 'dine_in', label: 'Dine-In' }]),
                     { id: 'take_away', label: 'Take-Away' },
-                    { id: 'online_closed_kitchen', label: 'Closed Kitchen' }
+                    { id: 'online_closed_kitchen', label: 'Online Order' }
                   ].map((ch) => (
                     <button
                       key={ch.id}
@@ -228,7 +228,7 @@ export default function MerchantWorkflowModal({
                     <ChefHat size={16} className="text-[#D97706] mt-0.5 shrink-0" />
                     <div>
                       <p className="text-xs font-bold text-[#141414]">
-                        Aktifkan Kanal Online / Closed Kitchen
+                        Aktifkan Kanal Online Order
                       </p>
                       <p className="text-[11px] text-[#52525B]">
                         Pesanan online masuk langsung ke antrean KDS dapur tanpa antre kasir tatap muka.

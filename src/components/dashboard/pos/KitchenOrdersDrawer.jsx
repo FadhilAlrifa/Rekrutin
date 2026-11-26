@@ -79,7 +79,7 @@ export default function KitchenOrdersDrawer({
               onClick={onReceiveClosedKitchenDemo}
               className="px-3.5 py-2 rounded-xl bg-[#FEF3C7] hover:bg-[#FDE68A] border border-[#FDE68A] text-[#B45309] text-xs font-extrabold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
             >
-              <Globe size={14} /> Terima Order Online (Closed Kitchen)
+              <Globe size={14} /> Terima Online Order
             </button>
           )}
 
@@ -120,7 +120,7 @@ export default function KitchenOrdersDrawer({
               : 'Belum ada riwayat order dapur / batal'}
           </p>
           <p className="text-xs text-[#52525B]">
-            Buat transaksi dari tab Katalog POS atau klik Terima Order Online untuk Closed Kitchen.
+            Buat transaksi dari tab Katalog POS atau klik Terima Online Order.
           </p>
         </div>
       ) : (
